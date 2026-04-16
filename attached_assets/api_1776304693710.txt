@@ -1,0 +1,1370 @@
+<?php
+/**
+ * ViaX Scout — api.php v6.2 (SSE)
+ *
+ * v6.2: Substitui polling por Server-Sent Events direto no POST.
+ *       Mensagens de status em tempo real na lista de passos.
+ */
+
+declare(strict_types=1);
+
+// ═════════════════════════════════════════════════════════════════════════════
+// PARSER APRIMORADO v2.0 - SEM DUPLICATAS
+// (funções extrairKmRodovia e extrairNumero já existem no api.php)
+// ═════════════════════════════════════════════════════════════════════════════
+
+function normalizarAcronimos(string $texto): string {
+    $map = [
+        '/\b(Lot|LT|L)[\s:]*(\d+[A-Z]?)\b/i'                 => 'Lote $2',
+        '/\b(Qua?|QD|Quad)[\s:]*(\d+)\b/i'                   => 'Quadra $2',
+        '/\b(Cs\.?|C)[\s:]*(\d+[A-Z]?)\b/i'                  => 'Casa $2',
+        '/\b(Lj\.?|Lj)[\s:]*(\d+[A-Z]?)\b/i'                 => 'Loja $2',
+        '/\b(Trav\.?|Trav)\s+(\d+)\b/i'                      => 'Travessa $2',
+        '/\b(\d+)\s+(fu|fds|f\.?)\b/i'                       => '$1 Fundos',
+        '/\b(Bl\.?|BL)\s+([A-Z])\b/i'                        => 'Bloco $2',
+        '/\b(Cond\.?|Cond)\s+([A-Z][a-z\s]+)\b/i'            => 'Condomínio $2',
+        '/\b(Conj\.?|Conj)\s+([A-Z])\b/i'                    => 'Conjunto $2',
+        '/\b(Apt\.?|Apto\.?)\s+(\d+[A-Z]?)\b/i'              => 'Apto. $2',
+    ];
+    return preg_replace(array_keys($map), array_values($map), $texto);
+}
+
+function extrairUnidadeSecundaria(string $texto): array {
+    $unidade = null;
+    $tipo = null;
+    
+    $padroesUnidade = [
+        '/,\s*(Casa|Apto|Apto\.|Loja|Sala|Bloco|Conj|Conjunto)\s*([A-Z0-9]+)/i'   => ['tipo' => 1, 'num' => 2],
+        '/\s+(Casa|Apto|Loja|Sala)\s+([A-Z0-9]+)(?=,|\s|$)/i'                      => ['tipo' => 1, 'num' => 2],
+    ];
+    
+    foreach ($padroesUnidade as $padrao => $grupos) {
+        if (preg_match($padrao, $texto, $m)) {
+            $tipo = strtolower($m[$grupos['tipo']]);
+            $unidade = $m[$grupos['num']];
+            $texto = preg_replace($padrao, '', $texto);
+            break;
+        }
+    }
+    
+    return ['tipo' => $tipo, 'numero' => $unidade, 'texto' => $texto];
+}
+
+function extrairReferenciasCadastrais(string $texto): array {
+    $refs = [
+        'quadra'    => null,
+        'lote'      => null,
+        'casa'      => null,
+        'bloco'     => null,
+        'loja'      => null,
+        'travessa'  => null,
+    ];
+    
+    if (preg_match('/Quadra\s+(\d+)/i', $texto, $m)) {
+        $refs['quadra'] = $m[1];
+        $texto = preg_replace('/[\s,]*Quadra\s+\d+/i', '', $texto);
+    }
+    if (preg_match('/Lote\s+([A-Z0-9]+)/i', $texto, $m)) {
+        $refs['lote'] = $m[1];
+        $texto = preg_replace('/[\s,]*Lote\s+[A-Z0-9]+/i', '', $texto);
+    }
+    if (preg_match('/Casa\s+(\d+[A-Z]?)/i', $texto, $m)) {
+        $refs['casa'] = $m[1];
+        $texto = preg_replace('/[\s,]*Casa\s+\d+[A-Z]?/i', '', $texto);
+    }
+    if (preg_match('/Bloco\s+([A-Z]+)/i', $texto, $m)) {
+        $refs['bloco'] = $m[1];
+        $texto = preg_replace('/[\s,]*Bloco\s+[A-Z]+/i', '', $texto);
+    }
+    if (preg_match('/Loja\s+(\d+[A-Z]?)/i', $texto, $m)) {
+        $refs['loja'] = $m[1];
+        $texto = preg_replace('/[\s,]*Loja\s+\d+[A-Z]?/i', '', $texto);
+    }
+    if (preg_match('/Travessa\s+(\d+)/i', $texto, $m)) {
+        $refs['travessa'] = $m[1];
+        $texto = preg_replace('/[\s,]*Travessa\s+\d+/i', '', $texto);
+    }
+    
+    return ['refs' => $refs, 'texto' => $texto];
+}
+
+function limparDescricaoesLogisticas(string $texto): string {
+    $padroes = [
+        '/\s*[-–]\s*(Deixar|Entregar|Próximo|Entre|Lado|Frente|Atrás|Embaixo|Ao lado|Não entregar|Cuidado|Acesso|Atenção).*/i' => '',
+        '/\s*;\s*.+$/i' => '',
+        '/\s*\(.*?(instrução|aviso|atenção|cuidado|entregar|deixar).*?\)/i' => '',
+        '/Mapas?.*/i' => '',
+        '/\s+placas?\s+(amarelas?|vermelhas?|brancas?|pretas?)/i' => '',
+        '/\s+(vidros?|blindex|altos?|fundos?|portão|garagem)(?=,|$)/i' => '',
+    ];
+    return trim(preg_replace(array_keys($padroes), array_values($padroes), $texto));
+}
+
+function sanitizarEnderecoParser(string $texto): string {
+    $texto = preg_replace('/\s+/', ' ', $texto);
+    $texto = preg_replace('/\s+\.\s+/', ' ', $texto);
+    $texto = preg_replace('/,+/', ',', $texto);
+    $texto = preg_replace('/\s+([,;])/', '$1', $texto);
+    return trim($texto);
+}
+
+function parserAprimorado(string $endereco): array {
+    $endereco = sanitizarEnderecoParser($endereco);
+    $endereco = normalizarAcronimos($endereco);
+    $endereco = limparDescricaoesLogisticas($endereco);
+    
+    $unidadeExtracao = extrairUnidadeSecundaria($endereco);
+    $endereco = $unidadeExtracao['texto'];
+    
+    $refsExtracao = extrairReferenciasCadastrais($endereco);
+    $endereco = $refsExtracao['texto'];
+    
+    $poi_estruturado = [];
+    $refs = $refsExtracao['refs'];
+    $refs_nao_nulas = array_filter($refs);
+    if (!empty($refs_nao_nulas)) {
+        foreach ($refs_nao_nulas as $tipo => $valor) {
+            $poi_estruturado[] = ucfirst($tipo) . " " . $valor;
+        }
+    }
+    if ($unidadeExtracao['tipo'] && $unidadeExtracao['numero']) {
+        $poi_estruturado[] = ucfirst($unidadeExtracao['tipo']) . " " . $unidadeExtracao['numero'];
+    }
+    
+    return [
+        'rua_principal'     => '',
+        'poi_estruturado'   => !empty($poi_estruturado) ? implode(', ', $poi_estruturado) : null,
+        'endereco_limpo'    => $endereco,
+    ];
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+
+// ===== LIMPEZA INICIAL ABSOLUTA =====
+while (ob_get_level() > 0) ob_end_clean();
+ob_start();
+
+error_reporting(E_ALL);
+ini_set('display_errors', '0');
+ini_set('log_errors', '1');
+set_time_limit(600);
+
+// Configuração para SSE (deve vir antes de qualquer saída)
+header('Content-Type: text/event-stream');
+header('Cache-Control: no-cache');
+header('Connection: keep-alive');
+header('X-Accel-Buffering: no'); // Para Nginx
+
+// Função para enviar eventos SSE
+function sendSSE(string $event, string $data): void
+{
+    echo "event: {$event}\n";
+    echo "data: {$data}\n\n";
+    ob_flush();
+    flush();
+}
+
+// Tratamento de erro fatal
+register_shutdown_function(function () {
+    $error = error_get_last();
+    if ($error !== null && in_array($error['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR])) {
+        sendSSE('error', json_encode(['success' => false, 'error' => 'Erro fatal: ' . $error['message']]));
+        if (defined('LOG_FILE')) {
+            @file_put_contents(LOG_FILE, '[' . date('Y-m-d H:i:s') . '] [FATAL] ' . json_encode($error) . PHP_EOL, FILE_APPEND);
+        }
+        exit;
+    }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CONFIGURAÇÃO
+// ─────────────────────────────────────────────────────────────────────────────
+define('CACHE_FILE',        __DIR__ . '/geocache.json');
+define('CACHE_TTL',         86400 * 30);
+define('CACHE_TTL_FAIL',    86400 * 7);
+define('SIMILARITY_LIMIAR', 0.68);
+define('USER_AGENT',        'ViaX-Scout/6.2 (viax-scout-br)');
+define('MAX_ENDERECOS',     500);
+define('KM_TOLERANCIA_M',   5000);
+define('POI_TOLERANCIA_M',  300);
+
+define('LIBPOSTAL_URL',     'http://127.0.0.1:5000/parse');
+define('LIBPOSTAL_TIMEOUT', 5);
+define('LIBPOSTAL_CONNECT_TIMEOUT', 2);
+
+define('LOG_FILE',      __DIR__ . '/viax_scout.log');
+define('LOG_MAX_BYTES', 5 * 1024 * 1024);
+define('LOG_LEVEL',     'DEBUG');
+
+$avenidasCriticas = [
+    'avenida independência', 'avenida independencia',
+    'avenida beira-mar', 'avenida beiramar', 'avenida beira mar',
+    'avenida beira-rio', 'avenida beirario', 'avenida beira rio',
+];
+
+$ruasGenericasFalsoPositivo = ['Avenida Independência', 'Avenida Brasil'];
+
+$nominatimInstances = [
+    'https://nominatim.openstreetmap.org',
+    'https://nominatim.geocoding.ai',
+];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SISTEMA DE LOG (mantido)
+// ─────────────────────────────────────────────────────────────────────────────
+$sessionId = strtoupper(substr(md5(uniqid('', true)), 0, 8));
+$logLevels = ['DEBUG' => 0, 'INFO' => 1, 'WARN' => 2, 'ERROR' => 3];
+
+function vlog(string $level, string $context, string $message, array $data = []): void
+{
+    $minLevel = $GLOBALS['logLevels'][LOG_LEVEL] ?? 0;
+    $currentLevel = $GLOBALS['logLevels'][$level] ?? 0;
+    if ($currentLevel < $minLevel) return;
+    $ts = date('Y-m-d H:i:s');
+    $session = $GLOBALS['sessionId'];
+    $dataStr = !empty($data) ? ' ' . json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) : '';
+    $line = "[{$ts}] [{$session}] [{$level}] [{$context}] {$message}{$dataStr}" . PHP_EOL;
+    if (file_exists(LOG_FILE) && filesize(LOG_FILE) >= LOG_MAX_BYTES) {
+        @rename(LOG_FILE, LOG_FILE . '.' . date('Ymd_His') . '.bak');
+    }
+    @file_put_contents(LOG_FILE, $line, FILE_APPEND);
+}
+
+function logInfo(string $ctx, string $msg, array $d = []): void  { vlog('INFO',  $ctx, $msg, $d); }
+function logWarn(string $ctx, string $msg, array $d = []): void  { vlog('WARN',  $ctx, $msg, $d); }
+function logError(string $ctx, string $msg, array $d = []): void { vlog('ERROR', $ctx, $msg, $d); }
+function logDebug(string $ctx, string $msg, array $d = []): void { vlog('DEBUG', $ctx, $msg, $d); }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ENTRY POINT PRINCIPAL
+// ─────────────────────────────────────────────────────────────────────────────
+try {
+    logInfo('STARTUP', 'ViaX Scout v6.2 (SSE) iniciado');
+
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        sendSSE('error', json_encode(['success' => false, 'error' => 'Método não permitido.']));
+        exit;
+    }
+    if (empty($_FILES['arquivo'])) {
+        sendSSE('error', json_encode(['success' => false, 'error' => 'Nenhum arquivo recebido.']));
+        exit;
+    }
+
+    $file    = $_FILES['arquivo'];
+    $tmpPath = $file['tmp_name'];
+    $ext     = strtolower(pathinfo($file['name'] ?? '', PATHINFO_EXTENSION));
+
+    logInfo('REQUEST', 'Arquivo recebido', [
+        'nome'    => $file['name'] ?? '?',
+        'tamanho' => ($file['size'] ?? 0) . ' bytes',
+        'ext'     => $ext,
+    ]);
+
+    if (!in_array($ext, ['xlsx', 'csv'], true)) {
+        sendSSE('error', json_encode(['success' => false, 'error' => 'Formato inválido. Use .xlsx ou .csv']));
+        exit;
+    }
+    if (!is_uploaded_file($tmpPath)) {
+        sendSSE('error', json_encode(['success' => false, 'error' => 'Falha de segurança.']));
+        exit;
+    }
+
+    sendSSE('step', json_encode(['step' => 'Lendo arquivo...']));
+
+    $tInicio   = microtime(true);
+    $enderecos = ($ext === 'xlsx') ? lerXLSX($tmpPath) : lerCSV($tmpPath);
+
+    if (empty($enderecos)) {
+        sendSSE('error', json_encode(['success' => false, 'error' => 'Nenhum endereço encontrado (coluna "Destination Address").']));
+        exit;
+    }
+
+    $totalLido      = count($enderecos);
+    $enderecos      = array_slice($enderecos, 0, MAX_ENDERECOS);
+    $totalProcessar = count($enderecos);
+
+    sendSSE('step', json_encode(['step' => "Processando {$totalProcessar} endereços..."]));
+
+    $cache          = carregarCache();
+    $cacheHits      = 0;
+    $detalhes       = [];
+    $totalNuances   = 0;
+    $geocodeSucesso = 0;
+    $ultimaReq      = 0.0;
+    $contMetodos    = [
+        'reverse' => 0,
+        'forward' => 0,
+        'cache_rev' => 0,
+        'cache_fwd' => 0,
+        'photon' => 0,
+        'brasilapi' => 0,
+        'brasilapi+forward' => 0,
+        'brasilapi+photon' => 0,
+        'brasilapi+cache_fwd' => 0,
+        'nenhum' => 0
+    ];
+    $errosGeocode   = 0;
+
+    $processed = 0;
+    foreach ($enderecos as $item) {
+        $linha   = $item['linha'];
+        $endOrig = $item['endereco'];
+        $lat     = $item['lat'];
+        $lon     = $item['lon'];
+        $cidade  = $item['cidade'];
+        $bairro  = $item['bairro'];
+
+        $processed++;
+        $statusMsg = sprintf('Processando %d/%d: %s', $processed, $totalProcessar, mb_substr($endOrig, 0, 40));
+        sendSSE('step', json_encode(['step' => $statusMsg]));
+
+        logDebug('PIPELINE', "── Linha {$linha} iniciada ──", ['endereco' => $endOrig]);
+
+        // ── 1. PARSE ──────────────────────────────────────────────────────
+        $parsed = parsearEnderecoHibrido($endOrig, $cidade, $bairro);
+        $cepExtraido = extrairCEP($endOrig);
+
+        // ── PARSER APRIMORADO v2.0 (estrutura POI) ─────────────────────────
+        $parserV2 = parserAprimorado($endOrig);
+        $parsed['poi_estruturado'] = $parserV2['poi_estruturado'];
+        logDebug('PARSER_V2', "Linha {$linha} → POI estruturado", [
+            'poi' => $parserV2['poi_estruturado'],
+        ]);
+
+        logDebug('PARSE', "Linha {$linha} → parse concluído", [
+            'rua_principal'  => $parsed['rua_principal'] ?: '(não extraída)',
+            'numero'         => $parsed['numero'] ?: '(sem número)',
+            'km_rodovia'     => $parsed['km_rodovia'] ?? '(N/A)',
+            'via_secundaria' => $parsed['via_secundaria'] ?? '(nenhuma)',
+            'poi'            => $parsed['poi'] ?: '(não detectado)',
+            'cidade'         => $parsed['cidade'] ?: '(não detectada)',
+            'cep'            => $cepExtraido ?: '(não detectado)',
+        ]);
+
+        if ($parsed['rua_principal'] === '') {
+            logWarn('PARSE', "Linha {$linha} → rua principal não extraída", ['endereco' => $endOrig]);
+        }
+
+        // ── 2. GEOCODIFICAÇÃO ─────────────────────────────────────────────
+        $geoResult = null;
+        $metodo    = 'nenhum';
+        $dadosCorreios = null;
+
+        // NÍVEL 1: Correios
+        $cep = $parsed['cep'] ?? extrairCEP($endOrig);
+        if ($cep) {
+            $dadosCorreios = geocodeBrasilAPI($cep);
+            if ($dadosCorreios) {
+                $parsed['rua_principal'] = $dadosCorreios['rua'];
+                if (empty($parsed['cidade']) && !empty($dadosCorreios['cidade'])) {
+                    $parsed['cidade'] = $dadosCorreios['cidade'];
+                }
+                if (empty($parsed['bairro']) && !empty($dadosCorreios['bairro'])) {
+                    $parsed['bairro'] = $dadosCorreios['bairro'];
+                }
+                $metodo = 'brasilapi';
+                logDebug('PIPELINE', "Linha {$linha} → Dados oficiais dos Correios aplicados", [
+                    'rua_corrigida' => $dadosCorreios['rua'],
+                    'cep' => $cep
+                ]);
+            }
+        }
+
+        // NÍVEL 2: Forward
+        if ($geoResult === null && $parsed['rua_principal'] !== '') {
+            $queryBusca = montarQueryBusca($parsed);
+            $cacheKey   = 'fwd_' . md5($queryBusca);
+            
+            if (isset($cache[$cacheKey]) && (time() - $cache[$cacheKey]['ts']) < $cache[$cacheKey]['ttl']) {
+                $geoResult = $cache[$cacheKey]['data'];
+                $cacheHits++;
+                if ($metodo === 'brasilapi') {
+                    $metodo = 'brasilapi+cache_fwd';
+                } else {
+                    $metodo = 'cache_fwd';
+                }
+                logDebug('GEOCODE', "Linha {$linha} → forward cache HIT", ['query' => $queryBusca]);
+            } else {
+                foreach ($GLOBALS['nominatimInstances'] as $instance) {
+                    $ultimaReq = aguardarRateLimit($ultimaReq);
+                    $geoResult = geocodeForwardWithInstance($queryBusca, $instance);
+                    if ($geoResult !== null) {
+                        if ($metodo === 'brasilapi') {
+                            $metodo = 'brasilapi+forward';
+                        } else {
+                            $metodo = 'forward';
+                        }
+                        logDebug('GEOCODE', "Linha {$linha} → forward retornou via {$instance}", [
+                            'rua_osm' => $geoResult['rua'] ?? 'null'
+                        ]);
+                        break;
+                    }
+                }
+                
+                if ($geoResult === null) {
+                    logDebug('GEOCODE', "Linha {$linha} → instâncias Nominatim falharam, tentando Photon API");
+                    $geoResult = geocodePhoton($queryBusca);
+                    if ($geoResult !== null) {
+                        if ($metodo === 'brasilapi') {
+                            $metodo = 'brasilapi+photon';
+                        } else {
+                            $metodo = 'photon';
+                        }
+                        logDebug('GEOCODE', "Linha {$linha} → Photon retornou com sucesso", [
+                            'rua_osm' => $geoResult['rua'] ?? 'null'
+                        ]);
+                    }
+                }
+                
+                $ttl = ($geoResult === null) ? CACHE_TTL_FAIL : CACHE_TTL;
+                $cache[$cacheKey] = ['data' => $geoResult, 'ts' => time(), 'ttl' => $ttl];
+            }
+        }
+
+        // NÍVEL 3: Reverse
+        if ($geoResult === null && $lat !== null && $lon !== null) {
+            $cacheKey = 'rev_' . round($lat, 5) . '_' . round($lon, 5);
+            if (isset($cache[$cacheKey]) && (time() - $cache[$cacheKey]['ts']) < $cache[$cacheKey]['ttl']) {
+                $geoResult = $cache[$cacheKey]['data'];
+                $cacheHits++;
+                $metodo = 'cache_rev';
+                logDebug('GEOCODE', "Linha {$linha} → reverse cache HIT", [
+                    'rua_osm' => $geoResult['rua'] ?? 'null'
+                ]);
+            } else {
+                logDebug('GEOCODE', "Linha {$linha} → chamando reverse como fallback", [
+                    'lat' => $lat, 
+                    'lon' => $lon
+                ]);
+                $ultimaReq = aguardarRateLimit($ultimaReq);
+                $geoResult = geocodeReverso($lat, $lon);
+                $ttl = ($geoResult === null) ? CACHE_TTL_FAIL : CACHE_TTL;
+                $cache[$cacheKey] = ['data' => $geoResult, 'ts' => time(), 'ttl' => $ttl];
+                $metodo = 'reverse';
+                logDebug('GEOCODE', "Linha {$linha} → reverse retornou", [
+                    'rua_osm' => $geoResult['rua'] ?? 'null'
+                ]);
+            }
+        }
+
+        // Validação de distância
+        if ($geoResult !== null && !in_array($metodo, ['reverse', 'cache_rev']) && $lat !== null && $lon !== null) {
+            if (isset($geoResult['lat']) && isset($geoResult['lon'])) {
+                $distancia = haversineMetros($lat, $lon, $geoResult['lat'], $geoResult['lon']);
+                if ($distancia > KM_TOLERANCIA_M * 2) {
+                    logWarn('GEOCODE', "Linha {$linha} → Forward encontrou rua a {$distancia}m da coordenada da planilha", [
+                        'rua_encontrada' => $geoResult['rua'] ?? 'null',
+                        'distancia_km' => round($distancia/1000, 2)
+                    ]);
+                    $geoResult['alerta_distancia'] = $distancia;
+                }
+            }
+        }
+
+        if ($geoResult !== null) {
+            $geocodeSucesso++;
+        } else {
+            $errosGeocode++;
+            logWarn('GEOCODE', "Linha {$linha} → geocodificação falhou em todos os métodos", [
+                'endereco' => $endOrig,
+                'rua_extraida' => $parsed['rua_principal'] ?: '(não extraída)',
+                'cep' => $cep ?? '(não detectado)'
+            ]);
+        }
+
+        $contMetodos[$metodo] = ($contMetodos[$metodo] ?? 0) + 1;
+
+        // ── 3. VERIFICAÇÃO DE NUANCE ───────────────────────────────────────
+        $verif = verificarNuance($parsed, $geoResult, null, $lat, $lon, $ultimaReq, $cache, $cacheHits);
+        $ultimaReq = $verif['_ultima_req'] ?? $ultimaReq;
+        $cacheHits = $verif['_cache_hits'] ?? $cacheHits;
+        unset($verif['_ultima_req'], $verif['_cache_hits']);
+
+        if ($verif['is_nuance']) {
+            $totalNuances++;
+            logInfo('NUANCE', "Linha {$linha} → NUANCE detectada", [
+                'endereco'     => $endOrig,
+                'rua_extraida' => $parsed['rua_principal'] ?: null,
+                'rua_oficial'  => $geoResult['rua'] ?? null,
+                'similaridade' => $verif['similaridade'],
+                'motivo'       => $verif['motivo'],
+                'metodo_geo'   => $metodo,
+            ]);
+        } else {
+            logDebug('NUANCE', "Linha {$linha} → OK", [
+                'rua_extraida' => $parsed['rua_principal'] ?: null,
+                'rua_oficial'  => $geoResult['rua'] ?? null,
+                'similaridade' => $verif['similaridade'],
+            ]);
+        }
+
+        $detalhes[] = [
+            'linha'                 => $linha,
+            'endereco_original'     => $endOrig,
+            'nome_rua_extraido'     => $parsed['rua_principal'] ?: null,
+            'nome_rua_oficial'      => $geoResult['rua'] ?? null,
+            'similaridade'          => $verif['similaridade'],
+            'is_nuance'             => $verif['is_nuance'],
+            'motivo'                => $verif['motivo'],
+            'poi_estruturado'       => $parsed['poi_estruturado'] ?? null,
+        ];
+    }
+
+    salvarCache($cache);
+
+    $total     = count($detalhes);
+    $tempoMs   = round((microtime(true) - $tInicio) * 1000);
+    $pctNuance = $total > 0 ? round(($totalNuances / $total) * 100, 1) : 0;
+    $pctGeo    = $total > 0 ? round(($geocodeSucesso / $total) * 100, 1) : 0;
+
+    sendSSE('step', json_encode(['step' => 'Finalizado. Gerando relatório...']));
+
+    logInfo('RESUMO', '━━━ Sessão concluída ━━━', [
+        'total_enderecos'        => $total,
+        'total_nuances'          => $totalNuances,
+        'percentual_nuance'      => $pctNuance . '%',
+        'geocode_sucesso'        => $geocodeSucesso,
+        'geocode_falha'          => $errosGeocode,
+        'taxa_geocode'           => $pctGeo . '%',
+        'cache_hits'             => $cacheHits,
+        'metodos_utilizados'     => $contMetodos,
+        'tempo_processamento_ms' => $tempoMs,
+    ]);
+
+    $response = [
+        'success'             => true,
+        'total_enderecos'     => $total,
+        'total_nuances'       => $totalNuances,
+        'percentual_problema' => $pctNuance,
+        'detalhes'            => $detalhes,
+        'metricas_tecnicas'   => [
+            'tempo_processamento_ms' => $tempoMs,
+            'cache_hits'             => $cacheHits,
+            'limite_requisicoes'     => '1 req/s (Nominatim TOS)',
+            'taxa_geocode_sucesso'   => $pctGeo,
+        ],
+    ];
+
+    sendSSE('result', json_encode(['result' => $response]));
+    exit;
+
+} catch (Throwable $e) {
+    logError('FATAL', 'Exceção não tratada', [
+        'message' => $e->getMessage(),
+        'file'    => $e->getFile(),
+        'line'    => $e->getLine(),
+    ]);
+    sendSSE('error', json_encode(['success' => false, 'error' => 'Erro interno: ' . $e->getMessage()]));
+    exit;
+}
+
+// =============================================================================
+// FUNÇÕES AUXILIARES (INALTERADAS EM RELAÇÃO À VERSÃO ANTERIOR)
+// =============================================================================
+
+function geocodeBrasilAPI(string $cep): ?array
+{
+    $cep = preg_replace('/[^0-9]/', '', $cep);
+    if (strlen($cep) !== 8) {
+        logDebug('BRASILAPI', 'CEP inválido ignorado', ['cep' => $cep]);
+        return null;
+    }
+
+    $url = "https://brasilapi.com.br/api/cep/v1/{$cep}";
+    
+    $ch = curl_init();
+    curl_setopt_array($ch, [
+        CURLOPT_URL => $url,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT => 5,
+        CURLOPT_CONNECTTIMEOUT => 3,
+        CURLOPT_USERAGENT => USER_AGENT,
+        CURLOPT_SSL_VERIFYPEER => false,
+    ]);
+    
+    $resp = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $err = curl_error($ch);
+    curl_close($ch);
+
+    if ($err) {
+        logWarn('BRASILAPI', 'Erro de conexão', ['error' => $err]);
+        return null;
+    }
+    
+    if ($httpCode !== 200) {
+        logWarn('BRASILAPI', "HTTP {$httpCode} - CEP não encontrado ou inválido", ['cep' => $cep]);
+        return null;
+    }
+    
+    $data = json_decode($resp, true);
+    if (json_last_error() !== JSON_ERROR_NONE) {
+        logError('BRASILAPI', 'Resposta JSON inválida', ['error' => json_last_error_msg()]);
+        return null;
+    }
+
+    if (empty($data['street'])) {
+        logWarn('BRASILAPI', 'CEP retornou sem nome de rua', ['cep' => $cep]);
+        return null;
+    }
+
+    if (function_exists('mb_convert_case')) {
+        $data['street'] = mb_convert_case($data['street'], MB_CASE_TITLE, 'UTF-8');
+    } else {
+        $data['street'] = ucwords(strtolower($data['street']));
+    }
+
+    logInfo('BRASILAPI', 'CEP validado com sucesso', [
+        'cep' => $cep,
+        'rua_oficial' => $data['street'],
+        'cidade' => $data['city'] ?? 'N/A',
+        'bairro' => $data['neighborhood'] ?? 'N/A'
+    ]);
+
+    return [
+        'rua'    => $data['street'],
+        'cidade' => $data['city'] ?? '',
+        'bairro' => $data['neighborhood'] ?? '',
+        'uf'     => $data['state'] ?? ''
+    ];
+}
+
+function parsearEnderecoHibrido(string $endereco, string $cidadeColuna = '', string $bairroColuna = ''): array
+{
+    $heur = parsearEnderecoHeuristico($endereco, $cidadeColuna, $bairroColuna);
+    $ruaHeuristica = $heur['rua_principal'];
+
+    if ($ruaHeuristica === '') {
+        $sugestaoLibpostal = extrairRuaComLibpostal($endereco);
+        if ($sugestaoLibpostal !== null) {
+            $ruaHeuristica = $sugestaoLibpostal;
+            logDebug('PARSE', 'Rua sugerida via libpostal (fallback completo)', ['rua' => $ruaHeuristica]);
+        } else {
+            logDebug('PARSE', 'Parser heurístico e libpostal não extraíram rua, mantendo estrutura original');
+            return $heur;
+        }
+    }
+
+    $ruaLimpa = preg_replace('/\s+(?:lote|quadra|qd|lt|casa|apto|apartamento|bloco|conjunto|residencial|condomínio|nº)\b.*/i', '', $ruaHeuristica);
+    $ruaLimpa = trim($ruaLimpa);
+    if ($ruaLimpa !== '' && $ruaLimpa !== $ruaHeuristica) {
+        logDebug('PARSE', 'Rua heurística limpa de complementos', ['original' => $ruaHeuristica, 'limpa' => $ruaLimpa]);
+        $ruaHeuristica = $ruaLimpa;
+    }
+
+    $ruaNormalizada = normalizarRuaComLibpostal($ruaHeuristica);
+    if ($ruaNormalizada === null) {
+        logDebug('PARSE', 'Libpostal falhou na normalização, usando rua heurística', ['rua' => $ruaHeuristica]);
+        $ruaNormalizada = $ruaHeuristica;
+    } else {
+        logDebug('PARSE', 'Rua normalizada via libpostal', ['original' => $ruaHeuristica, 'normalizada' => $ruaNormalizada]);
+    }
+
+    return [
+        'rua_principal'  => $ruaNormalizada,
+        'numero'         => $heur['numero'],
+        'km_rodovia'     => $heur['km_rodovia'],
+        'via_secundaria' => $heur['via_secundaria'],
+        'poi'            => $heur['poi'],
+        'cidade'         => $heur['cidade'],
+        'bairro'         => $heur['bairro'],
+    ];
+}
+
+function extrairRuaComLibpostal(string $endereco): ?string
+{
+    $url = LIBPOSTAL_URL;
+    $ch = curl_init();
+    curl_setopt_array($ch, [
+        CURLOPT_URL => $url,
+        CURLOPT_POST => true,
+        CURLOPT_POSTFIELDS => json_encode(['address' => $endereco]),
+        CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT => LIBPOSTAL_TIMEOUT,
+        CURLOPT_CONNECTTIMEOUT => LIBPOSTAL_CONNECT_TIMEOUT,
+    ]);
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    if ($httpCode !== 200 || empty($response)) return null;
+    $parsed = json_decode($response, true);
+    if (json_last_error() !== JSON_ERROR_NONE) return null;
+    $rua = $parsed['road'] ?? '';
+    if ($rua === '') return null;
+    if (function_exists('mb_convert_case')) {
+        $rua = mb_convert_case($rua, MB_CASE_TITLE, 'UTF-8');
+    } else {
+        $rua = ucwords(strtolower($rua));
+    }
+    return $rua;
+}
+
+function normalizarRuaComLibpostal(string $rua): ?string
+{
+    $url = LIBPOSTAL_URL;
+    $ch = curl_init();
+    curl_setopt_array($ch, [
+        CURLOPT_URL => $url,
+        CURLOPT_POST => true,
+        CURLOPT_POSTFIELDS => json_encode(['address' => $rua]),
+        CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT => LIBPOSTAL_TIMEOUT,
+        CURLOPT_CONNECTTIMEOUT => LIBPOSTAL_CONNECT_TIMEOUT,
+    ]);
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    if ($httpCode !== 200 || empty($response)) return null;
+    $parsed = json_decode($response, true);
+    if (json_last_error() !== JSON_ERROR_NONE) return null;
+    $ruaNormalizada = $parsed['road'] ?? '';
+    if ($ruaNormalizada === '') return null;
+    if (function_exists('mb_convert_case')) {
+        $ruaNormalizada = mb_convert_case($ruaNormalizada, MB_CASE_TITLE, 'UTF-8');
+    } else {
+        $ruaNormalizada = ucwords(strtolower($ruaNormalizada));
+    }
+    return $ruaNormalizada;
+}
+
+function parsearEnderecoHeuristico(string $end, string $cidadeColuna = '', string $bairroColuna = ''): array
+{
+    $end = preg_replace('/\s+/', ' ', trim($end));
+    $end = removerAnotacoesMotorista($end);
+
+    $viaSecundaria = extrairViaSecundaria($end);
+    $ruaPrincipal  = extrairLogradouroPrincipal($end);
+    $numero        = extrairNumero($end);
+    $kmRodovia     = extrairKmRodovia($end);
+    $poi           = extrairPOI($end);
+
+    $cidadeExtraida = $cidadeColuna !== '' ? $cidadeColuna : extrairCidadeDoEndereco($end);
+
+    return [
+        'rua_principal'  => $ruaPrincipal,
+        'numero'         => $numero,
+        'km_rodovia'     => $kmRodovia,
+        'via_secundaria' => $viaSecundaria,
+        'poi'            => $poi,
+        'cidade'         => $cidadeExtraida,
+        'bairro'         => $bairroColuna,
+    ];
+}
+
+function extrairLogradouroPrincipal(string $endereco): string
+{
+    $endereco = preg_replace('/^\s*(Loteamento|Condomínio|Residencial|Conjunto|Núcleo)\s+[^,]+?[,]?\s*/i', '', $endereco);
+    $endereco = preg_replace('/\bVerão\s+Vermelho\b\s*/i', '', $endereco);
+
+    $padrao = '/\b(?:Rua|Av\.?|Avenida|Alameda|Praça|Pça\.?|Travessa|Tv\.?|Estrada|Rod\.?|Rodovia|Viela|Beco|Passagem|Largo)\s+[^\s,.\d][^,.\d]*/iu';
+    if (preg_match($padrao, $endereco, $m)) {
+        $rua = trim($m[0]);
+        $rua = preg_replace('/^(Loteamento|Condomínio|Residencial)\s+[^,]+\s+/i', '', $rua);
+        return $rua;
+    }
+
+    if (preg_match('/^([^,\d]+)/', $endereco, $m)) {
+        $candidato = trim($m[1]);
+        if (mb_strlen($candidato) >= 4 && !preg_match('/^(lote|quadra|qd|lt|casa|apto|apartamento|bloco|conjunto|residencial|condomínio|nº)$/i', $candidato)) {
+            return $candidato;
+        }
+    }
+    return '';
+}
+
+function extrairViaSecundaria(string $endereco): ?string
+{
+    $padroes = [
+        '/\b(travessa|trav\.?|tv\.?|passagem|psg\.?|viela|beco)\s*\.?\s*\d*[A-Za-z]*\b/i',
+        '/,\s*(travessa|trav\.?|tv\.?|passagem|psg\.?|viela|beco)\s*\.?\s*\d*[^,]*/i',
+    ];
+    foreach ($padroes as $pat) {
+        if (preg_match($pat, $endereco, $m)) {
+            $via = trim($m[0]);
+            if (preg_match('/\d|[A-Za-z]$/i', $via) && strlen($via) > 3) {
+                return $via;
+            }
+        }
+    }
+    return null;
+}
+
+function extrairKmRodovia(string $endereco): ?float
+{
+    if (preg_match('/\bkm\s*(\d+(?:[.,]\d+)?)/i', $endereco, $m)) {
+        return (float) str_replace(',', '.', $m[1]);
+    }
+    return null;
+}
+
+function extrairPOI(string $endereco): string
+{
+    $sem = preg_replace(
+        '/^\s*(?:Rua|Av\.?|Avenida|Alameda|Praça|Pça\.?|Travessa|Tv\.?|Estrada|Rod\.?|Rodovia|Viela|Beco|Passagem|Largo)\s+[^,]+/iu',
+        '',
+        $endereco
+    );
+    $sem = preg_replace('/^[,\s]+\d*[,\s]*/u', '', $sem);
+    $sem = preg_replace('/^\s*(loja|apt\.?|apto\.?)\s+/iu', '', $sem);
+    $sem = preg_replace('/\b(travessa|trav\.?|tv\.?|passagem)\s*\.?\s*\d*[A-Za-z]*/iu', '', $sem);
+    $sem = trim($sem, " \t\n\r\0\x0B,()");
+    if (mb_strlen($sem, 'UTF-8') >= 3 && !is_numeric($sem) && !preg_match('/^[A-Z]\d*$/i', $sem)) {
+        return $sem;
+    }
+    return '';
+}
+
+function extrairNumero(string $endereco): string
+{
+    if (preg_match('/[,\s]+(\d+[A-Za-z]?|s\/?n|sn)\b/i', $endereco, $m)) {
+        return strtoupper(trim($m[1]));
+    }
+    return '';
+}
+
+function extrairCEP(string $texto): ?string
+{
+    if (preg_match('/\b(\d{5}-?\d{3})\b/', $texto, $m)) {
+        return preg_replace('/[^0-9]/', '', $m[1]);
+    }
+    return null;
+}
+
+function removerAnotacoesMotorista(string $s): string
+{
+    if (($pos = strpos($s, ' - ')) !== false) {
+        $s = substr($s, 0, $pos);
+    }
+    $s = preg_replace('/\s+\d+[°ªº].*$/u', '', $s);
+
+    $gatilhos = [
+        'proximo', 'próximo', 'perto', 'referencia', 'maps', 'google',
+        'waze', 'placas', 'portao', 'buzina', 'frente', 'fundos',
+        'esquina', 'atrás', 'cor da', 'casa de cor',
+    ];
+    $lower = mb_strtolower($s, 'UTF-8');
+    foreach ($gatilhos as $g) {
+        $pos = mb_strpos($lower, $g, 0, 'UTF-8');
+        if ($pos !== false && $pos > 5) {
+            $s = trim(mb_substr($s, 0, $pos, 'UTF-8'));
+            break;
+        }
+    }
+    return $s;
+}
+
+function extrairCidadeDoEndereco(string $endereco): string
+{
+    if (preg_match('/[,]\s*([A-Za-zÀ-ÖØ-öø-ÿ\s]+?)\s*[,]?\s*[A-Z]{2}\b/', $endereco, $m)) {
+        return trim($m[1]);
+    }
+    return '';
+}
+
+function verificarNuance(
+    array  $parsed,
+    ?array $geoResult,
+    ?float $similaridadeReverse,
+    ?float $lat,
+    ?float $lon,
+    float  $ultimaReq,
+    array  &$cache,
+    int    &$cacheHits
+): array {
+    $ruaExtraida = $parsed['rua_principal'];
+
+    if ($geoResult === null) {
+        return nuance('Endereço não encontrado no mapa (geocodificação falhou).');
+    }
+    $ruaOficial = $geoResult['rua'] ?? null;
+    if ($ruaOficial === null) {
+        return nuance('Coordenadas localizadas, mas OSM não identificou via nomeada.');
+    }
+
+    if ($parsed['via_secundaria'] !== null) {
+        $simRuaPai = calcularSimilaridade($ruaExtraida, $ruaOficial);
+        $limiarPai = limiarAdaptativo($ruaExtraida, $ruaOficial);
+        if ($simRuaPai >= $limiarPai) {
+            return ok($simRuaPai, $ultimaReq, $cacheHits);
+        }
+        return nuance(
+            "Via secundária '{$parsed['via_secundaria']}' presente e rua pai não confirmada pelo mapa — verificar manualmente.",
+            round($simRuaPai, 3)
+        );
+    }
+
+    if ($parsed['km_rodovia'] !== null && $lat !== null && $lon !== null) {
+        $ruaLower = mb_strtolower($ruaExtraida, 'UTF-8');
+        $ehRodovia = (strpos($ruaLower, 'rodovia') !== false || 
+                      strpos($ruaLower, 'br-') !== false || 
+                      strpos($ruaLower, 'rj-') !== false ||
+                      strpos($ruaLower, 'estrada') !== false);
+        
+        if ($ehRodovia) {
+            $kmInformado = $parsed['km_rodovia'];
+            $resultKm = validarKmRodovia($parsed, $kmInformado, $lat, $lon, $ultimaReq, $cache, $cacheHits);
+            if ($resultKm['validado']) {
+                $simRod = calcularSimilaridade($ruaExtraida, $ruaOficial);
+                $limiarEspecial = min(limiarAdaptativo($ruaExtraida, $ruaOficial), 0.60);
+                if ($simRod >= $limiarEspecial) {
+                    return ok($simRod, $ultimaReq, $cacheHits);
+                }
+                return nuance(
+                    sprintf('Rodovia com Km %s validado, mas nome da via difere significativamente do oficial (%.0f%%)', $kmInformado, $simRod * 100),
+                    round($simRod, 3)
+                );
+            }
+            if ($resultKm['sem_referencia']) {
+                return nuance("Rodovia com Km {$kmInformado} — posição não confirmável pelo mapa. Verificar manualmente.");
+            }
+            return nuance(sprintf(
+                'Coordenadas estão a %.0f m do Km %s informado na rodovia (tolerância ±%d m) — verificar posicionamento.',
+                $resultKm['distancia_m'], $kmInformado, KM_TOLERANCIA_M
+            ));
+        }
+    }
+
+    $temComplementoImpreciso = preg_match('/\b(lote|quadra|qd|lt)\b/i', $parsed['poi'] ?? '');
+    $numeroInvalido = in_array(strtoupper($parsed['numero']), ['', '0', 'SN', 'S/N', 'S-N']);
+    $ehAvenida = preg_match('/\b(Avenida|Av\.?)\b/i', $ruaExtraida);
+
+    if ($temComplementoImpreciso && $numeroInvalido && $ehAvenida) {
+        return nuance(
+            'Avenida com indicação de lote/quadra, mas sem número preciso — confirmar ponto exato com o cliente.',
+            calcularSimilaridade($ruaExtraida, $ruaOficial)
+        );
+    }
+
+    $ruaLower = mb_strtolower($ruaExtraida, 'UTF-8');
+    $ehAvenidaCritica = false;
+    foreach ($GLOBALS['avenidasCriticas'] as $critica) {
+        if (strpos($ruaLower, $critica) !== false) {
+            $ehAvenidaCritica = true;
+            break;
+        }
+    }
+    if ($ehAvenidaCritica) {
+        $poi = $parsed['poi'];
+        if ($poi !== '') {
+            $resultPOI = confirmarPOI($poi, $parsed, $lat, $lon, $ultimaReq, $cache, $cacheHits);
+            if ($resultPOI['encontrado']) {
+                $sim = calcularSimilaridade($ruaExtraida, $ruaOficial);
+                return ok($sim, $ultimaReq, $cacheHits);
+            }
+            if ($resultPOI['distancia_m'] === null) {
+                return nuance(
+                    "Estabelecimento \"{$poi}\" não encontrado no mapa para validação — confirmar endereço com o cliente."
+                );
+            }
+            return nuance(sprintf(
+                'Estabelecimento "%s" localizado a %.0f m das coordenadas informadas — verificar se o endereço está correto.',
+                $poi, $resultPOI['distancia_m']
+            ));
+        }
+        if ($numeroInvalido) {
+            return nuance(
+                'Avenida de grande extensão sem número ou estabelecimento identificado — entre em contato com o cliente para confirmar o ponto exato de entrega.'
+            );
+        }
+    }
+
+    $similaridade = calcularSimilaridade($ruaExtraida, $ruaOficial);
+    $limiar       = limiarAdaptativo($ruaExtraida, $ruaOficial);
+    if (mb_strlen($ruaExtraida) < 10) {
+        $limiar = min($limiar, 0.65);
+    }
+
+    if ($similaridade < $limiar) {
+        return nuance(
+            sprintf('"%s" difere do oficial "%s" (%.0f%%)', $ruaExtraida, $ruaOficial, $similaridade * 100),
+            round($similaridade, 3)
+        );
+    }
+    return ok($similaridade, $ultimaReq, $cacheHits);
+}
+
+function validarKmRodovia(array $parsed, float $kmInformado, float $latEntrega, float $lonEntrega, float &$ultimaReq, array &$cache, int &$cacheHits): array
+{
+    $partes   = [$parsed['rua_principal'], "Km {$kmInformado}"];
+    if ($parsed['cidade'] !== '') $partes[] = $parsed['cidade'];
+    $partes[] = 'Brasil';
+    $query    = implode(', ', $partes);
+    $cacheKey = 'km_' . md5($query);
+
+    $pontoKm = null;
+    if (isset($cache[$cacheKey]) && (time() - $cache[$cacheKey]['ts']) < $cache[$cacheKey]['ttl']) {
+        $pontoKm = $cache[$cacheKey]['data'];
+        $cacheHits++;
+    } else {
+        $ultimaReq = aguardarRateLimit($ultimaReq);
+        $data      = httpGet($GLOBALS['nominatimInstances'][0] . '/search?format=json&q=' . urlencode($query) . '&limit=1');
+        if (!empty($data[0]['lat']) && !empty($data[0]['lon'])) {
+            $pontoKm = ['lat' => (float)$data[0]['lat'], 'lon' => (float)$data[0]['lon']];
+        }
+        $ttl = ($pontoKm === null) ? CACHE_TTL_FAIL : CACHE_TTL;
+        $cache[$cacheKey] = ['data' => $pontoKm, 'ts' => time(), 'ttl' => $ttl];
+    }
+    if ($pontoKm === null) {
+        return ['validado' => false, 'sem_referencia' => true, 'distancia_m' => null];
+    }
+    $dist     = haversineMetros($latEntrega, $lonEntrega, $pontoKm['lat'], $pontoKm['lon']);
+    $validado = $dist <= KM_TOLERANCIA_M;
+    return ['validado' => $validado, 'sem_referencia' => false, 'distancia_m' => round($dist)];
+}
+
+function confirmarPOI(string $poi, array $parsed, ?float $lat, ?float $lon, float &$ultimaReq, array &$cache, int &$cacheHits): array
+{
+    if ($lat === null || $lon === null) {
+        return ['encontrado' => false, 'distancia_m' => null];
+    }
+    $partes   = [$poi];
+    if ($parsed['cidade'] !== '') $partes[] = $parsed['cidade'];
+    $partes[] = 'Brasil';
+    $query    = implode(', ', $partes);
+    $cacheKey = 'poi_' . md5($query);
+
+    $pontoPOI = null;
+    if (isset($cache[$cacheKey]) && (time() - $cache[$cacheKey]['ts']) < $cache[$cacheKey]['ttl']) {
+        $pontoPOI = $cache[$cacheKey]['data'];
+        $cacheHits++;
+    } else {
+        $ultimaReq = aguardarRateLimit($ultimaReq);
+        $data      = httpGet($GLOBALS['nominatimInstances'][0] . '/search?format=json&q=' . urlencode($query) . '&limit=1');
+        if (!empty($data[0]['lat']) && !empty($data[0]['lon'])) {
+            $pontoPOI = ['lat' => (float)$data[0]['lat'], 'lon' => (float)$data[0]['lon']];
+        }
+        $ttl = ($pontoPOI === null) ? CACHE_TTL_FAIL : CACHE_TTL;
+        $cache[$cacheKey] = ['data' => $pontoPOI, 'ts' => time(), 'ttl' => $ttl];
+    }
+    if ($pontoPOI === null) {
+        return ['encontrado' => false, 'distancia_m' => null];
+    }
+    $dist      = haversineMetros($lat, $lon, $pontoPOI['lat'], $pontoPOI['lon']);
+    $encontrado = $dist <= POI_TOLERANCIA_M;
+    return ['encontrado' => $encontrado, 'distancia_m' => round($dist)];
+}
+
+function montarQueryBusca(array $parsed): string
+{
+    $partes = [];
+    
+    if ($parsed['rua_principal'] !== '') {
+        $partes[] = $parsed['rua_principal'];
+    }
+    
+    $numero = strtoupper(trim($parsed['numero'] ?? ''));
+    $numerosInvalidos = ['', '0', 'SN', 'S/N', 'S-N'];
+    if (!in_array($numero, $numerosInvalidos, true) && $numero !== '') {
+        $partes[] = $numero;
+    }
+    
+    if (!empty($parsed['bairro'])) {
+        $partes[] = $parsed['bairro'];
+    }
+    
+    if (!empty($parsed['cidade'])) {
+        $partes[] = $parsed['cidade'];
+    }
+    
+    $partes[] = 'Brasil';
+    
+    $partes = array_filter($partes, function($p) { 
+        return trim((string)$p) !== ''; 
+    });
+    $partes = array_unique($partes);
+    
+    $query = implode(', ', $partes);
+    logDebug('QUERY', 'Query Forward montada', ['query' => $query]);
+    return $query;
+}
+
+function geocodeReverso(float $lat, float $lon): ?array
+{
+    $url = $GLOBALS['nominatimInstances'][0] . "/reverse?format=json&lat={$lat}&lon={$lon}&zoom=20&accept-language=pt-BR&layer=address";
+    $data = httpGet($url);
+    if (!$data || empty($data['address'])) return null;
+    return extrairDadosNominatim($data);
+}
+
+function geocodeForwardWithInstance(string $query, string $baseUrl): ?array
+{
+    $viewbox = "-74.0,-34.8,-34.8,5.3";
+    $url = $baseUrl . '/search?format=json&q=' . urlencode($query) . '&limit=3&addressdetails=1&viewbox=' . $viewbox . '&bounded=1';
+    $data = httpGet($url);
+    if (!$data || empty($data)) return null;
+    
+    foreach ($data as $item) {
+        if (empty($item['address'])) continue;
+        $candidato = extrairDadosNominatim($item);
+        if ($candidato !== null) {
+            $nomeRua = $candidato['rua'] ?? '';
+            if (strlen($nomeRua) <= 4 && preg_match('/^\w+$/', $nomeRua)) {
+                logDebug('GEOCODE', 'Resultado genérico ignorado no forward: ' . $nomeRua);
+                continue;
+            }
+            return $candidato;
+        }
+    }
+    return null;
+}
+
+function extrairDadosNominatim(array $data): ?array
+{
+    $addr = $data['address'] ?? [];
+    $camposVia = ['road', 'pedestrian', 'footway', 'cycleway', 'path', 'street', 'residential'];
+    
+    $rua = null;
+    foreach ($camposVia as $campo) {
+        if (!empty($addr[$campo])) {
+            $rua = trim((string)$addr[$campo]);
+            break;
+        }
+    }
+    
+    if ($rua === null) return null;
+    
+    $resultado = ['rua' => $rua];
+    if (isset($data['lat']) && isset($data['lon'])) {
+        $resultado['lat'] = (float)$data['lat'];
+        $resultado['lon'] = (float)$data['lon'];
+    }
+    return $resultado;
+}
+
+function geocodePhoton(string $query): ?array
+{
+    $url = 'https://photon.komoot.io/api/?q=' . urlencode($query) . '&limit=1';
+    $data = httpGet($url);
+    if (!$data || empty($data['features'])) return null;
+    
+    $feature = $data['features'][0];
+    $props = $feature['properties'] ?? [];
+    $rua = $props['street'] ?? $props['name'] ?? null;
+    
+    if (!$rua) return null;
+    
+    $resultado = ['rua' => $rua];
+    if (isset($feature['geometry']['coordinates'])) {
+        $resultado['lon'] = $feature['geometry']['coordinates'][0];
+        $resultado['lat'] = $feature['geometry']['coordinates'][1];
+    }
+    return $resultado;
+}
+
+function httpGet(string $url): mixed
+{
+    $ch = curl_init();
+    curl_setopt_array($ch, [
+        CURLOPT_URL            => $url,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_FOLLOWLOCATION => true,
+        CURLOPT_USERAGENT      => USER_AGENT,
+        CURLOPT_TIMEOUT        => 10,
+        CURLOPT_SSL_VERIFYPEER => false,
+    ]);
+    $resp     = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $err      = curl_error($ch);
+    curl_close($ch);
+    
+    if ($err || $httpCode !== 200) return null;
+    
+    $decoded = json_decode($resp, true);
+    if (json_last_error() !== JSON_ERROR_NONE) {
+        logWarn('HTTP', 'Resposta não-JSON recebida', ['url' => $url, 'http_code' => $httpCode, 'body_preview' => substr($resp, 0, 200)]);
+        return null;
+    }
+    return $decoded;
+}
+
+function aguardarRateLimit(float $ultimaReq): float
+{
+    $now  = microtime(true);
+    $diff = $now - $ultimaReq;
+    if ($diff < 1.0) usleep((int)((1.0 - $diff) * 1_000_000));
+    return microtime(true);
+}
+
+function haversineMetros(float $lat1, float $lon1, float $lat2, float $lon2): float
+{
+    $R  = 6_371_000.0;
+    $dL = deg2rad($lat2 - $lat1);
+    $dO = deg2rad($lon2 - $lon1);
+    $a  = sin($dL / 2) ** 2 + cos(deg2rad($lat1)) * cos(deg2rad($lat2)) * sin($dO / 2) ** 2;
+    return $R * 2.0 * atan2(sqrt($a), sqrt(1.0 - $a));
+}
+
+function nuance(string $motivo, ?float $similaridade = null): array
+{
+    return ['is_nuance' => true, 'similaridade' => $similaridade, 'motivo' => $motivo, '_ultima_req' => null, '_cache_hits' => null];
+}
+
+function ok(float $similaridade, float $ultimaReq, int $cacheHits): array
+{
+    return ['is_nuance' => false, 'similaridade' => round($similaridade, 3), 'motivo' => '', '_ultima_req' => $ultimaReq, '_cache_hits' => $cacheHits];
+}
+
+function calcularSimilaridade(string $str1, string $str2): float
+{
+    $str1 = normalizarTexto($str1);
+    $str2 = normalizarTexto($str2);
+    if ($str1 === '' || $str2 === '') return 0.0;
+    similar_text($str1, $str2, $perc);
+    return $perc / 100;
+}
+
+function normalizarTexto(string $texto): string
+{
+    $texto = mb_strtolower($texto, 'UTF-8');
+    $texto = preg_replace('/[^\p{L}\p{N}\s]/u', '', $texto);
+    $texto = preg_replace('/\s+/', ' ', $texto);
+    $texto = trim($texto);
+    $mapa  = ['à'=>'a','á'=>'a','â'=>'a','ã'=>'a','ä'=>'a','è'=>'e','é'=>'e','ê'=>'e','ë'=>'e','ì'=>'i','í'=>'i','î'=>'i','ï'=>'i','ò'=>'o','ó'=>'o','ô'=>'o','õ'=>'o','ö'=>'o','ù'=>'u','ú'=>'u','û'=>'u','ü'=>'u','ç'=>'c','ñ'=>'n'];
+    return strtr($texto, $mapa);
+}
+
+function limiarAdaptativo(string $extraida, string $oficial): float
+{
+    $len = mb_strlen($extraida, 'UTF-8');
+    if ($len < 5)  return 0.85;
+    if ($len < 10) return 0.75;
+    return 0.68;
+}
+
+function carregarCache(): array
+{
+    if (!file_exists(CACHE_FILE)) return [];
+    $cache = json_decode(file_get_contents(CACHE_FILE) ?: '', true);
+    return is_array($cache) ? $cache : [];
+}
+
+function salvarCache(array $cache): void
+{
+    file_put_contents(CACHE_FILE, json_encode($cache, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT), LOCK_EX);
+}
+
+function lerXLSX(string $caminho): array
+{
+    $libPath = __DIR__ . '/SimpleXLSX.php';
+    if (!file_exists($libPath)) {
+        sendSSE('error', json_encode(['success' => false, 'error' => 'Biblioteca SimpleXLSX não encontrada.']));
+        exit;
+    }
+    require_once $libPath;
+    
+    $xlsx = SimpleXLSX::parse($caminho);
+    if (!$xlsx) {
+        sendSSE('error', json_encode(['success' => false, 'error' => 'Erro ao ler XLSX: ' . SimpleXLSX::parseError()]));
+        exit;
+    }
+    $rows = $xlsx->rows();
+    if (empty($rows)) return [];
+    $h         = array_shift($rows);
+    $colEnd    = array_search('Destination Address', $h);
+    $colLat    = array_search('Latitude', $h);
+    $colLon    = array_search('Longitude', $h);
+    $colCidade = array_search('City', $h);
+    $colBairro = array_search('Neighborhood', $h);
+    if ($colEnd === false) {
+        sendSSE('error', json_encode(['success' => false, 'error' => 'Coluna "Destination Address" não encontrada.']));
+        exit;
+    }
+    $enderecos = []; $linha = 2;
+    foreach ($rows as $row) {
+        $endereco = trim((string)($row[$colEnd] ?? ''));
+        if ($endereco === '') { $linha++; continue; }
+        
+        $latVal = null;
+        if ($colLat !== false && isset($row[$colLat])) {
+            $val = $row[$colLat];
+            if (is_numeric($val) && trim((string)$val) !== '') {
+                $latVal = (float)$val;
+            }
+        }
+        $lonVal = null;
+        if ($colLon !== false && isset($row[$colLon])) {
+            $val = $row[$colLon];
+            if (is_numeric($val) && trim((string)$val) !== '') {
+                $lonVal = (float)$val;
+            }
+        }
+        
+        $cidade = ($colCidade !== false) ? trim((string)($row[$colCidade] ?? '')) : '';
+        $bairro = ($colBairro !== false) ? trim((string)($row[$colBairro] ?? '')) : '';
+        
+        $enderecos[] = [
+            'linha'   => $linha,
+            'endereco'=> $endereco,
+            'lat'     => $latVal,
+            'lon'     => $lonVal,
+            'cidade'  => $cidade,
+            'bairro'  => $bairro,
+        ];
+        $linha++;
+    }
+    return $enderecos;
+}
+
+function lerCSV(string $caminho): array
+{
+    $handle = fopen($caminho, 'r');
+    if (!$handle) {
+        sendSSE('error', json_encode(['success' => false, 'error' => 'Não foi possível abrir o CSV.']));
+        exit;
+    }
+    $h = fgetcsv($handle, 0, ',');
+    if ($h === false) {
+        sendSSE('error', json_encode(['success' => false, 'error' => 'CSV vazio ou inválido.']));
+        exit;
+    }
+    $colEnd    = array_search('Destination Address', $h);
+    $colLat    = array_search('Latitude', $h);
+    $colLon    = array_search('Longitude', $h);
+    $colCidade = array_search('City', $h);
+    $colBairro = array_search('Neighborhood', $h);
+    if ($colEnd === false) {
+        sendSSE('error', json_encode(['success' => false, 'error' => 'Coluna "Destination Address" não encontrada.']));
+        exit;
+    }
+    $enderecos = []; $linha = 2;
+    while (($row = fgetcsv($handle, 0, ',')) !== false) {
+        $endereco = trim((string)($row[$colEnd] ?? ''));
+        if ($endereco === '') { $linha++; continue; }
+        
+        $latVal = null;
+        if ($colLat !== false && isset($row[$colLat])) {
+            $val = $row[$colLat];
+            if (is_numeric($val) && trim((string)$val) !== '') {
+                $latVal = (float)$val;
+            }
+        }
+        $lonVal = null;
+        if ($colLon !== false && isset($row[$colLon])) {
+            $val = $row[$colLon];
+            if (is_numeric($val) && trim((string)$val) !== '') {
+                $lonVal = (float)$val;
+            }
+        }
+        
+        $cidade = ($colCidade !== false) ? trim((string)($row[$colCidade] ?? '')) : '';
+        $bairro = ($colBairro !== false) ? trim((string)($row[$colBairro] ?? '')) : '';
+        
+        $enderecos[] = [
+            'linha'   => $linha,
+            'endereco'=> $endereco,
+            'lat'     => $latVal,
+            'lon'     => $lonVal,
+            'cidade'  => $cidade,
+            'bairro'  => $bairro,
+        ];
+        $linha++;
+    }
+    fclose($handle);
+    return $enderecos;
+}
+
+// Fim do arquivo (sem tag de fechamento ?>)

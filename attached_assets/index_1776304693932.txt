@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ViaX Scout</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        /* (mesmo CSS da versão anterior, mantido por questões de espaço) */
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+        :root { --bg: #f4f3ef; --surface: #faf9f6; --surface-2: #eeecea; --text: #1a1917; --text-muted: #6b6860; --text-faint: #a09e9a; --accent: #d4521a; --accent-dim: rgba(212,82,26,0.12); --ok: #1a7a4a; --ok-dim: rgba(26,122,74,0.1); --border: rgba(26,25,23,0.1); --border-strong: rgba(26,25,23,0.18); --shadow-sm: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04); --shadow-md: 0 4px 16px rgba(0,0,0,0.07), 0 2px 6px rgba(0,0,0,0.05); --shadow-lg: 0 12px 40px rgba(0,0,0,0.09); --radius: 14px; --radius-sm: 8px; --font-display: 'Poppins', sans-serif; --font-mono: 'Poppins', sans-serif; --transition: 200ms cubic-bezier(0.4,0,0.2,1); }
+        [data-theme="dark"] { --bg: #121110; --surface: #1c1b19; --surface-2: #242320; --text: #f0ede8; --text-muted: #8a877f; --text-faint: #504d48; --accent: #e8703a; --accent-dim: rgba(232,112,58,0.13); --ok: #2ea863; --ok-dim: rgba(46,168,99,0.1); --border: rgba(240,237,232,0.08); --border-strong: rgba(240,237,232,0.14); }
+        html { font-size: 14px; } @media (min-width: 480px) { html { font-size: 15px; } } @media (min-width: 768px) { html { font-size: 16px; } }
+        body { background: var(--bg); color: var(--text); font-family: var(--font-mono); line-height: 1.6; min-height: 100vh; transition: background var(--transition), color var(--transition); }
+        .shell { max-width: 1200px; margin: 0 auto; padding: 1.25rem 1rem 3rem; } @media (min-width: 480px) { .shell { padding: 1.5rem 1.25rem 3.5rem; } } @media (min-width: 768px) { .shell { padding: 2rem 1.5rem 4rem; } }
+        .topbar { display: flex; align-items: center; justify-content: space-between; padding-bottom: 1rem; border-bottom: 1px solid var(--border-strong); margin-bottom: 1.5rem; } @media (min-width: 768px) { .topbar { padding-bottom: 1.5rem; margin-bottom: 2.5rem; } }
+        .brand { display: flex; align-items: baseline; gap: 0.6rem; } .brand-name { font-family: var(--font-display); font-size: 1.15rem; font-weight: 700; letter-spacing: -0.01em; color: var(--text); } @media (min-width: 480px) { .brand-name { font-size: 1.3rem; } }
+        .brand-tag { font-family: var(--font-display); font-size: 0.65rem; color: var(--accent); background: var(--accent-dim); padding: 0.15rem 0.5rem; border-radius: 4px; letter-spacing: 0.06em; font-weight: 600; }
+        .topbar-right { display: flex; align-items: center; gap: 0.75rem; }
+        .pill-btn { display: flex; align-items: center; gap: 0.4rem; padding: 0.4rem 0.85rem; border-radius: 99px; border: 1px solid var(--border-strong); background: var(--surface); color: var(--text-muted); font-family: var(--font-display); font-size: 0.75rem; font-weight: 500; cursor: pointer; transition: all var(--transition); box-shadow: var(--shadow-sm); }
+        .pill-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+        .pill-btn svg { width: 14px; height: 14px; flex-shrink: 0; }
+        .upload-card { background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--radius); box-shadow: var(--shadow-md); overflow: hidden; margin-bottom: 1.5rem; transition: background var(--transition), border-color var(--transition); }
+        .upload-header { padding: 1rem 1.25rem 0.75rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 0.6rem; }
+        .section-label { font-family: var(--font-display); font-size: 0.72rem; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-faint); }
+        .upload-zone { padding: 2rem 1.25rem; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.65rem; cursor: pointer; transition: background var(--transition); border: 2px dashed transparent; border-radius: 10px; margin: 0.75rem; }
+        @media (min-width: 480px) { .upload-zone { padding: 2.5rem 2rem; margin: 1rem; gap: 0.75rem; } }
+        .upload-zone:hover, .upload-zone.drag-over { background: var(--accent-dim); border-color: var(--accent); }
+        .upload-zone.drag-over { transform: scale(0.99); }
+        .upload-icon-wrap { width: 56px; height: 56px; border-radius: 14px; background: var(--accent-dim); border: 1px solid var(--border-strong); display: flex; align-items: center; justify-content: center; color: var(--accent); transition: all var(--transition); }
+        .upload-zone:hover .upload-icon-wrap { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(212,82,26,0.2); }
+        .upload-icon-wrap svg { width: 24px; height: 24px; }
+        .upload-zone-title { font-family: var(--font-display); font-size: 0.95rem; font-weight: 600; color: var(--text); }
+        .upload-zone-sub { font-size: 0.75rem; font-weight: 400; color: var(--text-faint); text-align: center; }
+        .upload-cta { display: inline-flex; align-items: center; gap: 0.45rem; padding: 0.55rem 1.25rem; border-radius: 99px; background: var(--accent); color: #fff; font-family: var(--font-display); font-size: 0.8rem; font-weight: 600; border: none; cursor: pointer; transition: all var(--transition); box-shadow: 0 2px 8px rgba(212,82,26,0.3); margin-top: 0.25rem; }
+        .upload-cta:hover { opacity: 0.88; transform: translateY(-1px); box-shadow: 0 4px 14px rgba(212,82,26,0.35); }
+        .upload-cta svg { width: 15px; height: 15px; }
+        #fileInput { display: none; }
+        .file-strip { display: none; align-items: center; gap: 0.65rem; padding: 0.65rem 1rem; background: var(--surface-2); border-top: 1px solid var(--border); font-size: 0.78rem; font-weight: 400; }
+        .file-strip.visible { display: flex; }
+        .file-strip-name { font-weight: 500; color: var(--text); flex: 1; }
+        .file-strip-meta { color: var(--text-faint); }
+        .file-strip-remove { background: none; border: none; cursor: pointer; color: var(--text-faint); transition: color var(--transition); padding: 0; display: flex; }
+        .file-strip-remove:hover { color: var(--accent); }
+        .file-strip-remove svg { width: 16px; height: 16px; }
+        .process-btn { display: flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.75rem 1.5rem; border-radius: 99px; background: var(--text); color: var(--bg); border: none; font-family: var(--font-display); font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: all var(--transition); margin: 0 0.75rem 0.75rem; width: calc(100% - 1.5rem); }
+        @media (min-width: 480px) { .process-btn { width: auto; margin: 0 1.25rem 1.25rem; justify-content: flex-start; } }
+        .process-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        .process-btn:not(:disabled):hover { opacity: 0.85; transform: translateY(-1px); }
+        .process-btn svg { width: 16px; height: 16px; }
+        .loading-wrap { display: none; padding: 3rem 2rem; flex-direction: column; align-items: center; gap: 1rem; }
+        .loading-wrap.visible { display: flex; }
+        .loader-ring { width: 40px; height: 40px; border: 2px solid var(--border-strong); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .loading-txt { font-size: 0.8rem; font-weight: 500; color: var(--text-muted); }
+        .loading-steps { display: flex; flex-direction: column; gap: 0.35rem; margin-top: 0.5rem; max-height: 200px; overflow-y: auto; width: 100%; }
+        .loading-step { display: flex; align-items: center; gap: 0.5rem; font-size: 0.72rem; font-weight: 400; color: var(--text-faint); opacity: 0; transform: translateX(-6px); animation: stepIn 0.3s ease forwards; }
+        @keyframes stepIn { to { opacity: 1; transform: none; } }
+        .step-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); flex-shrink: 0; animation: pulse 1s ease-in-out infinite; }
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+        #resultsArea { display: none; }
+        #resultsArea.visible { display: block; animation: fadeUp 0.4s ease; }
+        @keyframes fadeUp { from { opacity:0; transform: translateY(12px); } to { opacity:1; transform:none; } }
+        .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem; margin-bottom: 1.5rem; }
+        @media (max-width: 700px) { .stats-row { grid-template-columns: repeat(2,1fr); } } @media (max-width: 400px) { .stats-row { grid-template-columns: 1fr; } }
+        .stat-tile { background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--radius); padding: 1.1rem 1.1rem 0.9rem; box-shadow: var(--shadow-sm); transition: all var(--transition); position: relative; overflow: hidden; }
+        .stat-tile::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 2px; background: var(--border); transition: background var(--transition); }
+        .stat-tile.accent-line::after { background: var(--accent); }
+        .stat-tile.ok-line::after { background: var(--ok); }
+        .stat-tile:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+        .stat-val { font-family: var(--font-display); font-size: 1.7rem; font-weight: 800; letter-spacing: -0.02em; line-height: 1; margin-bottom: 0.3rem; }
+        @media (min-width: 480px) { .stat-val { font-size: 2rem; } }
+        .stat-val.danger { color: var(--accent); }
+        .stat-val.good { color: var(--ok); }
+        .stat-lbl { font-size: 0.66rem; color: var(--text-faint); letter-spacing: 0.05em; font-family: var(--font-display); font-weight: 600; text-transform: uppercase; }
+        .panel { background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--radius); box-shadow: var(--shadow-md); margin-bottom: 1.25rem; overflow: hidden; transition: background var(--transition); }
+        .panel-head { padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; }
+        @media (min-width: 480px) { .panel-head { padding: 0.85rem 1.25rem; flex-wrap: nowrap; } }
+        .panel-title { font-family: var(--font-display); font-size: 0.75rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); }
+        .filter-tabs { display: flex; gap: 0.35rem; }
+        .ftab { padding: 0.3rem 0.7rem; border-radius: 99px; border: 1px solid var(--border); background: transparent; color: var(--text-muted); font-family: var(--font-mono); font-size: 0.72rem; cursor: pointer; transition: all var(--transition); }
+        .ftab.active, .ftab:hover { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
+        .tbl-wrap { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
+        thead tr { background: var(--surface-2); }
+        th { padding: 0.65rem 1rem; text-align: left; font-family: var(--font-display); font-size: 0.68rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-faint); white-space: nowrap; border-bottom: 1px solid var(--border-strong); }
+        td { padding: 0.6rem 1rem; border-bottom: 1px solid var(--border); color: var(--text-muted); vertical-align: middle; font-family: var(--font-mono); }
+        tr:last-child td { border-bottom: none; }
+        tr:hover td { background: var(--surface-2); }
+        .col-line { width: 60px; color: var(--text-faint); }
+        .col-orig { max-width: 240px; }
+        .col-orig span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .col-name { max-width: 160px; }
+        .col-official { max-width: 160px; }
+        .col-sim { width: 100px; }
+        .sim-bar-wrap { display: flex; align-items: center; gap: 0.4rem; }
+        .sim-bar { height: 4px; border-radius: 2px; background: var(--border-strong); flex: 1; overflow: hidden; }
+        .sim-fill { height: 100%; border-radius: 2px; background: var(--ok); transition: width 0.6s ease; }
+        .sim-fill.low { background: var(--accent); }
+        .sim-val { font-size: 0.7rem; color: var(--text-faint); white-space: nowrap; min-width: 32px; }
+        .badge { display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.2rem 0.55rem; border-radius: 99px; font-size: 0.68rem; font-weight: 500; white-space: nowrap; font-family: var(--font-display); letter-spacing: 0.03em; }
+        .badge-nuance { background: var(--accent-dim); color: var(--accent); }
+        .badge-ok { background: var(--ok-dim); color: var(--ok); }
+        .badge svg { width: 11px; height: 11px; }
+        .motivo-cell { max-width: 200px; font-size: 0.72rem; color: var(--text-faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .motivo-cell[title] { cursor: help; }
+        .metrics-chart-grid { display: grid; grid-template-columns: 1fr 200px; gap: 1.5rem; padding: 1.25rem; align-items: center; }
+        @media (max-width: 600px) { .metrics-chart-grid { grid-template-columns: 1fr; } }
+        .metrics-list { display: flex; flex-direction: column; gap: 0.65rem; }
+        .metric-row { display: flex; align-items: center; justify-content: space-between; font-size: 0.78rem; }
+        .metric-key { color: var(--text-muted); display: flex; align-items: center; gap: 0.5rem; }
+        .metric-key svg { width: 13px; height: 13px; color: var(--text-faint); }
+        .metric-val { font-family: var(--font-display); font-weight: 700; color: var(--text); font-size: 0.85rem; }
+        .export-btn { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.4rem 0.9rem; border-radius: 99px; border: 1px solid var(--border-strong); background: transparent; color: var(--text-muted); font-family: var(--font-mono); font-size: 0.75rem; cursor: pointer; transition: all var(--transition); }
+        .export-btn:hover { border-color: var(--text); color: var(--text); }
+        .export-btn svg { width: 13px; height: 13px; }
+        .empty-state { padding: 3rem 2rem; text-align: center; color: var(--text-faint); font-size: 0.82rem; }
+        .footer { margin-top: 3rem; padding-top: 1.25rem; border-top: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; font-size: 0.72rem; color: var(--text-faint); }
+        .footer-left { display: flex; align-items: center; gap: 0.5rem; }
+        .footer-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--ok); }
+        .toast { position: fixed; bottom: 1.5rem; right: 1.5rem; background: #2a1410; border: 1px solid rgba(212,82,26,0.4); color: #f4a58a; padding: 0.85rem 1.25rem; border-radius: var(--radius-sm); font-size: 0.8rem; box-shadow: var(--shadow-lg); max-width: 320px; display: none; animation: slideIn 0.25s ease; z-index: 999; }
+        .toast.visible { display: block; }
+        @keyframes slideIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:none} }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 3px; }
+    </style>
+</head>
+<body>
+<div class="shell">
+
+    <header class="topbar">
+        <div class="brand">
+            <span class="brand-name">ViaX Route</span>
+            <span class="brand-tag">v7.0</span>
+        </div>
+        <div class="topbar-right">
+            <button class="pill-btn" id="themeToggle" aria-label="Alternar tema">
+                <svg id="themeIcon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+                </svg>
+                <span id="themeLabel">Escuro</span>
+            </button>
+        </div>
+    </header>
+
+    <div class="upload-card" id="uploadCard">
+        <div class="upload-header">
+            <span class="section-label">Importar rota</span>
+        </div>
+
+        <div class="upload-zone" id="uploadZone">
+            <div class="upload-icon-wrap">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                    <polyline points="14,2 14,8 20,8"/>
+                    <line x1="12" y1="18" x2="12" y2="12"/>
+                    <polyline points="9,15 12,12 15,15"/>
+                </svg>
+            </div>
+            <div class="upload-zone-title">Arraste o arquivo aqui</div>
+            <div class="upload-zone-sub">XLSX ou CSV · coluna "Destination Address" · máx 10MB</div>
+            <button class="upload-cta" id="uploadBtn">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 12l2 2 4-4"/>
+                </svg>
+                Selecionar arquivo
+            </button>
+            <input type="file" id="fileInput" accept=".csv,.xlsx">
+        </div>
+
+        <div class="file-strip" id="fileStrip">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--ok);flex-shrink:0">
+                <polyline points="20,6 9,17 4,12"/>
+            </svg>
+            <span class="file-strip-name" id="fileStripName">—</span>
+            <span class="file-strip-meta" id="fileStripMeta"></span>
+            <button class="file-strip-remove" id="fileStripRemove" aria-label="Remover arquivo">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+            </button>
+        </div>
+
+        <button class="process-btn" id="processBtn" disabled>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+            Analisar rota
+        </button>
+
+        <div class="loading-wrap" id="loadingWrap">
+            <div class="loader-ring"></div>
+            <div class="loading-txt" id="loadingTxt">Aguardando processamento...</div>
+            <div class="loading-steps" id="loadingSteps"></div>
+        </div>
+    </div>
+
+    <div id="resultsArea">
+        <div class="stats-row" id="statsRow"></div>
+        <div class="panel">
+            <div class="panel-head">
+                <span class="panel-title">Detalhes</span>
+                <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;">
+                    <div class="filter-tabs" id="filterTabs">
+                        <button class="ftab active" data-filter="all">Todos</button>
+                        <button class="ftab" data-filter="nuance">Nuances</button>
+                        <button class="ftab" data-filter="ok">OK</button>
+                    </div>
+                    <button class="export-btn" id="exportBtn">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                            <polyline points="7,10 12,15 17,10"/>
+                            <line x1="12" y1="15" x2="12" y2="3"/>
+                        </svg>
+                        Exportar CSV
+                    </button>
+                </div>
+            </div>
+            <div class="tbl-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th class="col-line">#</th>
+                            <th class="col-orig">Endereço original</th>
+                            <th class="col-name">Rua extraída</th>
+                            <th class="col-official">Rua oficial (OSM)</th>
+                            <th class="col-sim">Similaridade</th>
+                            <th>Status</th>
+                            <th>Motivo</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody"></tbody>
+                </table>
+                <div class="empty-state" id="emptyState" style="display:none">Nenhum registro encontrado para este filtro.</div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <div class="panel-head">
+                <span class="panel-title">Métricas técnicas</span>
+            </div>
+            <div class="metrics-chart-grid">
+                <div class="metrics-list" id="metricsList"></div>
+                <div>
+                    <canvas id="nuanceChart" width="180" height="180"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer class="footer">
+        <div class="footer-left">
+            <div class="footer-dot"></div>
+            <span>OpenStreetMap · Nominatim · Cache local · Rate limit 1 req/s</span>
+        </div>
+        <span>ViaX Scout</span>
+    </footer>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── STATE ──────────────────────────────────────────────────────────────────
+let currentFile = null;
+let currentData = null;
+let activeFilter = 'all';
+let chartInstance = null;
+let abortController = null;
+
+// ── ELEMENTS ───────────────────────────────────────────────────────────────
+const uploadZone    = document.getElementById('uploadZone');
+const fileInput     = document.getElementById('fileInput');
+const uploadBtn     = document.getElementById('uploadBtn');
+const fileStrip     = document.getElementById('fileStrip');
+const fileStripName = document.getElementById('fileStripName');
+const fileStripMeta = document.getElementById('fileStripMeta');
+const fileStripRemove = document.getElementById('fileStripRemove');
+const processBtn    = document.getElementById('processBtn');
+const loadingWrap   = document.getElementById('loadingWrap');
+const loadingTxt    = document.getElementById('loadingTxt');
+const loadingSteps  = document.getElementById('loadingSteps');
+const resultsArea   = document.getElementById('resultsArea');
+const statsRow      = document.getElementById('statsRow');
+const tableBody     = document.getElementById('tableBody');
+const emptyState    = document.getElementById('emptyState');
+const metricsList   = document.getElementById('metricsList');
+const exportBtn     = document.getElementById('exportBtn');
+const themeToggle   = document.getElementById('themeToggle');
+const themeIcon     = document.getElementById('themeIcon');
+const themeLabel    = document.getElementById('themeLabel');
+const toast         = document.getElementById('toast');
+
+// ── THEME ──────────────────────────────────────────────────────────────────
+const SUN_SVG  = `<path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/><circle cx="12" cy="12" r="5"/>`;
+const MOON_SVG = `<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>`;
+
+function applyTheme(dark) {
+    document.documentElement.setAttribute('data-theme', dark ? 'dark' : '');
+    themeIcon.innerHTML = dark ? SUN_SVG : MOON_SVG;
+    themeLabel.textContent = dark ? 'Claro' : 'Escuro';
+    localStorage.setItem('spx-theme', dark ? 'dark' : 'light');
+    if (chartInstance) updateChartTheme();
+}
+themeToggle.addEventListener('click', () => {
+    applyTheme(document.documentElement.getAttribute('data-theme') !== 'dark');
+});
+applyTheme(localStorage.getItem('spx-theme') === 'dark');
+
+// ── DRAG & DROP ────────────────────────────────────────────────────────────
+uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('drag-over'); });
+uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag-over'));
+uploadZone.addEventListener('drop', e => {
+    e.preventDefault();
+    uploadZone.classList.remove('drag-over');
+    if (e.dataTransfer.files.length) setFile(e.dataTransfer.files[0]);
+});
+uploadBtn.addEventListener('click', e => { e.stopPropagation(); fileInput.click(); });
+fileInput.addEventListener('change', e => { if (e.target.files[0]) setFile(e.target.files[0]); });
+fileStripRemove.addEventListener('click', clearFile);
+
+function setFile(file) {
+    const ext = file.name.split('.').pop().toLowerCase();
+    if (!['xlsx','csv'].includes(ext)) { showToast('Formato inválido. Use .xlsx ou .csv'); return; }
+    if (file.size > 10 * 1024 * 1024) { showToast('Arquivo muito grande. Máximo 10MB.'); return; }
+    currentFile = file;
+    fileStripName.textContent = file.name;
+    fileStripMeta.textContent = formatBytes(file.size);
+    fileStrip.classList.add('visible');
+    processBtn.disabled = false;
+}
+
+function clearFile() {
+    currentFile = null;
+    fileInput.value = '';
+    fileStrip.classList.remove('visible');
+    processBtn.disabled = true;
+}
+
+// ── PROCESS COM SSE (FETCH + STREAM) ──────────────────────────────────────
+processBtn.addEventListener('click', async () => {
+    if (!currentFile) return;
+
+    // UI de loading
+    processBtn.style.display = 'none';
+    loadingWrap.classList.add('visible');
+    loadingSteps.innerHTML = '';
+    resultsArea.classList.remove('visible');
+    loadingTxt.textContent = 'Conectando ao servidor...';
+
+    abortController = new AbortController();
+
+    try {
+        const formData = new FormData();
+        formData.append('arquivo', currentFile);
+
+        const response = await fetch('api.php', {
+            method: 'POST',
+            body: formData,
+            signal: abortController.signal
+        });
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || '';
+
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i];
+                if (line.startsWith('event: ')) {
+                    const eventType = line.slice(7);
+                    // Aguarda a próxima linha que contém data:
+                    const nextLine = lines[i+1];
+                    if (nextLine && nextLine.startsWith('data: ')) {
+                        const dataStr = nextLine.slice(6);
+                        try {
+                            const data = JSON.parse(dataStr);
+                            if (eventType === 'step') {
+                                addLoadingStep(data.step);
+                                loadingTxt.textContent = data.step;
+                            } else if (eventType === 'result') {
+                                currentData = data.result;
+                                renderResults(data.result);
+                            } else if (eventType === 'error') {
+                                throw new Error(data.error || 'Erro no servidor');
+                            }
+                        } catch (e) {
+                            console.warn('Erro ao parsear evento', e);
+                        }
+                        i++; // pula a linha de data já processada
+                    }
+                }
+            }
+        }
+    } catch (err) {
+        if (err.name === 'AbortError') {
+            showToast('Processamento cancelado pelo usuário.');
+        } else {
+            showToast('Erro: ' + err.message);
+        }
+    } finally {
+        loadingWrap.classList.remove('visible');
+        processBtn.style.display = '';
+        abortController = null;
+    }
+});
+
+function addLoadingStep(text) {
+    const div = document.createElement('div');
+    div.className = 'loading-step';
+    div.innerHTML = `<div class="step-dot"></div><span>${escapeHtml(text)}</span>`;
+    loadingSteps.appendChild(div);
+    // Scroll automático para o último passo
+    div.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+// ── RENDER RESULTS ─────────────────────────────────────────────────────────
+function renderResults(data) {
+    const { total_enderecos, total_nuances, percentual_problema, detalhes, metricas_tecnicas } = data;
+
+    statsRow.innerHTML = `
+        <div class="stat-tile">
+            <div class="stat-val">${total_enderecos}</div>
+            <div class="stat-lbl">Analisados</div>
+        </div>
+        <div class="stat-tile accent-line">
+            <div class="stat-val danger">${total_nuances}</div>
+            <div class="stat-lbl">Nuances</div>
+        </div>
+        <div class="stat-tile accent-line">
+            <div class="stat-val danger">${percentual_problema}%</div>
+            <div class="stat-lbl">Com problema</div>
+        </div>
+        <div class="stat-tile ok-line">
+            <div class="stat-val good">${metricas_tecnicas.taxa_geocode_sucesso}%</div>
+            <div class="stat-lbl">Geocode ok</div>
+        </div>
+    `;
+
+    renderTable(detalhes, activeFilter);
+
+    metricsList.innerHTML = [
+        { icon: clockIcon(), label: 'Tempo de processamento', val: metricas_tecnicas.tempo_processamento_ms + ' ms' },
+        { icon: dbIcon(), label: 'Cache hits', val: metricas_tecnicas.cache_hits },
+        { icon: mapIcon(), label: 'Geocodificação com sucesso', val: metricas_tecnicas.taxa_geocode_sucesso + '%' },
+        { icon: shieldIcon(), label: 'Rate limit', val: metricas_tecnicas.limite_requisicoes },
+    ].map(m => `
+        <div class="metric-row">
+            <span class="metric-key">${m.icon} ${m.label}</span>
+            <span class="metric-val">${m.val}</span>
+        </div>
+    `).join('');
+
+    renderChart(total_enderecos - total_nuances, total_nuances);
+    resultsArea.classList.add('visible');
+}
+
+function renderTable(detalhes, filter) {
+    const filtered = filter === 'all' ? detalhes
+        : filter === 'nuance' ? detalhes.filter(d => d.is_nuance)
+        : detalhes.filter(d => !d.is_nuance);
+
+    if (!filtered.length) {
+        tableBody.innerHTML = '';
+        emptyState.style.display = '';
+        return;
+    }
+    emptyState.style.display = 'none';
+
+    tableBody.innerHTML = filtered.map(item => {
+        const sim = item.similaridade !== null ? item.similaridade : null;
+        const simPct = sim !== null ? Math.round(sim * 100) : null;
+        const simBar = sim !== null
+            ? `<div class="sim-bar-wrap">
+                 <div class="sim-bar"><div class="sim-fill${simPct < 68 ? ' low' : ''}" style="width:${simPct}%"></div></div>
+                 <span class="sim-val">${simPct}%</span>
+               </div>`
+            : '<span class="sim-val">N/A</span>';
+
+        const badge = item.is_nuance
+            ? `<span class="badge badge-nuance">${warnIcon()} Nuance</span>`
+            : `<span class="badge badge-ok">${checkIcon()} OK</span>`;
+
+        const motivo = item.motivo
+            ? `<span class="motivo-cell" title="${escapeHtml(item.motivo)}">${escapeHtml(item.motivo)}</span>`
+            : '<span style="color:var(--text-faint)">—</span>';
+
+        return `<tr>
+            <td class="col-line">${item.linha}</td>
+            <td class="col-orig"><span title="${escapeHtml(item.endereco_original)}">${escapeHtml(trunc(item.endereco_original, 55))}</span></td>
+            <td class="col-name">${escapeHtml(item.nome_rua_extraido) || '<span style="color:var(--text-faint)">—</span>'}</td>
+            <td class="col-official">${escapeHtml(item.nome_rua_oficial) || '<em style="color:var(--text-faint)">não encontrado</em>'}</td>
+            <td class="col-sim">${simBar}</td>
+            <td>${badge}</td>
+            <td>${motivo}</td>
+        </tr>`;
+    }).join('');
+}
+
+// ── FILTER TABS ────────────────────────────────────────────────────────────
+document.getElementById('filterTabs').addEventListener('click', e => {
+    const btn = e.target.closest('.ftab');
+    if (!btn || !currentData) return;
+    document.querySelectorAll('.ftab').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    activeFilter = btn.dataset.filter;
+    renderTable(currentData.detalhes, activeFilter);
+});
+
+// ── CHART ──────────────────────────────────────────────────────────────────
+function getChartColors() {
+    const dark = document.documentElement.getAttribute('data-theme') === 'dark';
+    return {
+        ok: dark ? '#2ea863' : '#1a7a4a',
+        nuance: dark ? '#e8703a' : '#d4521a',
+        text: dark ? '#8a877f' : '#6b6860',
+    };
+}
+
+function renderChart(okCount, nuanceCount) {
+    const ctx = document.getElementById('nuanceChart').getContext('2d');
+    if (chartInstance) chartInstance.destroy();
+    const c = getChartColors();
+    chartInstance = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: ['OK', 'Nuance'],
+            datasets: [{
+                data: [okCount, nuanceCount],
+                backgroundColor: [c.ok, c.nuance],
+                borderWidth: 0,
+                hoverOffset: 4,
+            }]
+        },
+        options: {
+            responsive: false,
+            cutout: '68%',
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        color: c.text,
+                        font: { size: 11, family: "'Poppins', sans-serif" },
+                        boxWidth: 10,
+                        padding: 12,
+                    }
+                }
+            }
+        }
+    });
+}
+
+function updateChartTheme() {
+    if (!chartInstance || !currentData) return;
+    const c = getChartColors();
+    chartInstance.data.datasets[0].backgroundColor = [c.ok, c.nuance];
+    chartInstance.options.plugins.legend.labels.color = c.text;
+    chartInstance.update();
+}
+
+// ── EXPORT ────────────────────────────────────────────────────────────────
+exportBtn.addEventListener('click', () => {
+    if (!currentData) return;
+    const rows = [['Linha','Endereço Original','Rua Extraída','Rua Oficial','Similaridade','Is Nuance','Motivo']];
+    currentData.detalhes.forEach(d => {
+        rows.push([d.linha, d.endereco_original, d.nome_rua_extraido||'', d.nome_rua_oficial||'',
+            d.similaridade !== null ? d.similaridade : '', d.is_nuance ? 'Sim' : 'Não', d.motivo||'']);
+    });
+    const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'viax-scout-relatorio.csv';
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a); URL.revokeObjectURL(url);
+});
+
+// ── TOAST ─────────────────────────────────────────────────────────────────
+let toastTimer;
+function showToast(msg) {
+    toast.textContent = msg;
+    toast.classList.add('visible');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toast.classList.remove('visible'), 4000);
+}
+
+// ── UTILS ─────────────────────────────────────────────────────────────────
+function escapeHtml(s) {
+    if (!s) return '';
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function trunc(s, n) { return s && s.length > n ? s.slice(0, n) + '…' : (s || ''); }
+function formatBytes(b) {
+    if (b < 1024) return b + ' B';
+    if (b < 1024*1024) return (b/1024).toFixed(1) + ' KB';
+    return (b/(1024*1024)).toFixed(1) + ' MB';
+}
+
+// ── MINI SVG ICONS ─────────────────────────────────────────────────────────
+function warnIcon() { return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`; }
+function checkIcon() { return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20,6 9,17 4,12"/></svg>`; }
+function clockIcon() { return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg>`; }
+function dbIcon()    { return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>`; }
+function mapIcon()   { return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>`; }
+function shieldIcon(){ return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>`; }
+</script>
+</body>
+</html>

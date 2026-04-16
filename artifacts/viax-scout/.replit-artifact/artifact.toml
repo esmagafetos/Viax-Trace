@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "ViaX Scout"
+version = "1.0.0"
+id = "artifacts/viax-scout"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 19753
+
+[services.development]
+run = "pnpm --filter @workspace/viax-scout run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/viax-scout", "run", "build" ]
+publicDir = "artifacts/viax-scout/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "19753"
+BASE_PATH = "/"
