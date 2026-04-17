@@ -27,6 +27,31 @@ const X_SVG = (
   </svg>
 );
 
+const NAV_ICONS: Record<string, React.ReactNode> = {
+  "/dashboard": (
+    <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="3" width="7" height="8" rx="1.5" />
+      <rect x="14" y="3" width="7" height="5" rx="1.5" />
+      <rect x="14" y="12" width="7" height="9" rx="1.5" />
+      <rect x="3" y="15" width="7" height="6" rx="1.5" />
+    </svg>
+  ),
+  "/process": (
+    <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 18h6" />
+      <path d="M10 22h4" />
+      <path d="M12 2a7 7 0 0 0-4 12.75V16h8v-1.25A7 7 0 0 0 12 2Z" />
+    </svg>
+  ),
+  "/history": (
+    <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 12a9 9 0 1 0 3-6.7" />
+      <path d="M3 4v5h5" />
+      <path d="M12 7v5l3 2" />
+    </svg>
+  ),
+};
+
 export function useTheme() {
   const [dark, setDark] = useState(() => {
     return localStorage.getItem("viax-theme") === "dark";
@@ -222,18 +247,21 @@ export default function Layout({ children, showNav = true }: LayoutProps) {
                 </div>
               )}
 
-              {/* Mobile menu toggle */}
+            {/* Mobile menu toggle */}
               <button
                 onClick={() => setMobileMenuOpen((o) => !o)}
                 className="show-mobile"
+                aria-label={mobileMenuOpen ? "Fechar navegação" : "Abrir navegação"}
                 style={{
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  width: 36, height: 36, borderRadius: 8,
-                  border: "1px solid var(--border-strong)",
-                  background: "var(--surface)", color: "var(--text-muted)",
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: "0.45rem",
+                  height: 36, padding: "0 0.75rem", borderRadius: 99,
+                  border: `1px solid ${mobileMenuOpen ? "rgba(212,82,26,0.35)" : "var(--border-strong)"}`,
+                  background: mobileMenuOpen ? "var(--accent-dim)" : "var(--surface)",
+                  color: mobileMenuOpen ? "var(--accent)" : "var(--text-muted)",
                   cursor: "pointer",
                 }}
               >
+                <span style={{ fontSize: "0.76rem", fontWeight: 700 }}>Menu</span>
                 {mobileMenuOpen ? X_SVG : MENU_SVG}
               </button>
             </div>
@@ -244,25 +272,36 @@ export default function Layout({ children, showNav = true }: LayoutProps) {
             <div className="show-mobile" style={{
               borderTop: "1px solid var(--border-strong)",
               background: "var(--surface)",
-              padding: "0.5rem 1rem 1rem",
-              display: "flex", flexDirection: "column", gap: "0.25rem",
+              padding: "0.75rem 1rem 1rem",
+              boxShadow: "0 14px 34px rgba(0,0,0,0.08)",
             }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: "0.55rem", maxWidth: 520, margin: "0 auto" }}>
               {navLinks.map((link) => (
                 <Link key={link.href} href={link.href}>
                   <div style={{
-                    padding: "0.7rem 1rem",
-                    borderRadius: 10,
-                    fontSize: "0.9rem",
-                    fontWeight: 500,
+                    minHeight: 78,
+                    padding: "0.75rem 0.5rem",
+                    borderRadius: 14,
+                    fontSize: "0.74rem",
+                    fontWeight: 700,
                     cursor: "pointer",
                     color: loc === link.href ? "var(--accent)" : "var(--text-muted)",
-                    background: loc === link.href ? "var(--accent-dim)" : "transparent",
+                    background: loc === link.href ? "var(--accent-dim)" : "var(--surface-2)",
+                    border: `1px solid ${loc === link.href ? "rgba(212,82,26,0.32)" : "var(--border)"}`,
                     transition: "all 150ms",
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "0.45rem",
+                    textAlign: "center",
                   }}>
+                    <span style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>{NAV_ICONS[link.href]}</span>
                     {link.label}
                   </div>
                 </Link>
               ))}
+              </div>
             </div>
           )}
         </header>

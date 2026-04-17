@@ -38,11 +38,13 @@ function lerXLSX(buffer: Buffer): AddressRow[] {
   if (rows.length < 2) return [];
 
   const header = rows[0].map((c: any) => String(c).trim());
-  const colEnd = header.indexOf("Destination Address");
-  const colLat = header.indexOf("Latitude");
-  const colLon = header.indexOf("Longitude");
-  const colCidade = header.indexOf("City");
-  const colBairro = header.indexOf("Neighborhood");
+  const normalized = header.map(normalizarCabecalho);
+  const colEnd = encontrarColuna(normalized, ["destination address", "endereco destino", "endereço destino", "endereco", "endereço", "address"]);
+  const colLat = encontrarColuna(normalized, ["latitude", "lat"]);
+  const colLon = encontrarColuna(normalized, ["longitude", "lon", "lng"]);
+  const colCidade = encontrarColuna(normalized, ["city", "cidade", "municipio", "município"]);
+  const colBairro = encontrarColuna(normalized, ["neighborhood", "bairro"]);
+  const colCep = encontrarColuna(normalized, ["zipcodepostal code", "zipcode postal code", "zip", "zipcode", "postal code", "cep"]);
 
   if (colEnd === -1) throw new Error('Coluna "Destination Address" não encontrada.');
 
@@ -58,40 +60,32 @@ function lerXLSX(buffer: Buffer): AddressRow[] {
       lon: colLon !== -1 && row[colLon] !== "" ? Number(row[colLon]) : null,
       cidade: colCidade !== -1 ? String(row[colCidade] ?? "").trim() : "",
       bairro: colBairro !== -1 ? String(row[colBairro] ?? "").trim() : "",
+      cep: colCep !== -1 ? String(row[colCep] ?? "").trim() : "",
     });
   }
   return enderecos;
 }
 
 function lerCSV(buffer: Buffer): AddressRow[] {
-  const text = buffer.toString("utf-8");
-  const lines = text.split(/\r?\n/).filter((l) => l.trim());
-  if (lines.length < 2) return [];
+  return lerXLSX(buffer);
+}
 
-  const header = lines[0].split(",").map((c) => c.trim().replace(/^"|"$/g, ""));
-  const colEnd = header.indexOf("Destination Address");
-  const colLat = header.indexOf("Latitude");
-  const colLon = header.indexOf("Longitude");
-  const colCidade = header.indexOf("City");
-  const colBairro = header.indexOf("Neighborhood");
+function normalizarCabecalho(valor: string): string {
+  return valor
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9\s]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
 
-  if (colEnd === -1) throw new Error('Coluna "Destination Address" não encontrada.');
-
-  const enderecos: AddressRow[] = [];
-  for (let i = 1; i < lines.length; i++) {
-    const cells = lines[i].split(",").map((c) => c.trim().replace(/^"|"$/g, ""));
-    const endereco = cells[colEnd]?.trim() ?? "";
-    if (!endereco) continue;
-    enderecos.push({
-      linha: i + 1,
-      endereco,
-      lat: colLat !== -1 && cells[colLat] ? Number(cells[colLat]) : null,
-      lon: colLon !== -1 && cells[colLon] ? Number(cells[colLon]) : null,
-      cidade: colCidade !== -1 ? (cells[colCidade] ?? "").trim() : "",
-      bairro: colBairro !== -1 ? (cells[colBairro] ?? "").trim() : "",
-    });
+function encontrarColuna(header: string[], aliases: string[]): number {
+  for (const alias of aliases.map(normalizarCabecalho)) {
+    const idx = header.indexOf(alias);
+    if (idx !== -1) return idx;
   }
-  return enderecos;
+  return -1;
 }
 
 router.post("/process/upload", upload.single("arquivo"), async (req, res): Promise<void> => {

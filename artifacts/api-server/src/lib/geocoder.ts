@@ -46,6 +46,7 @@ export interface AddressRow {
   lon: number | null;
   cidade: string;
   bairro: string;
+  cep?: string;
 }
 
 export interface ResultRow {
@@ -63,6 +64,30 @@ export interface ResultRow {
 
 function normalizarTexto(texto: string): string {
   texto = texto.toLowerCase();
+  texto = texto
+    .replace(/\b(av|avda|aven)\b\.?/gi, "avenida")
+    .replace(/\b(tv|trav)\b\.?/gi, "travessa")
+    .replace(/\b(rod|rovia)\b\.?/gi, "rodovia")
+    .replace(/\bpç?a\b\.?/gi, "praca")
+    .replace(/\bdezoito\b/gi, "18")
+    .replace(/\bdezessete\b/gi, "17")
+    .replace(/\bdezesseis\b/gi, "16")
+    .replace(/\bquinze\b/gi, "15")
+    .replace(/\bcatorze\b/gi, "14")
+    .replace(/\btreze\b/gi, "13")
+    .replace(/\bdoze\b/gi, "12")
+    .replace(/\bonze\b/gi, "11")
+    .replace(/\bdez\b/gi, "10")
+    .replace(/\bnove\b/gi, "9")
+    .replace(/\boito\b/gi, "8")
+    .replace(/\bsete\b/gi, "7")
+    .replace(/\bseis\b/gi, "6")
+    .replace(/\bcinco\b/gi, "5")
+    .replace(/\bquatro\b/gi, "4")
+    .replace(/\btres\b/gi, "3")
+    .replace(/\btrês\b/gi, "3")
+    .replace(/\bdois\b/gi, "2")
+    .replace(/\bum\b/gi, "1");
   texto = texto.replace(/[^\p{L}\p{N}\s]/gu, "");
   texto = texto.replace(/\s+/g, " ").trim();
   const mapa: Record<string, string> = {
@@ -76,10 +101,25 @@ function normalizarTexto(texto: string): string {
   return texto.split("").map((c) => mapa[c] ?? c).join("");
 }
 
+function normalizarNomeRua(texto: string): string {
+  const tiposRua = /^(rua|r|av|avenida|alameda|estrada|rodovia|rovia|viela|beco|largo|praca|praça|pca|travessa|trav|tv|passagem)\s+/i;
+  return normalizarTexto(texto)
+    .replace(tiposRua, "")
+    .split(" ")
+    .filter((w) => w && !["de", "da", "do", "das", "dos", "a", "o", "e"].includes(w))
+    .join(" ");
+}
+
 function calcularSimilaridade(str1: string, str2: string): number {
-  const a = normalizarTexto(str1);
-  const b = normalizarTexto(str2);
+  const a = normalizarNomeRua(str1);
+  const b = normalizarNomeRua(str2);
   if (!a || !b) return 0;
+  if (a === b) return 1;
+  if (a.includes(b) || b.includes(a)) {
+    const menor = Math.min(a.length, b.length);
+    const maior = Math.max(a.length, b.length);
+    if (menor >= 5) return Math.max(0.82, menor / maior);
+  }
   // Jaccard de bigramas + presença de palavras
   const bigramas = (s: string) => {
     const set = new Set<string>();
@@ -92,7 +132,7 @@ function calcularSimilaridade(str1: string, str2: string): number {
   const union = new Set([...ba, ...bb]).size;
   const jaccard = union === 0 ? 0 : inter / union;
   // Verificação de palavras principais (ignoring tipo de logradouro)
-  const tiposRua = /^(rua|av|avenida|alameda|estrada|rodovia|viela|beco|largo|praça|pca|travessa|tv|passagem)\s+/i;
+  const tiposRua = /^(rua|r|av|avenida|alameda|estrada|rodovia|rovia|viela|beco|largo|praça|pca|travessa|trav|tv|passagem)\s+/i;
   const a2 = a.replace(tiposRua, "");
   const b2 = b.replace(tiposRua, "");
   const palavrasA = a2.split(" ").filter(Boolean);
@@ -132,8 +172,8 @@ function removerAnotacoesMotorista(s: string): string {
   const idx = s.indexOf(" - ");
   if (idx !== -1) s = s.substring(0, idx);
   s = s.replace(/\s+\d+[°ªº].*$/u, "");
-  const gatilhos = ["proximo", "próximo", "perto", "referencia", "maps", "google",
-    "waze", "placas", "portao", "buzina", "frente", "fundos", "esquina", "atrás"];
+  const gatilhos = ["proximo", "próximo", "perto", "referencia", "referência", "maps", "google",
+    "waze", "placas", "portao", "portão", "buzina", "frente", "fundos", "esquina", "atrás", "atras", "entre", "deixar", "nao entregar", "não entregar"];
   const lower = s.toLowerCase();
   for (const g of gatilhos) {
     const pos = lower.indexOf(g);
@@ -146,13 +186,18 @@ function removerAnotacoesMotorista(s: string): string {
 }
 
 function extrairLogradouroPrincipal(endereco: string): string {
-  endereco = endereco.replace(/^\s*(Loteamento|Condomínio|Residencial|Conjunto|Núcleo)\s+[^,]+?[,]?\s*/i, "");
-  const m = endereco.match(/\b(?:Rua|Av\.?|Avenida|Alameda|Praça|Pça\.?|Travessa|Tv\.?|Estrada|Rod\.?|Rodovia|Viela|Beco|Passagem|Largo)\s+[^\s,.\d][^,.\d]*/iu);
-  if (m) return m[0].trim();
-  const m2 = endereco.match(/^([^,\d]+)/);
+  const limpo = endereco.replace(/\bRovia\b/gi, "Rodovia");
+  const m = limpo.match(/\b(?:Rua|R\.?|Av\.?|Avenida|Alameda|Praça|Pça\.?|Travessa|Trav\.?|Tv\.?|Estrada|Rod\.?|Rodovia|Viela|Beco|Passagem|Largo)\s+[^\s,.\d][^,.;\n\r]*/iu);
+  if (m) {
+    return m[0]
+      .replace(/\s+\b(?:proximo|próximo|perto|refer[eê]ncia|maps|google|waze|placas|port[aã]o|buzina|frente|fundos|esquina|entre|deixar)\b.*$/iu, "")
+      .trim();
+  }
+  const semLoteamento = limpo.replace(/^\s*(Loteamento|Condomínio|Residencial|Conjunto|Núcleo)\s+[^,]+?[,]?\s*/i, "");
+  const m2 = semLoteamento.match(/^([^,\d]+)/);
   if (m2) {
     const candidato = m2[1].trim();
-    if (candidato.length >= 4 && !/^(lote|quadra|qd|lt|casa|apto|apartamento|bloco|conjunto|residencial|condomínio|nº)$/i.test(candidato)) {
+    if (candidato.length >= 4 && !/^(lote|quadra|qd|lt|casa|apto|apartamento|bloco|conjunto|residencial|condomínio|nº|bairro)$/i.test(candidato)) {
       return candidato;
     }
   }
@@ -189,6 +234,7 @@ function normalizarAcronimos(texto: string): string {
   texto = texto.replace(/\b(Lj\.?|Lj)[\s:]*(\d+[A-Z]?)\b/gi, "Loja $2");
   texto = texto.replace(/\b(Bl\.?|BL)\s+([A-Z])\b/gi, "Bloco $2");
   texto = texto.replace(/\b(Apt\.?|Apto\.?)\s+(\d+[A-Z]?)\b/gi, "Apto. $2");
+  texto = texto.replace(/\bRovia\b/gi, "Rodovia");
   return texto;
 }
 
@@ -201,12 +247,13 @@ function extrairRefsEstruturadas(texto: string): string | null {
   return refs.length > 0 ? refs.join(", ") : null;
 }
 
-export function parsearEndereco(endereco: string, cidade = "", bairro = ""): ParsedAddress {
+export function parsearEndereco(endereco: string, cidade = "", bairro = "", cepLinha = ""): ParsedAddress {
   let end = endereco.replace(/\s+/g, " ").trim();
   end = removerAnotacoesMotorista(end);
   end = normalizarAcronimos(end);
   const rua = extrairLogradouroPrincipal(end);
   const poi = extrairPOI(end);
+  const cep = extrairCEP(end) ?? (cepLinha ? cepLinha.replace(/\D/g, "") : null);
   return {
     rua_principal: rua,
     numero: extrairNumero(end),
@@ -216,7 +263,7 @@ export function parsearEndereco(endereco: string, cidade = "", bairro = ""): Par
     poi_estruturado: extrairRefsEstruturadas(end),
     cidade: cidade || extrairCidadeDoEndereco(end),
     bairro,
-    cep: extrairCEP(end),
+    cep,
     is_comercio: PALAVRAS_COMERCIO_REGEX.test(poi) || PALAVRAS_COMERCIO_REGEX.test(end),
     is_avenida_extensa: AVENIDAS_EXTENSAS_REGEX.test(rua) || AVENIDAS_EXTENSAS_REGEX.test(end),
   } as any;
@@ -248,7 +295,7 @@ async function aguardarRateLimit(ultimaReq: number): Promise<number> {
 
 function extrairDadosNominatim(data: any): GeoResult | null {
   const addr = data?.address ?? {};
-  const campos = ["road", "pedestrian", "footway", "cycleway", "path", "street", "residential", "suburb"];
+  const campos = ["road", "pedestrian", "footway", "cycleway", "path", "street", "residential"];
   for (const c of campos) {
     if (addr[c]) {
       return {
@@ -301,7 +348,7 @@ export async function geocodeForwardNominatim(
 
   for (const base of NOMINATIM_INSTANCES) {
     newUltimaReq = await aguardarRateLimit(newUltimaReq);
-    const url = `${base}/search?format=json&q=${encodeURIComponent(query)}&limit=5&addressdetails=1&viewbox=${viewbox}&bounded=1&accept-language=pt-BR`;
+    const url = `${base}/search?format=json&q=${encodeURIComponent(query)}&limit=5&addressdetails=1&viewbox=${viewbox}&bounded=1&countrycodes=br&accept-language=pt-BR`;
     const data = await httpGet(url);
     if (!data || !Array.isArray(data)) continue;
     for (const item of data) {
@@ -314,7 +361,7 @@ export async function geocodeForwardNominatim(
   }
 
   // Fallback Photon
-  const photon = await httpGet(`https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=3&lang=pt`);
+  const photon = await httpGet(`https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=5&lang=pt&osm_tag=highway`);
   if (photon?.features?.length > 0) {
     for (const f of photon.features) {
       const rua = f.properties?.street ?? f.properties?.name;
@@ -383,13 +430,30 @@ export async function geocodeReverseNominatim(
   ultimaReq: number
 ): Promise<{ result: GeoResult | null; ultimaReq: number }> {
   const newUltimaReq = await aguardarRateLimit(ultimaReq);
-  const url = `${NOMINATIM_INSTANCES[0]}/reverse?format=json&lat=${lat}&lon=${lon}&zoom=20&accept-language=pt-BR&layer=address`;
+  const url = `${NOMINATIM_INSTANCES[0]}/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1&accept-language=pt-BR&layer=address`;
   logger.debug({ lat, lon }, "geocodeReverseNominatim");
   const data = await httpGet(url);
   if (!data) return { result: null, ultimaReq: newUltimaReq };
   const result = extrairDadosNominatim(data);
   logger.debug({ lat, lon, found: result?.rua }, "Reverse geocode result");
   return { result, ultimaReq: newUltimaReq };
+}
+
+export async function geocodeReversePhoton(lat: number, lon: number): Promise<GeoResult | null> {
+  const data = await httpGet(`https://photon.komoot.io/reverse?lat=${lat}&lon=${lon}&radius=0.15&lang=pt`);
+  const features = Array.isArray(data?.features) ? data.features : [];
+  for (const f of features) {
+    const props = f.properties ?? {};
+    const rua = props.street ?? props.name;
+    if (rua && String(rua).trim().length > 3) {
+      return {
+        rua: String(rua).trim(),
+        lat: f.geometry?.coordinates?.[1],
+        lon: f.geometry?.coordinates?.[0],
+      };
+    }
+  }
+  return null;
 }
 
 export async function geocodeGoogleMaps(query: string, apiKey: string): Promise<GeoResult | null> {
@@ -411,6 +475,28 @@ export async function geocodeGoogleMaps(query: string, apiKey: string): Promise<
   };
 }
 
+export async function geocodeGoogleMapsReverse(lat: number, lon: number, apiKey: string): Promise<GeoResult | null> {
+  const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lon}&key=${apiKey}&language=pt-BR&region=BR&result_type=street_address|route|premise`;
+  logger.debug({ lat, lon }, "geocodeGoogleMapsReverse");
+  const data = await httpGet(url);
+  if (data?.status !== "OK" || !Array.isArray(data?.results)) {
+    logger.debug({ status: data?.status }, "Google Maps reverse: no result");
+    return null;
+  }
+  for (const result of data.results) {
+    const components = result.address_components ?? [];
+    const routeComp = components.find((c: any) => c.types.includes("route"));
+    if (routeComp) {
+      return {
+        rua: routeComp.long_name,
+        lat: result.geometry?.location?.lat,
+        lon: result.geometry?.location?.lng,
+      };
+    }
+  }
+  return null;
+}
+
 async function parseAddressWithAI(
   endereco: string,
   aiProvider: string,
@@ -420,12 +506,13 @@ async function parseAddressWithAI(
 
   const prompt = `Você é um parser de endereços brasileiros. Extraia os componentes do seguinte endereço e retorne JSON APENAS com os campos abaixo (sem explicação):
 {
-  "rua_principal": "nome do logradouro principal (ex: Rua Sinagoga, Avenida Beira Mar)",
+  "rua_principal": "nome do logradouro principal exatamente como rua/avenida/estrada/rodovia, ignorando lote, quadra, loja, casa e referências do motorista",
   "numero": "número ou S/N",
   "via_secundaria": "travessa/passagem/viela se presente, ou null",
   "poi": "nome do estabelecimento/comércio se presente, ou null"
 }
 
+Regras: corrija abreviações comuns (Av.=Avenida, Rovia=Rodovia), preserve nomes próprios, não confunda bairro/loteamento/condomínio com rua e ignore textos como próximo, maps, placas, portão, referência, deixar, não entregar.
 Endereço: "${endereco}"`;
 
   try {
@@ -535,58 +622,35 @@ export function verificarNuance(
   const similaridade = calcularSimilaridade(ruaExtraida, ruaOficial);
   const limiar = limiarAdaptativo(ruaExtraida, parsed.is_avenida_extensa, parsed.is_comercio);
 
-  // Calcular distância GPS vs geocoded
+  if (!ruaExtraida) {
+    return {
+      is_nuance: true,
+      similaridade: null,
+      motivo: "Não foi possível extrair o logradouro principal da planilha.",
+      distancia_metros: null,
+    };
+  }
+
   let distanciaMetros: number | null = null;
   if (gpsLat !== null && gpsLon !== null && geocodeLat !== null && geocodeLon !== null) {
     distanciaMetros = Math.round(haversineMetros(gpsLat, gpsLon, geocodeLat, geocodeLon));
     logger.debug({ distanciaMetros, toleranceMeters, rua: ruaExtraida }, "Distância GPS vs geocoded");
   }
 
-  // Para avenidas extensas E comércios: EXIGE validação por distância se GPS disponível
-  if ((parsed.is_avenida_extensa || parsed.is_comercio) && distanciaMetros !== null) {
-    if (distanciaMetros > toleranceMeters) {
-      return {
-        is_nuance: true,
-        similaridade: Math.round(similaridade * 1000) / 1000,
-        motivo: `Coordenada GPS a ${distanciaMetros}m do ponto oficial (tolerância: ${toleranceMeters}m). ${parsed.is_comercio ? "Comércio/POI não confirmado." : "Avenida extensa: exige alta precisão."}`,
-        distancia_metros: distanciaMetros,
-      };
-    }
-    // Distância OK em avenida extensa/comércio → aceitar mesmo com similaridade menor
-    return {
-      is_nuance: false,
-      similaridade: Math.round(similaridade * 1000) / 1000,
-      motivo: "",
-      distancia_metros: distanciaMetros,
-    };
-  }
-
-  // Para todos: se distância está disponível e é boa, não marcar como nuance por similaridade baixa
-  if (distanciaMetros !== null && distanciaMetros <= toleranceMeters && similaridade >= 0.5) {
-    return {
-      is_nuance: false,
-      similaridade: Math.round(similaridade * 1000) / 1000,
-      motivo: "",
-      distancia_metros: distanciaMetros,
-    };
-  }
-
-  // Validação por distância (sem coordenada GPS ou fora do OK): usar só similaridade
-  if (distanciaMetros !== null && distanciaMetros > toleranceMeters) {
-    return {
-      is_nuance: true,
-      similaridade: Math.round(similaridade * 1000) / 1000,
-      motivo: `Coordenada GPS a ${distanciaMetros}m do oficial (tolerância: ${toleranceMeters}m)`,
-      distancia_metros: distanciaMetros,
-    };
-  }
-
-  // Fallback: similaridade de nome
   if (similaridade < limiar) {
     return {
       is_nuance: true,
       similaridade: Math.round(similaridade * 1000) / 1000,
       motivo: `"${ruaExtraida}" difere do oficial "${ruaOficial}" (${Math.round(similaridade * 100)}% < limiar ${Math.round(limiar * 100)}%)`,
+      distancia_metros: distanciaMetros,
+    };
+  }
+
+  if (distanciaMetros !== null && distanciaMetros > toleranceMeters) {
+    return {
+      is_nuance: true,
+      similaridade: Math.round(similaridade * 1000) / 1000,
+      motivo: `Coordenada GPS a ${distanciaMetros}m do oficial (tolerância: ${toleranceMeters}m)${parsed.is_comercio ? ". Comércio/POI não confirmado." : parsed.is_avenida_extensa ? ". Avenida extensa: exige alta precisão." : ""}`,
       distancia_metros: distanciaMetros,
     };
   }
@@ -612,7 +676,7 @@ export async function processarEndereco(
 ): Promise<{ resultado: ResultRow; ultimaReq: number }> {
   logger.info({ linha: item.linha, endereco: item.endereco, instanceMode, parserMode }, "Processando endereço");
 
-  let parsed: ParsedAddress = parsearEndereco(item.endereco, item.cidade, item.bairro);
+  let parsed: ParsedAddress = parsearEndereco(item.endereco, item.cidade, item.bairro, item.cep);
 
   // AI parser mode: tentar melhorar a extração com IA
   if (parserMode === "ai" && aiProvider && aiApiKey) {
@@ -639,30 +703,55 @@ export async function processarEndereco(
 
   const cep = parsed.cep;
   let geoResult: GeoResult | null = null;
+  let reverseGeoResult: GeoResult | null = null;
+  let forwardGeoResult: GeoResult | null = null;
   let geocodeLat: number | null = null;
   let geocodeLon: number | null = null;
   let newUltimaReq = ultimaReq;
 
   if (instanceMode === "googlemaps" && googleMapsApiKey) {
-    // Google Maps: usar para rua principal
-    const query = montarQueryBusca(parsed);
-    geoResult = await geocodeGoogleMaps(query, googleMapsApiKey);
-    if (geoResult?.lat) geocodeLat = geoResult.lat;
-    if (geoResult?.lon) geocodeLon = geoResult.lon;
+    if (item.lat !== null && item.lon !== null) {
+      reverseGeoResult = await geocodeGoogleMapsReverse(item.lat, item.lon, googleMapsApiKey);
+      geoResult = reverseGeoResult;
+      if (reverseGeoResult?.lat) geocodeLat = reverseGeoResult.lat;
+      if (reverseGeoResult?.lon) geocodeLon = reverseGeoResult.lon;
+    }
 
-    // Para via secundária com Google Maps
-    if (!geoResult && parsed.via_secundaria) {
+    const query = montarQueryBusca(parsed);
+    forwardGeoResult = await geocodeGoogleMaps(query, googleMapsApiKey);
+    if (!geoResult) geoResult = forwardGeoResult;
+    if (forwardGeoResult?.lat) geocodeLat = forwardGeoResult.lat;
+    if (forwardGeoResult?.lon) geocodeLon = forwardGeoResult.lon;
+
+    if (!forwardGeoResult && parsed.via_secundaria) {
       const qVia = [parsed.via_secundaria, parsed.cidade, "Brasil"].filter(Boolean).join(", ");
-      geoResult = await geocodeGoogleMaps(qVia, googleMapsApiKey);
-      if (geoResult?.lat) geocodeLat = geoResult.lat;
-      if (geoResult?.lon) geocodeLon = geoResult.lon;
+      forwardGeoResult = await geocodeGoogleMaps(qVia, googleMapsApiKey);
+      if (!geoResult) geoResult = forwardGeoResult;
+      if (forwardGeoResult?.lat) geocodeLat = forwardGeoResult.lat;
+      if (forwardGeoResult?.lon) geocodeLon = forwardGeoResult.lon;
     }
   } else {
-    // Modo builtin: CEP → Forward → Via Secundária → Reverso
+    if (item.lat !== null && item.lon !== null) {
+      const cacheKey = `rev_${Math.round(item.lat * 100000)}_${Math.round(item.lon * 100000)}`;
+      const cached = cache.get(cacheKey);
+      if (cached && Date.now() - cached.ts < 2 * 3600 * 1000) {
+        reverseGeoResult = cached.data;
+      } else {
+        const rev = await geocodeReverseNominatim(item.lat, item.lon, newUltimaReq);
+        reverseGeoResult = rev.result;
+        newUltimaReq = rev.ultimaReq;
+        if (!reverseGeoResult) reverseGeoResult = await geocodeReversePhoton(item.lat, item.lon);
+        cache.set(cacheKey, { data: reverseGeoResult, ts: Date.now() });
+      }
+      geoResult = reverseGeoResult;
+      if (reverseGeoResult?.lat) geocodeLat = reverseGeoResult.lat;
+      if (reverseGeoResult?.lon) geocodeLon = reverseGeoResult.lon;
+    }
+
     if (cep) {
       const brasilApiData = await geocodeBrasilAPI(cep);
       if (brasilApiData) {
-        parsed.rua_principal = brasilApiData.rua;
+        if (!parsed.rua_principal) parsed.rua_principal = brasilApiData.rua;
         if (!parsed.cidade) parsed.cidade = brasilApiData.cidade;
         if (!parsed.bairro) parsed.bairro = brasilApiData.bairro;
       }
@@ -673,16 +762,18 @@ export async function processarEndereco(
       const cacheKey = `fwd_${query}`;
       const cached = cache.get(cacheKey);
       if (cached && Date.now() - cached.ts < 2 * 3600 * 1000) {
-        geoResult = cached.data;
-        if (geoResult?.lat) geocodeLat = geoResult.lat;
-        if (geoResult?.lon) geocodeLon = geoResult.lon;
+        forwardGeoResult = cached.data;
+        if (!geoResult) geoResult = forwardGeoResult;
+        if (forwardGeoResult?.lat) geocodeLat = forwardGeoResult.lat;
+        if (forwardGeoResult?.lon) geocodeLon = forwardGeoResult.lon;
       } else {
         const fwd = await geocodeForwardNominatim(query, newUltimaReq);
-        geoResult = fwd.result;
+        forwardGeoResult = fwd.result;
         newUltimaReq = fwd.ultimaReq;
-        if (geoResult?.lat) geocodeLat = geoResult.lat;
-        if (geoResult?.lon) geocodeLon = geoResult.lon;
-        cache.set(cacheKey, { data: geoResult, ts: Date.now() });
+        if (!geoResult) geoResult = forwardGeoResult;
+        if (forwardGeoResult?.lat) geocodeLat = forwardGeoResult.lat;
+        if (forwardGeoResult?.lon) geocodeLon = forwardGeoResult.lon;
+        cache.set(cacheKey, { data: forwardGeoResult, ts: Date.now() });
       }
     }
 
@@ -709,7 +800,7 @@ export async function processarEndereco(
               // Travessa está perto da rua principal → usar coordenada da travessa
               geocodeLat = fwdVia.result.lat!;
               geocodeLon = fwdVia.result.lon!;
-              geoResult = { rua: fwdVia.result.rua, lat: fwdVia.result.lat, lon: fwdVia.result.lon };
+              if (!reverseGeoResult) geoResult = { rua: fwdVia.result.rua, lat: fwdVia.result.lat, lon: fwdVia.result.lon };
             }
           } else {
             geocodeLat = fwdVia.result.lat!;
@@ -736,24 +827,6 @@ export async function processarEndereco(
           geocodeLon = fwdPoi.result.lon!;
           if (!geoResult) geoResult = fwdPoi.result;
         }
-      }
-    }
-
-    // Fallback: geocodificação reversa a partir do GPS
-    if (!geoResult && item.lat !== null && item.lon !== null) {
-      const cacheKey = `rev_${Math.round(item.lat * 100000)}_${Math.round(item.lon * 100000)}`;
-      const cached = cache.get(cacheKey);
-      if (cached && Date.now() - cached.ts < 2 * 3600 * 1000) {
-        geoResult = cached.data;
-        if (geoResult?.lat) geocodeLat = geoResult.lat;
-        if (geoResult?.lon) geocodeLon = geoResult.lon;
-      } else {
-        const rev = await geocodeReverseNominatim(item.lat, item.lon, newUltimaReq);
-        geoResult = rev.result;
-        newUltimaReq = rev.ultimaReq;
-        if (geoResult?.lat) geocodeLat = geoResult.lat;
-        if (geoResult?.lon) geocodeLon = geoResult.lon;
-        cache.set(cacheKey, { data: geoResult, ts: Date.now() });
       }
     }
   }
