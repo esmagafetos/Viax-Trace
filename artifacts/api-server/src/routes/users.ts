@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import multer from "multer";
 import { eq } from "drizzle-orm";
 import { db, usersTable, userSettingsTable } from "@workspace/db";
+import { logger } from "../lib/logger.js";
 import { UpdateProfileBody, UpdatePasswordBody, UpdateSettingsBody } from "@workspace/api-zod";
 
 const router: IRouter = Router();
@@ -15,6 +16,32 @@ function requireAuth(req: any, res: any): number | null {
     return null;
   }
   return userId;
+}
+
+function formatUser(user: any) {
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    avatarUrl: user.avatarUrl,
+    birthDate: user.birthDate,
+    createdAt: user.createdAt instanceof Date ? user.createdAt.toISOString() : user.createdAt,
+  };
+}
+
+function formatSettings(s: any) {
+  return {
+    parserMode: s.parserMode,
+    aiProvider: s.aiProvider ?? null,
+    aiApiKey: s.aiApiKey ?? null,
+    toleranceMeters: s.toleranceMeters,
+    instanceMode: s.instanceMode ?? "builtin",
+    googleMapsApiKey: s.googleMapsApiKey ?? null,
+    valorPorRota: s.valorPorRota ?? null,
+    cicloPagamentoDias: s.cicloPagamentoDias ?? 30,
+    metaMensalRotas: s.metaMensalRotas ?? null,
+    despesasFixasMensais: s.despesasFixasMensais ?? null,
+  };
 }
 
 router.patch("/users/profile", async (req, res): Promise<void> => {
@@ -32,20 +59,9 @@ router.patch("/users/profile", async (req, res): Promise<void> => {
   if (parsed.data.avatarUrl !== undefined) updateData.avatarUrl = parsed.data.avatarUrl;
   if (parsed.data.birthDate !== undefined) updateData.birthDate = parsed.data.birthDate;
 
-  const [user] = await db
-    .update(usersTable)
-    .set(updateData)
-    .where(eq(usersTable.id, userId))
-    .returning();
-
-  res.json({
-    id: user.id,
-    name: user.name,
-    email: user.email,
-    avatarUrl: user.avatarUrl,
-    birthDate: user.birthDate,
-    createdAt: user.createdAt.toISOString(),
-  });
+  const [user] = await db.update(usersTable).set(updateData).where(eq(usersTable.id, userId)).returning();
+  logger.debug({ userId, fields: Object.keys(updateData) }, "Profile updated");
+  res.json(formatUser(user));
 });
 
 router.post("/users/avatar", avatarUpload.single("avatar"), async (req, res): Promise<void> => {
@@ -66,20 +82,9 @@ router.post("/users/avatar", avatarUpload.single("avatar"), async (req, res): Pr
   const base64 = req.file.buffer.toString("base64");
   const dataUrl = `data:${req.file.mimetype};base64,${base64}`;
 
-  const [user] = await db
-    .update(usersTable)
-    .set({ avatarUrl: dataUrl })
-    .where(eq(usersTable.id, userId))
-    .returning();
-
-  res.json({
-    id: user.id,
-    name: user.name,
-    email: user.email,
-    avatarUrl: user.avatarUrl,
-    birthDate: user.birthDate,
-    createdAt: user.createdAt.toISOString(),
-  });
+  const [user] = await db.update(usersTable).set({ avatarUrl: dataUrl }).where(eq(usersTable.id, userId)).returning();
+  logger.debug({ userId, size: req.file.size }, "Avatar uploaded");
+  res.json(formatUser(user));
 });
 
 router.patch("/users/password", async (req, res): Promise<void> => {
@@ -106,7 +111,7 @@ router.patch("/users/password", async (req, res): Promise<void> => {
 
   const newHash = await bcrypt.hash(parsed.data.newPassword, 10);
   await db.update(usersTable).set({ passwordHash: newHash }).where(eq(usersTable.id, userId));
-
+  logger.info({ userId }, "Password changed");
   res.json({ message: "Senha alterada com sucesso." });
 });
 
@@ -115,20 +120,13 @@ router.get("/users/settings", async (req, res): Promise<void> => {
   if (!userId) return;
 
   let [settings] = await db.select().from(userSettingsTable).where(eq(userSettingsTable.userId, userId)).limit(1);
-
   if (!settings) {
-    const [created] = await db.insert(userSettingsTable).values({ userId, parserMode: "builtin", toleranceMeters: 300, instanceMode: "builtin" }).returning();
+    const [created] = await db.insert(userSettingsTable).values({
+      userId, parserMode: "builtin", toleranceMeters: 300, instanceMode: "builtin", cicloPagamentoDias: 30,
+    }).returning();
     settings = created;
   }
-
-  res.json({
-    parserMode: settings.parserMode,
-    aiProvider: settings.aiProvider,
-    aiApiKey: settings.aiApiKey,
-    toleranceMeters: settings.toleranceMeters,
-    instanceMode: (settings as any).instanceMode ?? "builtin",
-    googleMapsApiKey: (settings as any).googleMapsApiKey ?? null,
-  });
+  res.json(formatSettings(settings));
 });
 
 router.patch("/users/settings", async (req, res): Promise<void> => {
@@ -141,32 +139,32 @@ router.patch("/users/settings", async (req, res): Promise<void> => {
     return;
   }
 
+  const d = parsed.data as any;
   const updateData: Record<string, unknown> = {};
-  if (parsed.data.parserMode !== undefined) updateData.parserMode = parsed.data.parserMode;
-  if (parsed.data.aiProvider !== undefined) updateData.aiProvider = parsed.data.aiProvider;
-  if (parsed.data.aiApiKey !== undefined) updateData.aiApiKey = parsed.data.aiApiKey;
-  if (parsed.data.toleranceMeters !== undefined) updateData.toleranceMeters = parsed.data.toleranceMeters;
-  if ((parsed.data as any).instanceMode !== undefined) updateData.instanceMode = (parsed.data as any).instanceMode;
-  if ((parsed.data as any).googleMapsApiKey !== undefined) updateData.googleMapsApiKey = (parsed.data as any).googleMapsApiKey;
+  if (d.parserMode !== undefined) updateData.parserMode = d.parserMode;
+  if (d.aiProvider !== undefined) updateData.aiProvider = d.aiProvider;
+  if (d.aiApiKey !== undefined) updateData.aiApiKey = d.aiApiKey;
+  if (d.toleranceMeters !== undefined) updateData.toleranceMeters = d.toleranceMeters;
+  if (d.instanceMode !== undefined) updateData.instanceMode = d.instanceMode;
+  if (d.googleMapsApiKey !== undefined) updateData.googleMapsApiKey = d.googleMapsApiKey;
+  if (d.valorPorRota !== undefined) updateData.valorPorRota = d.valorPorRota;
+  if (d.cicloPagamentoDias !== undefined) updateData.cicloPagamentoDias = d.cicloPagamentoDias;
+  if (d.metaMensalRotas !== undefined) updateData.metaMensalRotas = d.metaMensalRotas;
+  if (d.despesasFixasMensais !== undefined) updateData.despesasFixasMensais = d.despesasFixasMensais;
 
   let [settings] = await db.select().from(userSettingsTable).where(eq(userSettingsTable.userId, userId)).limit(1);
-
   if (!settings) {
-    const [created] = await db.insert(userSettingsTable).values({ userId, parserMode: "builtin", toleranceMeters: 300, instanceMode: "builtin", ...updateData }).returning();
+    const [created] = await db.insert(userSettingsTable).values({
+      userId, parserMode: "builtin", toleranceMeters: 300, instanceMode: "builtin", cicloPagamentoDias: 30, ...updateData,
+    }).returning();
     settings = created;
   } else {
     const [updated] = await db.update(userSettingsTable).set(updateData).where(eq(userSettingsTable.userId, userId)).returning();
     settings = updated;
   }
 
-  res.json({
-    parserMode: settings.parserMode,
-    aiProvider: settings.aiProvider,
-    aiApiKey: settings.aiApiKey,
-    toleranceMeters: settings.toleranceMeters,
-    instanceMode: (settings as any).instanceMode ?? "builtin",
-    googleMapsApiKey: (settings as any).googleMapsApiKey ?? null,
-  });
+  logger.debug({ userId, fields: Object.keys(updateData) }, "Settings updated");
+  res.json(formatSettings(settings));
 });
 
 export default router;

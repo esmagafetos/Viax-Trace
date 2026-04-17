@@ -22,6 +22,7 @@ import type {
   AnalysisSummary,
   AuthResponse,
   CreateAnalysisBody,
+  DashboardFinancial,
   DashboardSummary,
   ErrorResponse,
   HealthStatus,
@@ -1353,6 +1354,81 @@ export function useGetRecentAnalyses<
   request?: SecondParameter<typeof customFetch>;
 }): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getGetRecentAnalysesQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Get financial overview for current cycle
+ */
+export const getGetDashboardFinancialUrl = () => {
+  return `/api/dashboard/financial`;
+};
+
+export const getDashboardFinancial = async (
+  options?: RequestInit,
+): Promise<DashboardFinancial> => {
+  return customFetch<DashboardFinancial>(getGetDashboardFinancialUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetDashboardFinancialQueryKey = () => {
+  return [`/api/dashboard/financial`] as const;
+};
+
+export const getGetDashboardFinancialQueryOptions = <
+  TData = Awaited<ReturnType<typeof getDashboardFinancial>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getDashboardFinancial>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetDashboardFinancialQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getDashboardFinancial>>
+  > = ({ signal }) => getDashboardFinancial({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getDashboardFinancial>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetDashboardFinancialQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getDashboardFinancial>>
+>;
+export type GetDashboardFinancialQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get financial overview for current cycle
+ */
+
+export function useGetDashboardFinancial<
+  TData = Awaited<ReturnType<typeof getDashboardFinancial>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getDashboardFinancial>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetDashboardFinancialQueryOptions(options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

@@ -8,7 +8,7 @@ import Dashboard from "@/pages/Dashboard";
 import Process from "@/pages/Process";
 import History from "@/pages/History";
 import Settings from "@/pages/Settings";
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -19,24 +19,55 @@ const queryClient = new QueryClient({
   },
 });
 
+function PageTransition({ children }: { children: React.ReactNode }) {
+  const [location] = useLocation();
+  const [displayChildren, setDisplayChildren] = useState(children);
+  const [transitionState, setTransitionState] = useState<"idle" | "out" | "in">("idle");
+  const prevLocationRef = useRef(location);
+
+  useEffect(() => {
+    if (location !== prevLocationRef.current) {
+      prevLocationRef.current = location;
+      setTransitionState("out");
+      const t1 = setTimeout(() => {
+        setDisplayChildren(children);
+        setTransitionState("in");
+      }, 120);
+      const t2 = setTimeout(() => setTransitionState("idle"), 280);
+      return () => { clearTimeout(t1); clearTimeout(t2); };
+    } else {
+      setDisplayChildren(children);
+    }
+  }, [location, children]);
+
+  return (
+    <div style={{
+      opacity: transitionState === "out" ? 0 : 1,
+      transform: transitionState === "out" ? "translateY(6px)" : "translateY(0)",
+      transition: transitionState === "out"
+        ? "opacity 120ms ease, transform 120ms ease"
+        : "opacity 200ms ease, transform 200ms ease",
+    }}>
+      {displayChildren}
+    </div>
+  );
+}
+
+const LoadingSpinner = () => (
+  <div style={{ minHeight: "100vh", background: "var(--bg)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+    <div style={{ width: 40, height: 40, border: "2px solid var(--border-strong)", borderTopColor: "var(--accent)", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+  </div>
+);
+
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
   const { isAuthenticated, isLoading } = useAuth();
   const [, navigate] = useLocation();
 
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      navigate("/login");
-    }
+    if (!isLoading && !isAuthenticated) navigate("/login");
   }, [isLoading, isAuthenticated, navigate]);
 
-  if (isLoading) {
-    return (
-      <div style={{ minHeight: "100vh", background: "var(--bg)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <div style={{ width: 40, height: 40, border: "2px solid var(--border-strong)", borderTopColor: "var(--accent)", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
-      </div>
-    );
-  }
-
+  if (isLoading) return <LoadingSpinner />;
   if (!isAuthenticated) return null;
   return <Component />;
 }
@@ -46,35 +77,29 @@ function PublicRoute({ component: Component }: { component: React.ComponentType 
   const [, navigate] = useLocation();
 
   useEffect(() => {
-    if (!isLoading && isAuthenticated) {
-      navigate("/dashboard");
-    }
+    if (!isLoading && isAuthenticated) navigate("/dashboard");
   }, [isLoading, isAuthenticated, navigate]);
 
-  if (isLoading) {
-    return (
-      <div style={{ minHeight: "100vh", background: "var(--bg)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <div style={{ width: 40, height: 40, border: "2px solid var(--border-strong)", borderTopColor: "var(--accent)", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
-      </div>
-    );
-  }
-
+  if (isLoading) return <LoadingSpinner />;
   return <Component />;
 }
 
 function AppRoutes() {
+  const [location] = useLocation();
   return (
-    <Switch>
-      <Route path="/login" component={() => <PublicRoute component={Login} />} />
-      <Route path="/register" component={() => <PublicRoute component={Register} />} />
-      <Route path="/setup" component={() => <ProtectedRoute component={Setup} />} />
-      <Route path="/dashboard" component={() => <ProtectedRoute component={Dashboard} />} />
-      <Route path="/process" component={() => <ProtectedRoute component={Process} />} />
-      <Route path="/history" component={() => <ProtectedRoute component={History} />} />
-      <Route path="/settings" component={() => <ProtectedRoute component={Settings} />} />
-      <Route path="/" component={() => <Redirect to="/dashboard" />} />
-      <Route component={() => <Redirect to="/dashboard" />} />
-    </Switch>
+    <PageTransition key={location}>
+      <Switch>
+        <Route path="/login" component={() => <PublicRoute component={Login} />} />
+        <Route path="/register" component={() => <PublicRoute component={Register} />} />
+        <Route path="/setup" component={() => <ProtectedRoute component={Setup} />} />
+        <Route path="/dashboard" component={() => <ProtectedRoute component={Dashboard} />} />
+        <Route path="/process" component={() => <ProtectedRoute component={Process} />} />
+        <Route path="/history" component={() => <ProtectedRoute component={History} />} />
+        <Route path="/settings" component={() => <ProtectedRoute component={Settings} />} />
+        <Route path="/" component={() => <Redirect to="/dashboard" />} />
+        <Route component={() => <Redirect to="/dashboard" />} />
+      </Switch>
+    </PageTransition>
   );
 }
 

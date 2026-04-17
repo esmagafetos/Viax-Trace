@@ -3,6 +3,7 @@ import multer from "multer";
 import { read as xlsxRead, utils as xlsxUtils } from "xlsx";
 import { eq } from "drizzle-orm";
 import { db, userSettingsTable, analysesTable } from "@workspace/db";
+import { logger } from "../lib/logger.js";
 import {
   parsearEndereco,
   processarEndereco,
@@ -121,11 +122,24 @@ router.post("/process/upload", upload.single("arquivo"), async (req, res): Promi
 
     let settings = (await db.select().from(userSettingsTable).where(eq(userSettingsTable.userId, userId)).limit(1))[0];
     if (!settings) {
-      [settings] = await db.insert(userSettingsTable).values({ userId, parserMode: "builtin", toleranceMeters: 300, instanceMode: "builtin" }).returning();
+      [settings] = await db.insert(userSettingsTable).values({
+        userId,
+        parserMode: "builtin",
+        toleranceMeters: 300,
+        instanceMode: "builtin",
+      }).returning();
     }
 
     const instanceMode = (settings as any).instanceMode ?? "builtin";
     const googleMapsApiKey = (settings as any).googleMapsApiKey ?? null;
+    const toleranceMeters = (settings as any).toleranceMeters ?? 300;
+    const parserMode = (settings as any).parserMode ?? "builtin";
+    const aiProvider = (settings as any).aiProvider ?? null;
+    const aiApiKey = (settings as any).aiApiKey ?? null;
+
+    logger.info({
+      userId, fileName: req.file.originalname, instanceMode, parserMode, toleranceMeters,
+    }, "Início processamento de rota");
 
     sendSSE(res, "step", { step: "Lendo arquivo..." });
 
@@ -133,6 +147,7 @@ router.post("/process/upload", upload.single("arquivo"), async (req, res): Promi
     try {
       enderecos = ext === "xlsx" ? lerXLSX(req.file.buffer) : lerCSV(req.file.buffer);
     } catch (e: any) {
+      logger.error({ error: e?.message }, "Erro ao ler arquivo");
       sendSSE(res, "error", { error: e.message ?? "Erro ao ler arquivo." });
       res.end();
       return;
@@ -144,8 +159,15 @@ router.post("/process/upload", upload.single("arquivo"), async (req, res): Promi
       return;
     }
 
+    const totalOriginal = enderecos.length;
     enderecos = enderecos.slice(0, MAX_ENDERECOS);
-    sendSSE(res, "step", { step: `Processando ${enderecos.length} endereço(s)...` });
+    if (totalOriginal > MAX_ENDERECOS) {
+      sendSSE(res, "step", { step: `⚠️ Arquivo tem ${totalOriginal} endereços. Processando os primeiros ${MAX_ENDERECOS}.` });
+    }
+
+    const instanceLabel = instanceMode === "googlemaps" ? "Google Maps API" : "Nominatim/OSM + BrasilAPI";
+    const parserLabel = parserMode === "ai" && aiProvider ? `IA (${aiProvider})` : "Parser embutido";
+    sendSSE(res, "step", { step: `${enderecos.length} endereço(s) · Instância: ${instanceLabel} · Parser: ${parserLabel} · Tolerância: ${toleranceMeters}m` });
 
     const detalhes: ResultRow[] = [];
     let totalNuances = 0;
@@ -153,15 +175,21 @@ router.post("/process/upload", upload.single("arquivo"), async (req, res): Promi
     let ultimaReq = 0;
     const geoCache = new Map<string, { data: any; ts: number }>();
 
-    const instanceLabel = instanceMode === "googlemaps" ? "Google Maps API" : "Nominatim/OSM";
-    sendSSE(res, "step", { step: `Usando instância: ${instanceLabel}` });
-
     for (let i = 0; i < enderecos.length; i++) {
       const item = enderecos[i];
-      sendSSE(res, "step", { step: `Processando ${i + 1}/${enderecos.length}: ${item.endereco.substring(0, 50)}...` });
+      const label = item.endereco.length > 45 ? item.endereco.substring(0, 45) + "..." : item.endereco;
+      sendSSE(res, "step", { step: `[${i + 1}/${enderecos.length}] ${label}` });
 
       const { resultado, ultimaReq: novaUltimaReq } = await processarEndereco(
-        item, instanceMode, googleMapsApiKey, ultimaReq, geoCache
+        item,
+        instanceMode,
+        googleMapsApiKey,
+        ultimaReq,
+        geoCache,
+        toleranceMeters,
+        parserMode,
+        aiProvider,
+        aiApiKey
       );
       ultimaReq = novaUltimaReq;
 
@@ -170,7 +198,7 @@ router.post("/process/upload", upload.single("arquivo"), async (req, res): Promi
       if (resultado.nome_rua_oficial) geocodeSucesso++;
     }
 
-    sendSSE(res, "step", { step: "Finalizando. Gerando relatório..." });
+    sendSSE(res, "step", { step: "✓ Geocodificação concluída. Gerando relatório..." });
 
     const total = detalhes.length;
     const tempoMs = Date.now() - tInicio;
@@ -184,26 +212,36 @@ router.post("/process/upload", upload.single("arquivo"), async (req, res): Promi
       geocodeSuccess: geocodeSucesso,
       similarityAvg: Math.round(similarityAvg * 1000) / 1000,
       processingTimeMs: tempoMs,
-      parserMode: instanceMode === "googlemaps" ? "googlemaps" : settings.parserMode,
+      parserMode: instanceMode === "googlemaps" ? "googlemaps" : parserMode,
       status: "done",
       results: JSON.stringify(detalhes),
     });
+
+    const percentualProblema = total > 0 ? Math.round((totalNuances / total) * 100 * 10) / 10 : 0;
+
+    logger.info({
+      userId, fileName: req.file.originalname, total, totalNuances, percentualProblema,
+      geocodeSucesso, tempoMs, instanceMode, parserMode, toleranceMeters,
+    }, "Processamento concluído");
 
     sendSSE(res, "result", {
       result: {
         success: true,
         total_enderecos: total,
         total_nuances: totalNuances,
-        percentual_problema: total > 0 ? Math.round((totalNuances / total) * 100 * 10) / 10 : 0,
+        percentual_problema: percentualProblema,
         detalhes,
         metricas_tecnicas: {
           tempo_processamento_ms: tempoMs,
           taxa_geocode_sucesso: total > 0 ? Math.round((geocodeSucesso / total) * 100 * 10) / 10 : 0,
           instancia: instanceLabel,
+          parser: parserLabel,
+          tolerancia_metros: toleranceMeters,
         },
       },
     });
   } catch (e: any) {
+    logger.error({ error: e?.message, stack: e?.stack }, "Erro interno no processamento");
     sendSSE(res, "error", { error: "Erro interno: " + (e.message ?? String(e)) });
   } finally {
     res.end();

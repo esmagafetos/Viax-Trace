@@ -126,6 +126,15 @@ export const GetSettingsResponse = zod.object({
       "Geocoding instance: builtin=Nominatim\/OSM, googlemaps=Google Maps API",
     ),
   googleMapsApiKey: zod.string().nullish(),
+  valorPorRota: zod.number().nullish().describe("Earnings per route (BRL)"),
+  cicloPagamentoDias: zod
+    .number()
+    .describe("Payment cycle in days (7, 14, 30)"),
+  metaMensalRotas: zod.number().nullish().describe("Monthly routes target"),
+  despesasFixasMensais: zod
+    .number()
+    .nullish()
+    .describe("Fixed monthly expenses (BRL)"),
 });
 
 /**
@@ -138,6 +147,10 @@ export const UpdateSettingsBody = zod.object({
   toleranceMeters: zod.number().optional(),
   instanceMode: zod.enum(["builtin", "googlemaps"]).optional(),
   googleMapsApiKey: zod.string().nullish(),
+  valorPorRota: zod.number().nullish(),
+  cicloPagamentoDias: zod.number().optional(),
+  metaMensalRotas: zod.number().nullish(),
+  despesasFixasMensais: zod.number().nullish(),
 });
 
 export const UpdateSettingsResponse = zod.object({
@@ -153,6 +166,15 @@ export const UpdateSettingsResponse = zod.object({
       "Geocoding instance: builtin=Nominatim\/OSM, googlemaps=Google Maps API",
     ),
   googleMapsApiKey: zod.string().nullish(),
+  valorPorRota: zod.number().nullish().describe("Earnings per route (BRL)"),
+  cicloPagamentoDias: zod
+    .number()
+    .describe("Payment cycle in days (7, 14, 30)"),
+  metaMensalRotas: zod.number().nullish().describe("Monthly routes target"),
+  despesasFixasMensais: zod
+    .number()
+    .nullish()
+    .describe("Fixed monthly expenses (BRL)"),
 });
 
 /**
@@ -262,6 +284,29 @@ export const GetRecentAnalysesResponseItem = zod.object({
 export const GetRecentAnalysesResponse = zod.array(
   GetRecentAnalysesResponseItem,
 );
+
+/**
+ * @summary Get financial overview for current cycle
+ */
+export const GetDashboardFinancialResponse = zod.object({
+  rotasCicloAtual: zod.number(),
+  receitaEstimada: zod.number(),
+  despesasFixas: zod.number(),
+  lucroBruto: zod.number(),
+  metaRotas: zod.number().nullish(),
+  percentualMeta: zod.number().nullish(),
+  valorPorRota: zod.number().nullish(),
+  cicloPagamentoDias: zod.number(),
+  inicioDoCliclo: zod.string(),
+  fimDoCiclo: zod.string(),
+  graficoDiario: zod.array(
+    zod.object({
+      data: zod.string(),
+      rotas: zod.number(),
+      receita: zod.number(),
+    }),
+  ),
+});
 
 /**
  * @summary Upload and process a route file via SSE

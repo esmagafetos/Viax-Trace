@@ -93,6 +93,23 @@ export interface UserSettings {
   instanceMode: UserSettingsInstanceMode;
   /** @nullable */
   googleMapsApiKey?: string | null;
+  /**
+   * Earnings per route (BRL)
+   * @nullable
+   */
+  valorPorRota?: number | null;
+  /** Payment cycle in days (7, 14, 30) */
+  cicloPagamentoDias: number;
+  /**
+   * Monthly routes target
+   * @nullable
+   */
+  metaMensalRotas?: number | null;
+  /**
+   * Fixed monthly expenses (BRL)
+   * @nullable
+   */
+  despesasFixasMensais?: number | null;
 }
 
 export type UpdateSettingsBodyParserMode =
@@ -121,6 +138,13 @@ export interface UpdateSettingsBody {
   instanceMode?: UpdateSettingsBodyInstanceMode;
   /** @nullable */
   googleMapsApiKey?: string | null;
+  /** @nullable */
+  valorPorRota?: number | null;
+  cicloPagamentoDias?: number;
+  /** @nullable */
+  metaMensalRotas?: number | null;
+  /** @nullable */
+  despesasFixasMensais?: number | null;
 }
 
 export type AnalysisStatus =
@@ -188,6 +212,29 @@ export interface DashboardSummary {
   avgGeocodeSuccess: number;
   avgSimilarity: number;
   analysesThisMonth: number;
+}
+
+export type DashboardFinancialGraficoDiarioItem = {
+  data: string;
+  rotas: number;
+  receita: number;
+};
+
+export interface DashboardFinancial {
+  rotasCicloAtual: number;
+  receitaEstimada: number;
+  despesasFixas: number;
+  lucroBruto: number;
+  /** @nullable */
+  metaRotas?: number | null;
+  /** @nullable */
+  percentualMeta?: number | null;
+  /** @nullable */
+  valorPorRota?: number | null;
+  cicloPagamentoDias: number;
+  inicioDoCliclo: string;
+  fimDoCiclo: string;
+  graficoDiario: DashboardFinancialGraficoDiarioItem[];
 }
 
 export type UploadAvatarBody = {
