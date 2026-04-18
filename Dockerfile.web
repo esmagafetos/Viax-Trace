@@ -1,0 +1,20 @@
+FROM node:20-alpine AS base
+WORKDIR /app
+RUN npm install -g pnpm
+
+FROM base AS deps
+COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
+COPY tsconfig.base.json tsconfig.json ./
+COPY lib/ ./lib/
+COPY artifacts/viax-scout/package.json ./artifacts/viax-scout/
+RUN mkdir -p scripts && echo '{"name":"@workspace/scripts","private":true}' > scripts/package.json
+RUN pnpm install --frozen-lockfile
+
+FROM deps AS builder
+COPY artifacts/viax-scout/ ./artifacts/viax-scout/
+RUN PORT=3000 BASE_PATH=/ pnpm --filter @workspace/viax-scout run build
+
+FROM nginx:alpine AS runner
+COPY --from=builder /app/artifacts/viax-scout/dist/public /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+EXPOSE 3000

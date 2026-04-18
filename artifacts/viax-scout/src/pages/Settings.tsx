@@ -12,7 +12,7 @@ import Layout from "@/components/Layout";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/components/Toast";
 
-type Tab = "perfil" | "financeiro" | "instancias" | "parser" | "tolerancia";
+type Tab = "perfil" | "financeiro" | "instancias" | "parser" | "tolerancia" | "sobre";
 
 const CICLO_OPTS = [
   { value: 7, label: "Semanal (7 dias)" },
@@ -160,6 +160,7 @@ export default function Settings() {
     { id: "instancias", label: "Instâncias" },
     { id: "parser", label: "Parser" },
     { id: "tolerancia", label: "Tolerância" },
+    { id: "sobre", label: "Sobre" },
   ];
 
   const inputStyle: React.CSSProperties = {
@@ -475,6 +476,198 @@ export default function Settings() {
                   <SaveBtn label="Salvar Tolerância" loading={updateSettingsMutation.isPending} onClick={handleSettingsSave} />
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Sobre */}
+      {activeTab === "sobre" && (
+        <div className="animate-fade-up">
+          {/* Hero block */}
+          <div style={{ ...card, background: "linear-gradient(135deg, var(--surface) 0%, var(--surface-2) 100%)", marginBottom: "1.25rem" }}>
+            <div style={{ padding: "2rem 1.75rem", display: "flex", flexDirection: "column", alignItems: "flex-start", gap: "1rem" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+                <div style={{
+                  width: 52, height: 52, borderRadius: 14, flexShrink: 0,
+                  background: "linear-gradient(145deg, #D4521A 0%, #9333ea 100%)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  boxShadow: "0 4px 18px rgba(212,82,26,0.35)",
+                }}>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 22 22" fill="none">
+                    <circle cx="4" cy="4" r="2.2" fill="white"/>
+                    <circle cx="18" cy="4" r="2.2" fill="white"/>
+                    <line x1="4" y1="4" x2="11" y2="17" stroke="white" strokeWidth="2.2" strokeLinecap="round"/>
+                    <line x1="18" y1="4" x2="11" y2="17" stroke="white" strokeWidth="2.2" strokeLinecap="round"/>
+                    <circle cx="11" cy="17" r="3.2" stroke="white" strokeWidth="1.6" fill="none"/>
+                    <line x1="11" y1="13" x2="11" y2="14.2" stroke="white" strokeWidth="1.4" strokeLinecap="round"/>
+                    <line x1="11" y1="19.8" x2="11" y2="21" stroke="white" strokeWidth="1.4" strokeLinecap="round"/>
+                    <line x1="7" y1="17" x2="8.2" y2="17" stroke="white" strokeWidth="1.4" strokeLinecap="round"/>
+                    <line x1="13.8" y1="17" x2="15" y2="17" stroke="white" strokeWidth="1.4" strokeLinecap="round"/>
+                  </svg>
+                </div>
+                <div>
+                  <div style={{ display: "flex", alignItems: "baseline", gap: "0.6rem" }}>
+                    <span style={{ fontSize: "1.4rem", fontWeight: 800, letterSpacing: "-0.03em" }}>ViaX<span style={{ opacity: 0.4, fontWeight: 300 }}>:</span> System</span>
+                    <span style={{ fontSize: "0.62rem", fontWeight: 700, padding: "0.15rem 0.55rem", borderRadius: 5, background: "var(--accent-dim)", color: "var(--accent)", letterSpacing: "0.06em" }}>v8.0</span>
+                  </div>
+                  <div style={{ fontSize: "0.78rem", color: "var(--text-muted)", marginTop: "0.15rem" }}>Validação inteligente de rotas de entrega</div>
+                </div>
+              </div>
+              <p style={{ fontSize: "0.82rem", color: "var(--text-muted)", lineHeight: 1.7, maxWidth: 620, margin: 0 }}>
+                Sistema de auditoria de rotas logísticas que valida endereços de planilhas de entrega contra coordenadas GPS reais via geocodificação reversa. Detecta automaticamente divergências entre o endereço informado e o local de coleta, gerando relatórios de nuances para análise operacional.
+              </p>
+            </div>
+          </div>
+
+          {/* Links */}
+          <div style={card}>
+            <div style={cardHead}><span style={cardHeadLabel}>Repositório & Documentação</span></div>
+            <div style={cardBody}>
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.65rem" }}>
+                {[
+                  {
+                    href: "https://github.com/esmagafetos/Viax-Scout",
+                    icon: <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0 1 12 6.844a9.59 9.59 0 0 1 2.504.337c1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.02 10.02 0 0 0 22 12.017C22 6.484 17.522 2 12 2z"/></svg>,
+                    label: "GitHub — esmagafetos/Viax-Scout",
+                    sub: "Código-fonte, issues, pull requests e releases",
+                    badge: "Open Source",
+                    badgeColor: "#16a34a",
+                    badgeBg: "rgba(22,163,74,0.1)",
+                  },
+                  {
+                    href: "https://github.com/esmagafetos/Viax-Scout/blob/main/README.md",
+                    icon: <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10,9 9,9 8,9"/></svg>,
+                    label: "Documentação (README)",
+                    sub: "Guia de instalação, configuração e uso",
+                    badge: "Docs",
+                    badgeColor: "#1d4ed8",
+                    badgeBg: "rgba(29,78,216,0.1)",
+                  },
+                  {
+                    href: "https://github.com/esmagafetos/Viax-Scout/issues",
+                    icon: <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>,
+                    label: "Issues & Suporte",
+                    sub: "Reporte bugs, solicite funcionalidades ou tire dúvidas",
+                    badge: "Issues",
+                    badgeColor: "#b45309",
+                    badgeBg: "rgba(180,83,9,0.1)",
+                  },
+                  {
+                    href: "https://github.com/esmagafetos/Viax-Scout/releases",
+                    icon: <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>,
+                    label: "Releases & Changelog",
+                    sub: "Histórico de versões, notas de atualização",
+                    badge: "v8.0",
+                    badgeColor: "var(--accent)",
+                    badgeBg: "var(--accent-dim)",
+                  },
+                ].map((item) => (
+                  <a key={item.href} href={item.href} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>
+                    <div style={{
+                      display: "flex", alignItems: "center", gap: "0.9rem",
+                      padding: "0.85rem 1rem", borderRadius: 10,
+                      border: "1px solid var(--border)", background: "var(--surface-2)",
+                      cursor: "pointer", transition: "border-color 150ms, background 150ms",
+                    }}
+                    onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = "var(--accent)"; (e.currentTarget as HTMLDivElement).style.background = "var(--accent-dim)"; }}
+                    onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = "var(--border)"; (e.currentTarget as HTMLDivElement).style.background = "var(--surface-2)"; }}
+                    >
+                      <div style={{ color: "var(--text-muted)", flexShrink: 0 }}>{item.icon}</div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: "0.82rem", fontWeight: 600, color: "var(--text)" }}>{item.label}</div>
+                        <div style={{ fontSize: "0.7rem", color: "var(--text-faint)", marginTop: "0.1rem" }}>{item.sub}</div>
+                      </div>
+                      <span style={{ fontSize: "0.6rem", fontWeight: 700, padding: "0.12rem 0.5rem", borderRadius: 99, background: item.badgeBg, color: item.badgeColor, letterSpacing: "0.05em", whiteSpace: "nowrap", flexShrink: 0 }}>{item.badge}</span>
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ color: "var(--text-faint)", flexShrink: 0 }}><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15,3 21,3 21,9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                    </div>
+                  </a>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Stack tecnológico */}
+          <div style={card}>
+            <div style={cardHead}><span style={cardHeadLabel}>Stack Tecnológico</span></div>
+            <div style={cardBody}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: "0.6rem" }}>
+                {[
+                  { layer: "Frontend", tech: "React 18 + Vite", detail: "TypeScript, Tailwind CSS, Wouter" },
+                  { layer: "Backend", tech: "Express 5", detail: "TypeScript, REST API, pino logger" },
+                  { layer: "Banco de Dados", tech: "PostgreSQL", detail: "Drizzle ORM, migrações automáticas" },
+                  { layer: "Monorepo", tech: "pnpm workspaces", detail: "Libs compartilhadas, builds isolados" },
+                  { layer: "Geocodificação", tech: "Photon (Komoot)", detail: "Primário — sem rate limit" },
+                  { layer: "Geocodificação", tech: "Overpass API", detail: "Secundário — multi-mirror" },
+                  { layer: "Geocodificação", tech: "Nominatim / OSM", detail: "Fallback — 1 req/s" },
+                  { layer: "Premium opcional", tech: "Google Maps API", detail: "Máxima precisão, pay-per-use" },
+                ].map((item, i) => (
+                  <div key={i} style={{ padding: "0.75rem 0.9rem", borderRadius: 10, background: "var(--surface-2)", border: "1px solid var(--border)" }}>
+                    <div style={{ fontSize: "0.6rem", fontWeight: 700, letterSpacing: "0.07em", textTransform: "uppercase", color: "var(--text-faint)", marginBottom: "0.25rem" }}>{item.layer}</div>
+                    <div style={{ fontSize: "0.8rem", fontWeight: 700, color: "var(--text)", marginBottom: "0.15rem" }}>{item.tech}</div>
+                    <div style={{ fontSize: "0.68rem", color: "var(--text-muted)" }}>{item.detail}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Instalação rápida */}
+          <div style={card}>
+            <div style={cardHead}><span style={cardHeadLabel}>Instalação</span></div>
+            <div style={cardBody}>
+              <p style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginBottom: "1rem", lineHeight: 1.6 }}>
+                Scripts de instalação automática estão disponíveis no repositório para Linux, macOS, Windows e Android (Termux). Cada script instala dependências, configura o banco e inicia o sistema completo.
+              </p>
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                {[
+                  { platform: "Linux / macOS", cmd: "curl -fsSL https://raw.githubusercontent.com/esmagafetos/Viax-Scout/main/install.sh | bash", icon: "🐧" },
+                  { platform: "Windows (PowerShell)", cmd: "iwr -useb https://raw.githubusercontent.com/esmagafetos/Viax-Scout/main/install.ps1 | iex", icon: "🪟" },
+                  { platform: "Android — Termux", cmd: "curl -fsSL https://raw.githubusercontent.com/esmagafetos/Viax-Scout/main/install-termux.sh | bash", icon: "📱" },
+                ].map((item) => (
+                  <div key={item.platform} style={{ padding: "0.85rem 1rem", borderRadius: 10, background: "var(--surface-2)", border: "1px solid var(--border)" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.45rem" }}>
+                      <span style={{ fontSize: "0.9rem" }}>{item.icon}</span>
+                      <span style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--text)" }}>{item.platform}</span>
+                    </div>
+                    <div style={{ fontFamily: "monospace", fontSize: "0.7rem", color: "var(--text-muted)", background: "var(--bg)", padding: "0.45rem 0.7rem", borderRadius: 6, border: "1px solid var(--border)", overflowX: "auto", wordBreak: "break-all" }}>
+                      {item.cmd}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <p style={{ fontSize: "0.72rem", color: "var(--text-faint)", marginTop: "0.9rem", lineHeight: 1.5 }}>
+                Pré-requisitos: <strong>Node.js 18+</strong>, <strong>pnpm</strong> e <strong>PostgreSQL 14+</strong>. O script instala automaticamente o que estiver faltando (requer conexão com internet).
+              </p>
+            </div>
+          </div>
+
+          {/* Licença e versão */}
+          <div style={{ ...card, marginBottom: 0 }}>
+            <div style={cardHead}><span style={cardHeadLabel}>Licença & Versão</span></div>
+            <div style={{ ...cardBody, display: "flex", flexWrap: "wrap", gap: "1.5rem" }}>
+              <div>
+                <div style={{ fontSize: "0.7rem", fontWeight: 700, color: "var(--text-faint)", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "0.3rem" }}>Licença</div>
+                <div style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--text)" }}>MIT License</div>
+                <div style={{ fontSize: "0.7rem", color: "var(--text-muted)", marginTop: "0.15rem" }}>Uso livre, comercial e pessoal</div>
+              </div>
+              <div>
+                <div style={{ fontSize: "0.7rem", fontWeight: 700, color: "var(--text-faint)", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "0.3rem" }}>Versão Atual</div>
+                <div style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--accent)" }}>v8.0 — estável</div>
+                <div style={{ fontSize: "0.7rem", color: "var(--text-muted)", marginTop: "0.15rem" }}>Geocodificador Photon-first</div>
+              </div>
+              <div>
+                <div style={{ fontSize: "0.7rem", fontWeight: 700, color: "var(--text-faint)", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "0.3rem" }}>Ambiente</div>
+                <div style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--text)" }}>Node.js 18+</div>
+                <div style={{ fontSize: "0.7rem", color: "var(--text-muted)", marginTop: "0.15rem" }}>pnpm · PostgreSQL 14+</div>
+              </div>
+              <div>
+                <div style={{ fontSize: "0.7rem", fontWeight: 700, color: "var(--text-faint)", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "0.3rem" }}>Repositório</div>
+                <a href="https://github.com/esmagafetos/Viax-Scout" target="_blank" rel="noopener noreferrer" style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--accent)", textDecoration: "none" }}>
+                  github.com/esmagafetos/Viax-Scout
+                </a>
+                <div style={{ fontSize: "0.7rem", color: "var(--text-muted)", marginTop: "0.15rem" }}>Fork & contribua!</div>
+              </div>
             </div>
           </div>
         </div>

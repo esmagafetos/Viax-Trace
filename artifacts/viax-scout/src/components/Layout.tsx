@@ -98,28 +98,28 @@ export default function Layout({ children, showNav = true }: LayoutProps) {
             <div className="header-top-row" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", height: 64 }}>
               {/* Brand */}
               <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexShrink: 0 }}>
-                <div style={{ width: 34, height: 34, borderRadius: 10, background: "linear-gradient(135deg, var(--accent) 0%, color-mix(in srgb, var(--accent) 70%, #6d28d9) 100%)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", boxShadow: "0 2px 8px color-mix(in srgb, var(--accent) 40%, transparent)" }}>
-                  {/* ViaX System — Route Validation Network Icon */}
-                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
-                    {/* Waypoint: origin (bottom-left) */}
-                    <circle cx="4.5" cy="18.5" r="2" fill="currentColor" strokeWidth="0"/>
-                    {/* Waypoint: destination (top-right) */}
-                    <circle cx="19.5" cy="5.5" r="2" fill="currentColor" strokeWidth="0"/>
-                    {/* Route lines */}
-                    <line x1="6.2" y1="17" x2="10.4" y2="12.9" strokeWidth="2"/>
-                    <line x1="13.6" y1="11.1" x2="17.8" y2="7" strokeWidth="2"/>
-                    {/* Center checkpoint: hollow ring */}
-                    <circle cx="12" cy="12" r="2.8" strokeWidth="2"/>
-                    {/* Crosshair/scan lines through checkpoint (system indicator) */}
-                    <line x1="12" y1="8" x2="12" y2="9.2" strokeWidth="1.5"/>
-                    <line x1="12" y1="14.8" x2="12" y2="16" strokeWidth="1.5"/>
-                    <line x1="8" y1="12" x2="9.2" y2="12" strokeWidth="1.5"/>
-                    <line x1="14.8" y1="12" x2="16" y2="12" strokeWidth="1.5"/>
+                <div style={{
+                  width: 36, height: 36, borderRadius: 10, flexShrink: 0,
+                  background: "linear-gradient(145deg, #D4521A 0%, #9333ea 100%)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  boxShadow: "0 2px 10px rgba(212,82,26,0.35), inset 0 1px 0 rgba(255,255,255,0.15)",
+                }}>
+                  {/* ViaX: System — V-route mark with validation reticle */}
+                  <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 22 22" fill="none">
+                    <circle cx="4" cy="4" r="2.2" fill="white"/>
+                    <circle cx="18" cy="4" r="2.2" fill="white"/>
+                    <line x1="4" y1="4" x2="11" y2="17" stroke="white" strokeWidth="2.2" strokeLinecap="round"/>
+                    <line x1="18" y1="4" x2="11" y2="17" stroke="white" strokeWidth="2.2" strokeLinecap="round"/>
+                    <circle cx="11" cy="17" r="3.2" stroke="white" strokeWidth="1.6" fill="none"/>
+                    <line x1="11" y1="13" x2="11" y2="14.2" stroke="white" strokeWidth="1.4" strokeLinecap="round"/>
+                    <line x1="11" y1="19.8" x2="11" y2="21" stroke="white" strokeWidth="1.4" strokeLinecap="round"/>
+                    <line x1="7" y1="17" x2="8.2" y2="17" stroke="white" strokeWidth="1.4" strokeLinecap="round"/>
+                    <line x1="13.8" y1="17" x2="15" y2="17" stroke="white" strokeWidth="1.4" strokeLinecap="round"/>
                   </svg>
                 </div>
                 <div style={{ display: "flex", flexDirection: "column" }}>
-                  <span style={{ fontFamily: "var(--font-display)", fontSize: "1.05rem", fontWeight: 700, letterSpacing: "-0.01em", lineHeight: 1.1 }}>ViaX<span style={{ opacity: 0.7, fontWeight: 400 }}>:</span> System</span>
-                  <span style={{ fontSize: "0.65rem", color: "var(--text-muted)", fontWeight: 500 }}>Validação de Rotas</span>
+                  <span style={{ fontFamily: "var(--font-display)", fontSize: "1.05rem", fontWeight: 700, letterSpacing: "-0.01em", lineHeight: 1.15 }}>ViaX<span style={{ opacity: 0.5, fontWeight: 400 }}>:</span> System</span>
+                  <span style={{ fontSize: "0.6rem", color: "var(--accent)", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", lineHeight: 1 }}>v8.0</span>
                 </div>
               </div>
 
