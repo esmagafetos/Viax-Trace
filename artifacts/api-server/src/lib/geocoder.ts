@@ -18,6 +18,9 @@ export interface GeoResult {
   rua: string;
   lat?: number;
   lon?: number;
+  fonte?: "reverse" | "forward" | "photon" | "overpass" | "brasilapi" | "google";
+  confianca?: "rua" | "localidade" | "estimado";
+  localidade?: string;
 }
 
 export interface ParsedAddress {
@@ -110,6 +113,21 @@ function normalizarNomeRua(texto: string): string {
     .join(" ");
 }
 
+function temTipoLogradouro(texto: string): boolean {
+  return /^(rua|r|av|avenida|alameda|estrada|rodovia|rovia|viela|beco|largo|praca|praça|pca|travessa|trav|tv|passagem)\b/i.test(texto.trim());
+}
+
+function limparNomeLogradouro(candidato: string): string {
+  return candidato
+    .replace(/\b(s\/?n|sn)\b.*$/iu, "")
+    .replace(/\bkm\s*\d+(?:[.,]\d+)?.*$/iu, "")
+    .replace(/\b(?:lote|quadra|qd|lt|casa|loja|lj|bloco|apto|apartamento|cond\.?|condom[ií]nio|residencial)\b.*$/iu, "")
+    .replace(/\s+\d+[A-Za-z]?\b.*$/u, "")
+    .replace(/\s+/g, " ")
+    .replace(/[,\s]+$/u, "")
+    .trim();
+}
+
 function calcularSimilaridade(str1: string, str2: string): number {
   const a = normalizarNomeRua(str1);
   const b = normalizarNomeRua(str2);
@@ -143,7 +161,8 @@ function calcularSimilaridade(str1: string, str2: string): number {
 }
 
 function limiarAdaptativo(extraida: string, isAvenidaExtensa: boolean, isComercioPOI: boolean): number {
-  if (isAvenidaExtensa || isComercioPOI) return SIMILARITY_THRESHOLD_AVENIDA;
+  if (isAvenidaExtensa) return SIMILARITY_THRESHOLD_AVENIDA;
+  if (isComercioPOI) return 0.72;
   const len = extraida.length;
   if (len < 5) return 0.85;
   if (len < 10) return 0.78;
@@ -157,8 +176,9 @@ function extrairCEP(texto: string): string | null {
 }
 
 function extrairNumero(endereco: string): string {
-  const m = endereco.match(/[,\s]+(\d+[A-Za-z]?|s\/?n|sn)\b/i);
-  if (m) return m[1].toUpperCase();
+  const semKm = endereco.replace(/\bkm\s*\d+(?:[.,]\d+)?/gi, "");
+  const m = semKm.match(/[,\s]+(\d+[A-Za-z]?|s\/?n|sn)\b/i);
+  if (m && !["0"].includes(m[1])) return m[1].toUpperCase();
   return "";
 }
 
@@ -189,15 +209,15 @@ function extrairLogradouroPrincipal(endereco: string): string {
   const limpo = endereco.replace(/\bRovia\b/gi, "Rodovia");
   const m = limpo.match(/\b(?:Rua|R\.?|Av\.?|Avenida|Alameda|Praça|Pça\.?|Travessa|Trav\.?|Tv\.?|Estrada|Rod\.?|Rodovia|Viela|Beco|Passagem|Largo)\s+[^\s,.\d][^,.;\n\r]*/iu);
   if (m) {
-    return m[0]
+    return limparNomeLogradouro(m[0]
       .replace(/\s+\b(?:proximo|próximo|perto|refer[eê]ncia|maps|google|waze|placas|port[aã]o|buzina|frente|fundos|esquina|entre|deixar)\b.*$/iu, "")
-      .trim();
+      .trim());
   }
   const semLoteamento = limpo.replace(/^\s*(Loteamento|Condomínio|Residencial|Conjunto|Núcleo)\s+[^,]+?[,]?\s*/i, "");
   const m2 = semLoteamento.match(/^([^,\d]+)/);
   if (m2) {
-    const candidato = m2[1].trim();
-    if (candidato.length >= 4 && !/^(lote|quadra|qd|lt|casa|apto|apartamento|bloco|conjunto|residencial|condomínio|nº|bairro)$/i.test(candidato)) {
+    const candidato = limparNomeLogradouro(m2[1].trim());
+    if (candidato.length >= 4 && !/^(lote|quadra|qd|lt|casa|apto|apartamento|bloco|conjunto|residencial|condomínio|nº|bairro|área rural|area rural)$/i.test(candidato)) {
       return candidato;
     }
   }
@@ -242,7 +262,7 @@ function extrairRefsEstruturadas(texto: string): string | null {
   const refs: string[] = [];
   if (/Quadra\s+(\d+)/i.test(texto)) refs.push("Quadra " + texto.match(/Quadra\s+(\d+)/i)![1]);
   if (/Lote\s+([A-Z0-9]+)/i.test(texto)) refs.push("Lote " + texto.match(/Lote\s+([A-Z0-9]+)/i)![1]);
-  if (/Casa\s+(\d+[A-Z]?)/i.test(texto)) refs.push("Casa " + texto.match(/Casa\s+(\d+[A-Z]?)/i)![1]);
+  if (/\bCasa\s+(\d+[A-Z]?)\b/i.test(texto)) refs.push("Casa " + texto.match(/\bCasa\s+(\d+[A-Z]?)\b/i)![1]);
   if (/Bloco\s+([A-Z]+)/i.test(texto)) refs.push("Bloco " + texto.match(/Bloco\s+([A-Z]+)/i)![1]);
   return refs.length > 0 ? refs.join(", ") : null;
 }
@@ -302,19 +322,27 @@ function extrairDadosNominatim(data: any): GeoResult | null {
         rua: String(addr[c]).trim(),
         lat: data.lat ? parseFloat(data.lat) : undefined,
         lon: data.lon ? parseFloat(data.lon) : undefined,
+        fonte: "reverse",
+        confianca: "rua",
       };
     }
   }
-  // Fallback: nome do display para POIs
-  if (data.display_name && data.lat && data.lon) {
-    const partes = data.display_name.split(",");
+  const localidade = addr.neighbourhood ?? addr.suburb ?? addr.locality ?? addr.hamlet ?? addr.village ?? addr.town ?? addr.city_district;
+  if (localidade && data.lat && data.lon) {
     return {
-      rua: partes[0]?.trim() ?? "",
+      rua: "",
       lat: parseFloat(data.lat),
       lon: parseFloat(data.lon),
+      fonte: "reverse",
+      confianca: "localidade",
+      localidade: String(localidade).trim(),
     };
   }
   return null;
+}
+
+function isRuaConfiavel(result: GeoResult | null): boolean {
+  return Boolean(result?.rua && result.confianca !== "localidade");
 }
 
 export function haversineMetros(lat1: number, lon1: number, lat2: number, lon2: number): number {
@@ -355,7 +383,7 @@ export async function geocodeForwardNominatim(
       const result = extrairDadosNominatim(item);
       if (result && result.rua.length > 3) {
         logger.debug({ query, found: result.rua, lat: result.lat, lon: result.lon }, "Nominatim forward hit");
-        return { result, ultimaReq: newUltimaReq };
+        return { result: { ...result, fonte: "forward", confianca: "rua" }, ultimaReq: newUltimaReq };
       }
     }
   }
@@ -368,7 +396,7 @@ export async function geocodeForwardNominatim(
       if (rua && rua.length > 3) {
         logger.debug({ query, found: rua }, "Photon fallback hit");
         return {
-          result: { rua, lat: f.geometry?.coordinates?.[1], lon: f.geometry?.coordinates?.[0] },
+          result: { rua, lat: f.geometry?.coordinates?.[1], lon: f.geometry?.coordinates?.[0], fonte: "photon", confianca: "rua" },
           ultimaReq: newUltimaReq,
         };
       }
@@ -402,6 +430,8 @@ export async function geocodeForwardPOI(
             rua: (item.address?.road ?? item.address?.name ?? item.display_name?.split(",")[0] ?? poi).trim(),
             lat: parseFloat(item.lat),
             lon: parseFloat(item.lon),
+            fonte: "forward",
+            confianca: "rua",
           },
           ultimaReq: newUltimaReq,
         };
@@ -444,16 +474,50 @@ export async function geocodeReversePhoton(lat: number, lon: number): Promise<Ge
   const features = Array.isArray(data?.features) ? data.features : [];
   for (const f of features) {
     const props = f.properties ?? {};
-    const rua = props.street ?? props.name;
+    const rua = props.street;
     if (rua && String(rua).trim().length > 3) {
       return {
         rua: String(rua).trim(),
         lat: f.geometry?.coordinates?.[1],
         lon: f.geometry?.coordinates?.[0],
+        fonte: "photon",
+        confianca: "rua",
       };
     }
   }
   return null;
+}
+
+export async function geocodeNearbyOsmRoad(lat: number, lon: number, radiusMeters = 90): Promise<GeoResult | null> {
+  const query = `[out:json][timeout:8];way(around:${radiusMeters},${lat},${lon})["highway"]["name"];out geom;`;
+  const data = await httpGet(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`, 12000);
+  const elements = Array.isArray(data?.elements) ? data.elements : [];
+  let best: GeoResult | null = null;
+  let bestDistance = Infinity;
+
+  for (const element of elements) {
+    const name = String(element.tags?.name ?? "").trim();
+    const geometry = Array.isArray(element.geometry) ? element.geometry : [];
+    if (!name || geometry.length === 0) continue;
+
+    for (const point of geometry) {
+      if (typeof point.lat !== "number" || typeof point.lon !== "number") continue;
+      const dist = haversineMetros(lat, lon, point.lat, point.lon);
+      if (dist < bestDistance) {
+        bestDistance = dist;
+        best = {
+          rua: name,
+          lat: point.lat,
+          lon: point.lon,
+          fonte: "overpass",
+          confianca: "rua",
+        };
+      }
+    }
+  }
+
+  if (best) logger.debug({ lat, lon, found: best.rua, distance: Math.round(bestDistance) }, "Overpass nearby road hit");
+  return best;
 }
 
 export async function geocodeGoogleMaps(query: string, apiKey: string): Promise<GeoResult | null> {
@@ -472,6 +536,8 @@ export async function geocodeGoogleMaps(query: string, apiKey: string): Promise<
     rua: routeComp.long_name,
     lat: result.geometry?.location?.lat,
     lon: result.geometry?.location?.lng,
+    fonte: "google",
+    confianca: "rua",
   };
 }
 
@@ -491,6 +557,8 @@ export async function geocodeGoogleMapsReverse(lat: number, lon: number, apiKey:
         rua: routeComp.long_name,
         lat: result.geometry?.location?.lat,
         lon: result.geometry?.location?.lng,
+        fonte: "google",
+        confianca: "rua",
       };
     }
   }
@@ -590,6 +658,11 @@ function montarQueryBusca(parsed: ParsedAddress): string {
   return [...new Set(partes)].join(", ");
 }
 
+function forwardConfirmaRua(parsed: ParsedAddress, result: GeoResult | null): boolean {
+  if (!isRuaConfiavel(result) || !parsed.rua_principal) return false;
+  return calcularSimilaridade(parsed.rua_principal, result.rua) >= 0.6;
+}
+
 export function verificarNuance(
   parsed: ParsedAddress,
   geoResult: GeoResult | null,
@@ -610,10 +683,11 @@ export function verificarNuance(
   }
   const ruaOficial = geoResult.rua;
   if (!ruaOficial) {
+    const localidade = geoResult.localidade ? ` (${geoResult.localidade})` : "";
     return {
       is_nuance: true,
       similaridade: null,
-      motivo: "Coordenadas localizadas, mas OSM não identificou via nomeada.",
+      motivo: `Coordenadas localizadas${localidade}, mas o mapa não identificou uma via nomeada nesse ponto. Validar manualmente ou usar Google Maps para maior cobertura.`,
       distancia_metros: null,
     };
   }
@@ -713,15 +787,21 @@ export async function processarEndereco(
     if (item.lat !== null && item.lon !== null) {
       reverseGeoResult = await geocodeGoogleMapsReverse(item.lat, item.lon, googleMapsApiKey);
       geoResult = reverseGeoResult;
-      if (reverseGeoResult?.lat) geocodeLat = reverseGeoResult.lat;
-      if (reverseGeoResult?.lon) geocodeLon = reverseGeoResult.lon;
+      if (isRuaConfiavel(reverseGeoResult)) {
+        if (reverseGeoResult?.lat) geocodeLat = reverseGeoResult.lat;
+        if (reverseGeoResult?.lon) geocodeLon = reverseGeoResult.lon;
+      }
     }
 
-    const query = montarQueryBusca(parsed);
-    forwardGeoResult = await geocodeGoogleMaps(query, googleMapsApiKey);
-    if (!geoResult) geoResult = forwardGeoResult;
-    if (forwardGeoResult?.lat) geocodeLat = forwardGeoResult.lat;
-    if (forwardGeoResult?.lon) geocodeLon = forwardGeoResult.lon;
+    if (!isRuaConfiavel(reverseGeoResult)) {
+      const query = montarQueryBusca(parsed);
+      forwardGeoResult = await geocodeGoogleMaps(query, googleMapsApiKey);
+      if (forwardConfirmaRua(parsed, forwardGeoResult)) {
+        geoResult = forwardGeoResult;
+        if (forwardGeoResult?.lat) geocodeLat = forwardGeoResult.lat;
+        if (forwardGeoResult?.lon) geocodeLon = forwardGeoResult.lon;
+      }
+    }
 
     if (!forwardGeoResult && parsed.via_secundaria) {
       const qVia = [parsed.via_secundaria, parsed.cidade, "Brasil"].filter(Boolean).join(", ");
@@ -741,11 +821,17 @@ export async function processarEndereco(
         reverseGeoResult = rev.result;
         newUltimaReq = rev.ultimaReq;
         if (!reverseGeoResult) reverseGeoResult = await geocodeReversePhoton(item.lat, item.lon);
+        if (!isRuaConfiavel(reverseGeoResult)) {
+          const nearbyRoad = await geocodeNearbyOsmRoad(item.lat, item.lon);
+          if (nearbyRoad) reverseGeoResult = nearbyRoad;
+        }
         cache.set(cacheKey, { data: reverseGeoResult, ts: Date.now() });
       }
       geoResult = reverseGeoResult;
-      if (reverseGeoResult?.lat) geocodeLat = reverseGeoResult.lat;
-      if (reverseGeoResult?.lon) geocodeLon = reverseGeoResult.lon;
+      if (isRuaConfiavel(reverseGeoResult)) {
+        if (reverseGeoResult?.lat) geocodeLat = reverseGeoResult.lat;
+        if (reverseGeoResult?.lon) geocodeLon = reverseGeoResult.lon;
+      }
     }
 
     if (cep) {
@@ -757,22 +843,26 @@ export async function processarEndereco(
       }
     }
 
-    if (parsed.rua_principal) {
+    if (parsed.rua_principal && !isRuaConfiavel(reverseGeoResult)) {
       const query = montarQueryBusca(parsed);
       const cacheKey = `fwd_${query}`;
       const cached = cache.get(cacheKey);
       if (cached && Date.now() - cached.ts < 2 * 3600 * 1000) {
         forwardGeoResult = cached.data;
-        if (!geoResult) geoResult = forwardGeoResult;
-        if (forwardGeoResult?.lat) geocodeLat = forwardGeoResult.lat;
-        if (forwardGeoResult?.lon) geocodeLon = forwardGeoResult.lon;
+        if (forwardConfirmaRua(parsed, forwardGeoResult)) {
+          geoResult = forwardGeoResult;
+          if (forwardGeoResult?.lat) geocodeLat = forwardGeoResult.lat;
+          if (forwardGeoResult?.lon) geocodeLon = forwardGeoResult.lon;
+        }
       } else {
         const fwd = await geocodeForwardNominatim(query, newUltimaReq);
         forwardGeoResult = fwd.result;
         newUltimaReq = fwd.ultimaReq;
-        if (!geoResult) geoResult = forwardGeoResult;
-        if (forwardGeoResult?.lat) geocodeLat = forwardGeoResult.lat;
-        if (forwardGeoResult?.lon) geocodeLon = forwardGeoResult.lon;
+        if (forwardConfirmaRua(parsed, forwardGeoResult)) {
+          geoResult = forwardGeoResult;
+          if (forwardGeoResult?.lat) geocodeLat = forwardGeoResult.lat;
+          if (forwardGeoResult?.lon) geocodeLon = forwardGeoResult.lon;
+        }
         cache.set(cacheKey, { data: forwardGeoResult, ts: Date.now() });
       }
     }
@@ -785,7 +875,7 @@ export async function processarEndereco(
         // Se a via secundária foi encontrada e tem coordenada, usamos ela
         if (cachedVia.data?.lat && cachedVia.data?.lon) {
           if (!geocodeLat) { geocodeLat = cachedVia.data.lat; geocodeLon = cachedVia.data.lon; }
-          if (!geoResult) geoResult = cachedVia.data;
+          if (!isRuaConfiavel(geoResult) && isRuaConfiavel(cachedVia.data)) geoResult = cachedVia.data;
         }
       } else {
         const fwdVia = await geocodeViaSecundaria(parsed.via_secundaria, parsed.cidade, parsed.bairro, newUltimaReq);
@@ -800,12 +890,12 @@ export async function processarEndereco(
               // Travessa está perto da rua principal → usar coordenada da travessa
               geocodeLat = fwdVia.result.lat!;
               geocodeLon = fwdVia.result.lon!;
-              if (!reverseGeoResult) geoResult = { rua: fwdVia.result.rua, lat: fwdVia.result.lat, lon: fwdVia.result.lon };
+              if (!isRuaConfiavel(reverseGeoResult)) geoResult = { rua: fwdVia.result.rua, lat: fwdVia.result.lat, lon: fwdVia.result.lon, fonte: fwdVia.result.fonte, confianca: fwdVia.result.confianca };
             }
           } else {
             geocodeLat = fwdVia.result.lat!;
             geocodeLon = fwdVia.result.lon!;
-            if (!geoResult) geoResult = fwdVia.result;
+            if (!isRuaConfiavel(geoResult) && isRuaConfiavel(fwdVia.result)) geoResult = fwdVia.result;
           }
         }
       }
@@ -817,7 +907,7 @@ export async function processarEndereco(
       const cachedPoi = cache.get(poiKey);
       if (cachedPoi && Date.now() - cachedPoi.ts < 2 * 3600 * 1000) {
         if (cachedPoi.data?.lat) { geocodeLat = cachedPoi.data.lat!; geocodeLon = cachedPoi.data.lon!; }
-        if (!geoResult) geoResult = cachedPoi.data;
+        if (!isRuaConfiavel(geoResult) && isRuaConfiavel(cachedPoi.data)) geoResult = cachedPoi.data;
       } else {
         const fwdPoi = await geocodeForwardPOI(parsed.poi, parsed.rua_principal, parsed.cidade, newUltimaReq);
         newUltimaReq = fwdPoi.ultimaReq;
@@ -825,7 +915,7 @@ export async function processarEndereco(
         if (fwdPoi.result?.lat) {
           geocodeLat = fwdPoi.result.lat!;
           geocodeLon = fwdPoi.result.lon!;
-          if (!geoResult) geoResult = fwdPoi.result;
+          if (!isRuaConfiavel(geoResult) && isRuaConfiavel(fwdPoi.result)) geoResult = fwdPoi.result;
         }
       }
     }
@@ -854,7 +944,7 @@ export async function processarEndereco(
       linha: item.linha,
       endereco_original: item.endereco,
       nome_rua_extraido: parsed.rua_principal || null,
-      nome_rua_oficial: geoResult?.rua ?? null,
+      nome_rua_oficial: geoResult?.rua || null,
       similaridade: verif.similaridade,
       is_nuance: verif.is_nuance,
       motivo: verif.motivo,
