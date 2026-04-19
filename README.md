@@ -56,25 +56,37 @@ Planilha XLSX/CSV → Parser de endereço → Geocodificação reversa → Compa
 
 ## Screenshots
 
-> As capturas abaixo ilustram as principais telas do sistema.
+> O sistema suporta modo claro e escuro com alternância instantânea.
 
 ### Login
-![Login](docs/screenshots/login.jpg)
+| Claro | Escuro |
+|-------|--------|
+| ![Login claro](docs/screenshots/login.jpg) | ![Login escuro](docs/screenshots/login-dark.jpg) |
 
 ### Cadastro
-![Cadastro](docs/screenshots/register.jpg)
+| Claro | Escuro |
+|-------|--------|
+| ![Cadastro claro](docs/screenshots/register.jpg) | ![Cadastro escuro](docs/screenshots/register-dark.jpg) |
 
 ### Dashboard
-![Dashboard](docs/screenshots/dashboard.jpg)
+| Claro | Escuro |
+|-------|--------|
+| ![Dashboard claro](docs/screenshots/dashboard.jpg) | ![Dashboard escuro](docs/screenshots/dashboard-dark.jpg) |
 
-### Processamento de Rota
-![Processamento](docs/screenshots/processing.jpg)
+### Processar Rota
+| Claro | Escuro |
+|-------|--------|
+| ![Processar claro](docs/screenshots/processing.jpg) | ![Processar escuro](docs/screenshots/processing-dark.jpg) |
 
 ### Histórico de Análises
-![Histórico](docs/screenshots/history.jpg)
+| Claro | Escuro |
+|-------|--------|
+| ![Histórico claro](docs/screenshots/history.jpg) | ![Histórico escuro](docs/screenshots/history-dark.jpg) |
 
 ### Configurações
-![Configurações](docs/screenshots/settings.jpg)
+| Claro | Escuro |
+|-------|--------|
+| ![Config claro](docs/screenshots/settings.jpg) | ![Config escuro](docs/screenshots/settings-dark.jpg) |
 
 ---
 
