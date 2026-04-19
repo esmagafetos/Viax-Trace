@@ -58,17 +58,23 @@ Planilha XLSX/CSV → Parser de endereço → Geocodificação reversa → Compa
 
 > As capturas abaixo ilustram as principais telas do sistema.
 
+### Login
+![Login](docs/screenshots/login.jpg)
+
+### Cadastro
+![Cadastro](docs/screenshots/register.jpg)
+
 ### Dashboard
-![Dashboard](docs/screenshots/dashboard.png)
+![Dashboard](docs/screenshots/dashboard.jpg)
 
 ### Processamento de Rota
-![Processamento](docs/screenshots/processing.png)
+![Processamento](docs/screenshots/processing.jpg)
 
-### Relatório de Nuances
-![Relatório](docs/screenshots/report.png)
+### Histórico de Análises
+![Histórico](docs/screenshots/history.jpg)
 
 ### Configurações
-![Configurações](docs/screenshots/settings.png)
+![Configurações](docs/screenshots/settings.jpg)
 
 ---
 
