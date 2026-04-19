@@ -25,6 +25,14 @@ const AVENIDAS_EXTENSAS_REGEX = /\b(beira[\s-]?mar|beira[\s-]?rio|beira[\s-]?lag
 // Palavras que indicam endereço comercial / POI
 const PALAVRAS_COMERCIO_REGEX = /\b(agência|agencia|loja|mercado|supermercado|hipermercado|farmácia|farmacia|drogaria|posto|banco|caixa|correios|hospital|clínica|clinica|posto\s+de\s+saúde|posto\s+de\s+saude|escola|colégio|colegio|faculdade|universidade|shopping|centro\s+comercial|academia|salão|salao|barbearia|padaria|restaurante|bar|hotel|pousada|condomínio|condominio|edifício|edificio|residencial|conjunto)\b/i;
 
+// Rodovias / vias de alta velocidade (BR, RJ, SP, etc. ou prefixo "Rodovia")
+const RODOVIA_PREFIXO_REGEX = /^(rodovia|rod\.?)\b/i;
+const RODOVIA_QUALQUER_REGEX = /\b(rodovia|rod\.?|br[-\s]?\d{2,3}|rj[-\s]?\d{2,3}|sp[-\s]?\d{2,3}|mg[-\s]?\d{2,3}|es[-\s]?\d{2,3}|ba[-\s]?\d{2,3}|via\s+dutra|via\s+expressa)\b/i;
+
+// Nomes que indicam estabelecimento comercial informal (sem palavras-chave explícitas)
+// Usados para detectar negócios em rodovias: ex. "Ruby designer", "Auto Center X", "Depósito Z"
+const NEGOCIO_INFORMAL_REGEX = /\b(designer|studio|store|shop|modas?|salon|salão|auto\s*center|moto|tech|center|açougue|mercearia|depósito|deposito|distribuidora|indústria|industria|fábrica|fabrica|oficina|atacado|varejo|express|delivery|market|mart|grill|burger|pizza|churrascaria|borracharia|mecânica|mecanica|elétrica|eletrica|madeireira|cerâmica|ceramica|ferragem|tintas|ótica|otica|imobiliária|imobiliaria|imóveis|imoveis|seguros|consultório|consultorio|empresa|ltda|eireli|s\.a\.?|cia\.?)\b/i;
+
 export interface GeoResult {
   rua: string;
   lat?: number;
@@ -45,6 +53,7 @@ export interface ParsedAddress {
   cep: string | null;
   is_comercio: boolean;
   is_avenida_extensa: boolean;
+  is_rodovia: boolean;
 }
 
 export interface NuanceResult {
@@ -297,6 +306,7 @@ export function parsearEndereco(endereco: string, cidade = "", bairro = "", cepL
     cep,
     is_comercio: PALAVRAS_COMERCIO_REGEX.test(poi) || PALAVRAS_COMERCIO_REGEX.test(end),
     is_avenida_extensa: AVENIDAS_EXTENSAS_REGEX.test(rua) || AVENIDAS_EXTENSAS_REGEX.test(end),
+    is_rodovia: RODOVIA_PREFIXO_REGEX.test(rua) || RODOVIA_QUALQUER_REGEX.test(end),
   } as any;
 }
 
@@ -855,6 +865,21 @@ export function verificarNuance(
   }
 
   if (similaridade < limiar) {
+    // ── Caso especial: via secundária do endereço coincide com a rua oficial ──
+    // Ex.: "Rua Sinagoga, 49, Travessa B" → mapa retorna "Travessa B"
+    // "Rua Sinagoga" é referência de bairro/área; "Travessa B" é a via real.
+    if (parsed.via_secundaria) {
+      const simVia = calcularSimilaridade(parsed.via_secundaria, ruaOficial);
+      if (simVia >= 0.65) {
+        return {
+          is_nuance: true,
+          similaridade: Math.round(simVia * 1000) / 1000,
+          motivo: `Possível referência de área: "${ruaExtraida}" pode indicar o bairro/localidade. A via específica "${parsed.via_secundaria}" corresponde ao oficial "${ruaOficial}" (${Math.round(simVia * 100)}%). Verifique se a entrega é na ${parsed.via_secundaria} na região indicada — endereço não-padrão, confirmar antes de roteirizar.`,
+          distancia_metros: distanciaMetros,
+        };
+      }
+    }
+
     return {
       is_nuance: true,
       similaridade: Math.round(similaridade * 1000) / 1000,
@@ -870,6 +895,35 @@ export function verificarNuance(
       motivo: `Coordenada GPS a ${distanciaMetros}m do oficial (tolerância: ${toleranceMeters}m)${parsed.is_comercio ? ". Comércio/POI não confirmado." : parsed.is_avenida_extensa ? ". Avenida extensa: exige alta precisão." : ""}`,
       distancia_metros: distanciaMetros,
     };
+  }
+
+  // ── Entrega em rodovia: verificar indício de comércio ou ponto de Km ──
+  // Rodovias extensas com nomes de estabelecimentos exigem confirmação manual.
+  if (parsed.is_rodovia) {
+    const temComercioExplicito = parsed.is_comercio;
+    const temNegocioInformal = NEGOCIO_INFORMAL_REGEX.test(parsed.poi || "");
+    const complementoNaoResidencial =
+      parsed.poi
+        ? !/^(casa|fundos|ap(to)?\.?|lote|quadra|bloco|altos|andar|cond\.?)\b/i.test(parsed.poi.trim())
+        : false;
+
+    if (temComercioExplicito || temNegocioInformal) {
+      return {
+        is_nuance: true,
+        similaridade: Math.round(similaridade * 1000) / 1000,
+        motivo: `50% — Entrega em rodovia com indício de estabelecimento comercial${parsed.poi ? ` ("${parsed.poi}")` : ""}. Recomendamos verificação manual ou use o modo Google Maps para confirmar a localização exata do estabelecimento.`,
+        distancia_metros: distanciaMetros,
+      };
+    }
+
+    if (parsed.km_rodovia !== null && complementoNaoResidencial) {
+      return {
+        is_nuance: true,
+        similaridade: Math.round(similaridade * 1000) / 1000,
+        motivo: `50% — Entrega em rodovia no Km ${parsed.km_rodovia}. Rodovias extensas podem ter múltiplos pontos com endereços similares. Confirme a localização exata no mapa antes de roteirizar.`,
+        distancia_metros: distanciaMetros,
+      };
+    }
   }
 
   return {
@@ -905,11 +959,14 @@ export async function processarEndereco(
       // Re-avaliar flags
       parsed.is_comercio = PALAVRAS_COMERCIO_REGEX.test(parsed.poi) || PALAVRAS_COMERCIO_REGEX.test(item.endereco);
       parsed.is_avenida_extensa = AVENIDAS_EXTENSAS_REGEX.test(parsed.rua_principal);
+      parsed.is_rodovia = RODOVIA_PREFIXO_REGEX.test(parsed.rua_principal) || RODOVIA_QUALQUER_REGEX.test(item.endereco);
     }
   }
 
   const tipoEndereco = parsed.is_comercio
     ? "comercio"
+    : parsed.is_rodovia
+    ? "rodovia"
     : parsed.is_avenida_extensa
     ? "avenida_extensa"
     : parsed.via_secundaria
