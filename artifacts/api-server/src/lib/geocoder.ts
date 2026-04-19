@@ -23,7 +23,7 @@ const OSM_HIGHWAY_PRIORITIES = [
 const AVENIDAS_EXTENSAS_REGEX = /\b(beira[\s-]?mar|beira[\s-]?rio|beira[\s-]?lago|independ[eê]ncia|presidente|marechal|general|brasil|rep[uú]blica|get[uú]lio\s+vargas|jo[aã]o\s+pessoa|santos\s+dumont|dom\s+pedro|princesa\s+isabel|sete\s+de\s+setembro)\b/i;
 
 // Palavras que indicam endereço comercial / POI
-const PALAVRAS_COMERCIO_REGEX = /\b(agência|agencia|loja|mercado|supermercado|hipermercado|farmácia|farmacia|drogaria|posto|banco|caixa|correios|hospital|clínica|clinica|posto\s+de\s+saúde|posto\s+de\s+saude|escola|colégio|colegio|faculdade|universidade|shopping|centro\s+comercial|academia|salão|salao|barbearia|padaria|restaurante|bar|hotel|pousada|condomínio|condominio|edifício|edificio|residencial|conjunto)\b/i;
+const PALAVRAS_COMERCIO_REGEX = /\b(agência|agencia|loja|mercado|supermercado|hipermercado|farmácia|farmacia|drogaria|posto|banco|caixa|correios|hospital|clínica|clinica|posto\s+de\s+saúde|posto\s+de\s+saude|escola|colégio|colegio|faculdade|universidade|shopping|centro\s+comercial|academia|salão|salao|barbearia|padaria|restaurante|bar|hotel|pousada|condomínio|condominio|edifício|edificio|residencial|conjunto|armazém|armazem|mercearia|empório|emporio|panificadora|açougue|acougue|pizzaria|lanchonete|sorveteria|churrascaria|borracharia|mecânica|mecanica|oficina|tabacaria|livraria|papelaria|conveniência|conveniencia|estética|estetica|cabeleireiro|lavanderia|distribuidora|atacado|atacadista|depósito|deposito|comércio|comercio|empresa|ltda|eireli|microempresa|imobiliária|imobiliaria|lotérica|loterica|pet\s+shop|açaí|acai|minimercado|hortifruti|quitanda|sapataria|ótica|otica|joalheria|autopeças|auto\s+peças|funilaria|vidraçaria|vidracaria|serralheria|marcenaria|carpintaria|pintura|decoração|decoracao|móveis|moveis|tapeceria|colchões|colchoes|boutique|confecções|confeccoes|calcados|calçados|ferragens|tintas|material\s+de\s+construção|construção|construcao|escritório|escritorio|consultório|consultorio|cartório|cartorio|sindicato|associação|associacao|cia\.?)\b/i;
 
 // Rodovias / vias de alta velocidade (BR, RJ, SP, etc. ou prefixo "Rodovia")
 const RODOVIA_PREFIXO_REGEX = /^(rodovia|rod\.?)\b/i;
@@ -239,8 +239,14 @@ function extrairKmRodovia(endereco: string): number | null {
 }
 
 function removerAnotacoesMotorista(s: string): string {
-  const idx = s.indexOf(" - ");
-  if (idx !== -1) s = s.substring(0, idx);
+  // Só remove " - " se o sufixo for uma anotação do motorista, NÃO um logradouro ou nome de negócio
+  const dashIdx = s.indexOf(" - ");
+  if (dashIdx !== -1) {
+    const sufixo = s.substring(dashIdx + 3).toLowerCase().trim();
+    const ehLogradouro = /^(rua|r\.|av\.|avenida|alameda|estrada|rod\.|rodovia|travessa|trav\.|tv\.|viela|beco|passagem|largo|praça|pça\.)\b/i.test(sufixo);
+    const ehAnotacao = !ehLogradouro && /^(próximo|proximo|perto|referência|referencia|maps|google|waze|placas|portão|portao|buzina|frente|fundos|esquina|atrás|atras|entre|deixar|não\s+entregar|nao\s+entregar|obs\b|atenção|atencao)\b/i.test(sufixo);
+    if (ehAnotacao) s = s.substring(0, dashIdx);
+  }
   s = s.replace(/\s+\d+[°ªº].*$/u, "");
   const gatilhos = ["proximo", "próximo", "perto", "referencia", "referência", "maps", "google",
     "waze", "placas", "portao", "portão", "buzina", "frente", "fundos", "esquina", "atrás", "atras", "entre", "deixar", "nao entregar", "não entregar"];
@@ -283,6 +289,15 @@ function extrairViaSecundaria(endereco: string): string | null {
 }
 
 function extrairPOI(endereco: string): string {
+  // Caso 1: POI antes do logradouro — ex: "Mercearia João, Rua X, 123" ou "Borracharia Silva - Av. Y"
+  const idxTipoRua = endereco.search(/\b(?:Rua|R\.|Av\.|Avenida|Alameda|Praça|Pça\.|Travessa|Trav\.|Tv\.|Estrada|Rod\.|Rodovia|Viela|Beco|Passagem|Largo)\s+\S/iu);
+  if (idxTipoRua > 5) {
+    const poiCandidate = endereco.substring(0, idxTipoRua).replace(/[\s,\-]+$/g, "").trim();
+    if (poiCandidate.length >= 3 && !/^\d+$/.test(poiCandidate) && !/^[A-Z]\d*$/i.test(poiCandidate)) {
+      return poiCandidate;
+    }
+  }
+  // Caso 2: POI após o logradouro — ex: "Rua X, 123, Mercado João"
   let sem = endereco.replace(/^\s*(?:Rua|Av\.?|Avenida|Alameda|Praça|Pça\.?|Travessa|Tv\.?|Estrada|Rod\.?|Rodovia|Viela|Beco|Passagem|Largo)\s+[^,]+/iu, "");
   sem = sem.replace(/^[,\s]+\d*[,\s]*/u, "");
   sem = sem.replace(/^\s*(loja|apt\.?|apto\.?)\s+/iu, "");
@@ -335,7 +350,7 @@ export function parsearEndereco(endereco: string, cidade = "", bairro = "", cepL
     cidade: cidade || extrairCidadeDoEndereco(end),
     bairro,
     cep,
-    is_comercio: PALAVRAS_COMERCIO_REGEX.test(poi) || PALAVRAS_COMERCIO_REGEX.test(end),
+    is_comercio: PALAVRAS_COMERCIO_REGEX.test(poi) || PALAVRAS_COMERCIO_REGEX.test(end) || NEGOCIO_INFORMAL_REGEX.test(poi),
     is_avenida_extensa: AVENIDAS_EXTENSAS_REGEX.test(rua) || AVENIDAS_EXTENSAS_REGEX.test(end),
     is_rodovia: RODOVIA_PREFIXO_REGEX.test(rua) || RODOVIA_QUALQUER_REGEX.test(end),
   } as any;
@@ -603,7 +618,7 @@ export async function geocodeReversePhoton(lat: number, lon: number): Promise<Ge
   return null;
 }
 
-export async function geocodeNearbyOsmRoad(lat: number, lon: number, radiusMeters = 40): Promise<GeoResult | null> {
+export async function geocodeNearbyOsmRoad(lat: number, lon: number, radiusMeters = 40, hintName?: string): Promise<GeoResult | null> {
   // Two-pass: first with tight radius (40m), then wider (90m) if needed
   for (const radius of radiusMeters === 40 ? [40, 90] : [radiusMeters]) {
     // Use tags-only output (faster than geom) for the first pass, then geom for distance calc
@@ -636,8 +651,19 @@ export async function geocodeNearbyOsmRoad(lat: number, lon: number, radiusMeter
 
     if (scored.length === 0) continue;
 
-    // Sort: primary criteria = OSM highway priority index, secondary = distance
+    // Sort: se há hint de nome esperado, priorizar a via que coincide com o endereço da planilha.
+    // Isso evita que uma avenida principal (alta prioridade OSM) prevaleça sobre a travessa que
+    // o endereço menciona explicitamente.
+    const hintNorm = hintName ? normalizarNomeRua(hintName) : null;
     scored.sort((a, b) => {
+      if (hintNorm) {
+        const aNorm = normalizarNomeRua(a.name);
+        const bNorm = normalizarNomeRua(b.name);
+        const aMatch = aNorm === hintNorm || aNorm.includes(hintNorm) || hintNorm.includes(aNorm);
+        const bMatch = bNorm === hintNorm || bNorm.includes(hintNorm) || hintNorm.includes(bNorm);
+        if (aMatch && !bMatch) return -1;
+        if (!aMatch && bMatch) return 1;
+      }
       const pa = OSM_HIGHWAY_PRIORITIES.indexOf(a.hwType);
       const pb = OSM_HIGHWAY_PRIORITIES.indexOf(b.hwType);
       const prioA = pa === -1 ? 99 : pa;
@@ -897,18 +923,48 @@ export function verificarNuance(
 
   if (similaridade < limiar) {
     // ── Caso especial: via secundária do endereço coincide com a rua oficial ──
-    // Ex.: "Rua Sinagoga, 49, Travessa B" → mapa retorna "Travessa B"
-    // "Rua Sinagoga" é referência de bairro/área; "Travessa B" é a via real.
+    // Padrão MUITO comum no Brasil: "Rua Sinagoga, 49, Travessa B (Apt 1)"
+    // O GPS está em "Travessa B"; "Rua Sinagoga" é a via de referência da área.
+    // Se a travessa/passagem/viela coincide com o oficial, o endereço está CORRETO — não é nuance.
     if (parsed.via_secundaria) {
       const simVia = calcularSimilaridadeVia(parsed.via_secundaria, ruaOficial);
-      if (simVia >= 0.65) {
+      if (simVia >= 0.75) {
+        // Via secundária confirma a rua oficial → endereço válido
+        if (distanciaMetros !== null && distanciaMetros > toleranceMeters) {
+          return {
+            is_nuance: true,
+            similaridade: Math.round(simVia * 1000) / 1000,
+            motivo: `Via secundária "${parsed.via_secundaria}" confirma oficial "${ruaOficial}" (${Math.round(simVia * 100)}%), porém GPS a ${distanciaMetros}m (tolerância: ${toleranceMeters}m). Verificar precisão das coordenadas.`,
+            distancia_metros: distanciaMetros,
+          };
+        }
         return {
-          is_nuance: true,
+          is_nuance: false,
           similaridade: Math.round(simVia * 1000) / 1000,
-          motivo: `Possível referência de área: "${ruaExtraida}" pode indicar o bairro/localidade. A via específica "${parsed.via_secundaria}" corresponde ao oficial "${ruaOficial}" (${Math.round(simVia * 100)}%). Verifique se a entrega é na ${parsed.via_secundaria} na região indicada — endereço não-padrão, confirmar antes de roteirizar.`,
+          motivo: "",
           distancia_metros: distanciaMetros,
         };
       }
+      if (simVia >= 0.55) {
+        // Correspondência parcial — manter como aviso mas não bloquear
+        return {
+          is_nuance: true,
+          similaridade: Math.round(simVia * 1000) / 1000,
+          motivo: `Possível referência de área: "${ruaExtraida}" pode indicar bairro/localidade. Via secundária "${parsed.via_secundaria}" corresponde parcialmente ao oficial "${ruaOficial}" (${Math.round(simVia * 100)}%). Confirmar antes de roteirizar.`,
+          distancia_metros: distanciaMetros,
+        };
+      }
+    }
+
+    // ── Comércio com GPS dentro da tolerância: confiar na coordenada ──
+    // POIs comerciais têm nomes variáveis; se o GPS está próximo, o endereço provavelmente é válido.
+    if (parsed.is_comercio && distanciaMetros !== null && distanciaMetros <= toleranceMeters) {
+      return {
+        is_nuance: false,
+        similaridade: Math.round(similaridade * 1000) / 1000,
+        motivo: "",
+        distancia_metros: distanciaMetros,
+      };
     }
 
     return {
@@ -1053,8 +1109,11 @@ export async function processarEndereco(
         if (photonRev) reverseGeoResult = photonRev;
 
         // 2. Overpass (secondary: direct OSM road geometry query — more precise, but often busy)
+        // Passa hint do nome esperado para priorizar a via que o endereço menciona
+        // (evita que uma avenida maior "ganhe" sobre a travessa/passagem explícita)
         if (!isRuaConfiavel(reverseGeoResult)) {
-          const overpassRoad = await geocodeNearbyOsmRoad(item.lat, item.lon);
+          const hintRua = parsed.rua_principal || parsed.via_secundaria || undefined;
+          const overpassRoad = await geocodeNearbyOsmRoad(item.lat, item.lon, 40, hintRua);
           if (overpassRoad) reverseGeoResult = overpassRoad;
         }
 
