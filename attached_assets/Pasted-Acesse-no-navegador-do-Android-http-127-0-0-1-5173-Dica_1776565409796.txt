@@ -1,0 +1,68 @@
+Acesse no navegador do Android:
+  http://127.0.0.1:5173
+
+  Dica: Instale o app Termux:Widget para iniciar com um toque!
+
+~ $ bash ~/viax-system/start.sh
+Iniciando PostgreSQL...
+waiting for server to start.... stopped waiting
+Iniciando API...
+Iniciando Frontend...
+
+✅ ViaX: System rodando!
+   Frontend : http://localhost:5173
+   API      : http://localhost:8080
+
+Acesse pelo navegador: http://127.0.0.1:5173
+Ctrl+C para parar
+file:///data/data/com.termux/files/home/viax-system/artifacts/api-server/dist/index.mjs:108996
+  throw new Error(
+        ^
+
+Error: DATABASE_URL must be set. Did you forget to provision a database?
+    at file:///data/data/com.termux/files/home/viax-system/artifacts/api-server/dist/index.mjs:108996:9
+    at ModuleJob.run (node:internal/modules/esm/module_job:430:25)
+    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:639:26)
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)
+
+Node.js v25.8.2
+/data/data/com.termux/files/home/viax-system/node_modules/.pnpm/rollup@4.59.0/node_modules/rollup/dist/native.js:115
+                throw new Error(
+                      ^
+
+Error: Cannot find module @rollup/rollup-android-arm64. npm has a bug related to optional dependencies (https://github.com/npm/cli/issues/4828). Please try `npm i` again after removing both package-lock.json and node_modules directory.
+    at requireWithFriendlyError (/data/data/com.termux/files/home/viax-system/node_modules/.pnpm/rollup@4.59.0/node_modules/rollup/dist/native.js:115:9)
+    at Object.<anonymous> (/data/data/com.termux/files/home/viax-system/node_modules/.pnpm/rollup@4.59.0/node_modules/rollup/dist/native.js:124:76)
+    at Module._compile (node:internal/modules/cjs/loader:1829:14)
+    at Module._extensions..js (node:internal/modules/cjs/loader:1969:10)
+    at Module.load (node:internal/modules/cjs/loader:1552:32)
+    at Module._load (node:internal/modules/cjs/loader:1354:12)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+    at loadCJSModuleWithModuleLoad (node:internal/modules/esm/translators:325:3)
+    at ModuleWrap.<anonymous> (node:internal/modules/esm/translators:230:7)
+    at ModuleJob.run (node:internal/modules/esm/module_job:430:25) {
+  [cause]: Error: Cannot find module '@rollup/rollup-android-arm64'
+  Require stack:
+  - /data/data/com.termux/files/home/viax-system/node_modules/.pnpm/rollup@4.59.0/node_modules/rollup/dist/native.js
+      at Module._resolveFilename (node:internal/modules/cjs/loader:1475:15)
+      at wrapResolveFilename (node:internal/modules/cjs/loader:1048:27)
+      at defaultResolveImplForCJSLoading (node:internal/modules/cjs/loader:1072:10)
+      at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1093:12)
+      at Module._load (node:internal/modules/cjs/loader:1261:25)
+      at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+      at Module.require (node:internal/modules/cjs/loader:1575:12)
+      at require (node:internal/modules/helpers:191:16)
+      at requireWithFriendlyError (/data/data/com.termux/files/home/viax-system/node_modules/.pnpm/rollup@4.59.0/node_modules/rollup/dist/native.js:97:10)
+      at Object.<anonymous> (/data/data/com.termux/files/home/viax-system/node_modules/.pnpm/rollup@4.59.0/node_modules/rollup/dist/native.js:124:76) {
+    code: 'MODULE_NOT_FOUND',
+    requireStack: [
+      '/data/data/com.termux/files/home/viax-system/node_modules/.pnpm/rollup@4.59.0/node_modules/rollup/dist/native.js'
+    ]
+  }
+}
+
+Node.js v25.8.2
+waiting for server to shut down.... done
+server stopped
+Encerrado.
+~ $

@@ -128,7 +128,7 @@ success ".env criado"
 # ---------------------------------------------------------------------------
 header "Instalando dependências"
 cd "$APP_DIR"
-pnpm install
+pnpm install --no-frozen-lockfile
 success "Dependências instaladas"
 
 header "Aplicando schema"
@@ -148,7 +148,7 @@ header "Criando scripts de controle"
 cat > "$APP_DIR/start.sh" <<'STARTSCRIPT'
 #!/usr/bin/env bash
 cd "$(dirname "$0")"
-source .env 2>/dev/null || export $(grep -v '^#' .env | xargs)
+set -a; source .env; set +a
 
 PG_DATA="${PREFIX}/var/lib/postgresql"
 
