@@ -104,7 +104,8 @@ export DATABASE_URL
 header "Clonando repositório"
 if [[ -d "$APP_DIR/.git" ]]; then
   info "Atualizando repositório existente..."
-  git -C "$APP_DIR" pull --rebase
+  git -C "$APP_DIR" fetch origin
+  git -C "$APP_DIR" reset --hard origin/main
 else
   git clone "$REPO_URL" "$APP_DIR"
 fi
