@@ -128,8 +128,9 @@ success ".env criado"
 # ---------------------------------------------------------------------------
 header "Instalando dependências"
 cd "$APP_DIR"
-# Remove overrides that block Android ARM64 native modules (added for Replit/Linux only)
-sed -i '/"rollup>@rollup\/rollup-android-arm64": "-"/d' pnpm-workspace.yaml
+# Remove ALL overrides that block Android native modules (those overrides are Replit/Linux-only).
+# This covers rollup, lightningcss, @tailwindcss/oxide, and esbuild android variants.
+sed -i '/android/d' pnpm-workspace.yaml
 pnpm install --no-frozen-lockfile
 success "Dependências instaladas"
 
