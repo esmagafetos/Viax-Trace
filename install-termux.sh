@@ -132,7 +132,7 @@ pnpm install
 success "Dependências instaladas"
 
 header "Aplicando schema"
-pnpm --filter @workspace/db run push || warn "Falha ao aplicar schema — verifique o PostgreSQL e DATABASE_URL"
+DATABASE_URL="$DATABASE_URL" pnpm --filter @workspace/db run push || warn "Falha ao aplicar schema — verifique o PostgreSQL e DATABASE_URL"
 success "Schema aplicado"
 
 header "Compilando API"
