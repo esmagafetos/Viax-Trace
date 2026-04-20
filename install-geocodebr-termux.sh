@@ -93,20 +93,43 @@ inf "Atualizando listas de pacotes..."
 ubuntu "export DEBIAN_FRONTEND=noninteractive && apt-get update -qq" \
   || warn "apt-get update retornou erro — continuando..."
 
-inf "Instalando bibliotecas necessárias..."
+inf "Instalando bibliotecas de sistema base..."
 ubuntu "
   export DEBIAN_FRONTEND=noninteractive
   apt-get install -y --no-install-recommends \
-    r-base r-base-dev \
+    r-base r-base-dev cmake \
     libcurl4-openssl-dev libssl-dev libxml2-dev \
     libgdal-dev libgeos-dev libproj-dev libudunits2-dev \
     libuv1-dev libsodium-dev \
     libfontconfig1-dev libfreetype-dev \
     libharfbuzz-dev libfribidi-dev \
     libpng-dev libjpeg-dev \
-    build-essential ca-certificates git pkg-config curl \
+    libzstd-dev liblz4-dev libbrotli-dev libsnappy-dev \
+    build-essential ca-certificates git pkg-config curl wget \
     2>&1 | grep -E '^(E:|Get:|Setting up|0 upgraded|[0-9]+ upgraded)' || true
 " || die "Falha crítica ao instalar dependências de sistema"
+
+# Instala libarrow-dev do repositório oficial do Apache Arrow
+# (biblioteca C++ pré-compilada para arm64 — essencial para o pacote R 'arrow')
+inf "Adicionando repositório oficial do Apache Arrow..."
+ubuntu "
+  export DEBIAN_FRONTEND=noninteractive
+  cd /tmp
+  # Usa o pacote APT source para noble (compatível com questing no arm64)
+  wget -q 'https://apache.jfrog.io/artifactory/arrow/ubuntu/apache-arrow-apt-source-latest-noble.deb' \
+    -O apache-arrow.deb 2>&1 || true
+  if [[ -f apache-arrow.deb && -s apache-arrow.deb ]]; then
+    apt-get install -y ./apache-arrow.deb 2>&1 | tail -3
+    apt-get update -qq 2>&1 | tail -1
+    apt-get install -y --no-install-recommends \
+      libarrow-dev libarrow-dataset-dev libparquet-dev \
+      2>&1 | grep -E '^(E:|Get:|Setting up|0 upgraded|[0-9]+ upgraded)' || true
+    echo '[ok] libarrow-dev instalado do repositório oficial'
+  else
+    echo '[av] Download do APT source do Arrow falhou — arrow sera compilado do zero'
+  fi
+  rm -f apache-arrow.deb
+"
 ok "Dependências de sistema instaladas"
 
 # ---------------------------------------------------------------------------
@@ -126,8 +149,7 @@ ubuntu "
     r-cran-mime r-cran-rcpp r-cran-digest \
     r-cran-generics r-cran-tidyselect r-cran-utf8 r-cran-fansi \
     r-cran-withr r-cran-parallelly r-cran-globals r-cran-listenv \
-    r-cran-data.table \
-    r-cran-nanoarrow r-cran-arrow \
+    r-cran-data.table r-cran-nanoarrow \
     2>&1 | grep -E '^(E:|Get:|Setting up|0 upgraded|[0-9]+ upgraded)' || true
 " || warn "Alguns pacotes apt não encontrados — serão instalados via CRAN"
 ok "Pacotes apt instalados"
@@ -135,8 +157,9 @@ ok "Pacotes apt instalados"
 # ---------------------------------------------------------------------------
 # PASSO 7 — Escreve e executa script R para instalar plumber + geocodebr
 # ---------------------------------------------------------------------------
-step "Instalando plumber e geocodebr via CRAN/PPM/DuckDB..."
-inf "Esta etapa envolve compilação — pode demorar 30-60 min na primeira vez."
+step "Instalando plumber e geocodebr via CRAN/PPM/DuckDB/Arrow..."
+inf "Esta etapa instala ~20 pacotes. Arrow compilará rápido (libarrow-dev já instalado)."
+inf "Tempo estimado: 15-40 min."
 
 mkdir -p "$UBUNTU_WORK"
 cat > "$UBUNTU_ROOT/root/viax-geocodebr/_install_pkgs.R" << RSCRIPT
@@ -200,14 +223,36 @@ safe_install <- function(pkg, tries = 3) {
 
 # ── Instala na ordem correta de dependências ──────────────────────────────────
 pkgs_order <- c(
-  "sodium",       # dep do plumber — compila com libsodium-dev
+  # --- plumber e suas deps ---
+  "sodium",       # dep do plumber (compila com libsodium-dev)
   "webutils",     # dep do plumber
-  "httpuv",       # dep do plumber — usa libuv do sistema
+  "httpuv",       # dep do plumber (usa libuv1-dev do sistema)
   "plumber",      # servidor HTTP R
-  # arrow e nanoarrow instalados via apt (r-cran-arrow / r-cran-nanoarrow)
-  # duckdb instalado via duckdb r-universe (binário arm64)
-  "duckdb",       # dep do geocodebr — binário via duckdb r-universe
-  "geocodebr"     # pacote principal
+
+  # --- deps do geocodebr: instaladas explicitamente antes para evitar
+  #     que geocodebr instale versões erradas no momento errado ---
+  "fs",           # dep de processx (usa libuv1-dev)
+  "processx",     # dep de callr
+  "callr",        # dep de enderecobr
+  "checkmate",    # dep de geocodebr
+  "backports",    # dep de varias
+  "blob",         # dep de duckdb
+  "uuid",         # dep de geocodebr
+  "dbplyr",       # dep de geocodebr
+  "h3lib",        # dep de h3r
+  "h3r",          # dep de geocodebr
+  "geometries",   # dep de sfheaders
+  "sfheaders",    # dep de geocodebr
+  # nanoarrow instalado via apt (r-cran-nanoarrow)
+  "geoarrow",     # dep de geocodebr (precisa de arrow + nanoarrow)
+  "arrow",        # dep do geocodebr — com libarrow-dev ja instalado, so compila wrapper fino
+  "duckdb",       # dep do geocodebr — binario via duckdb r-universe
+  "duckspatial",  # dep do geocodebr
+  "enderecobr",   # dep do geocodebr
+  "httr2",        # dep do geocodebr
+
+  # --- pacote principal ---
+  "geocodebr"
 )
 
 results <- vapply(pkgs_order, safe_install, logical(1))
