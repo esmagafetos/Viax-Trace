@@ -124,21 +124,21 @@ export function GitHubBanner() {
       rel="noopener noreferrer"
       style={{ display: "block", textDecoration: "none" }}
     >
-      <div style={{
-        background: "#0d0c0b",
-        borderRadius: 14,
-        overflow: "hidden",
-        border: "1px solid rgba(255,255,255,0.1)",
-        boxShadow: "0 4px 24px rgba(0,0,0,0.25)",
-        transition: "box-shadow 200ms, transform 200ms",
-        cursor: "pointer",
-      }}
+      <div
+        style={{
+          borderRadius: 14,
+          overflow: "hidden",
+          boxShadow: "0 4px 32px rgba(0,0,0,0.35)",
+          transition: "box-shadow 200ms, transform 200ms",
+          cursor: "pointer",
+          lineHeight: 0,
+        }}
         onMouseEnter={e => {
-          (e.currentTarget as HTMLDivElement).style.boxShadow = "0 8px 40px rgba(0,0,0,0.4)";
-          (e.currentTarget as HTMLDivElement).style.transform = "translateY(-2px)";
+          (e.currentTarget as HTMLDivElement).style.boxShadow = "0 10px 48px rgba(0,0,0,0.5)";
+          (e.currentTarget as HTMLDivElement).style.transform = "translateY(-3px)";
         }}
         onMouseLeave={e => {
-          (e.currentTarget as HTMLDivElement).style.boxShadow = "0 4px 24px rgba(0,0,0,0.25)";
+          (e.currentTarget as HTMLDivElement).style.boxShadow = "0 4px 32px rgba(0,0,0,0.35)";
           (e.currentTarget as HTMLDivElement).style.transform = "translateY(0)";
         }}
       >
