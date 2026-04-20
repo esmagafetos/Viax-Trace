@@ -127,6 +127,7 @@ ubuntu "
     r-cran-generics r-cran-tidyselect r-cran-utf8 r-cran-fansi \
     r-cran-withr r-cran-parallelly r-cran-globals r-cran-listenv \
     r-cran-data.table \
+    r-cran-nanoarrow r-cran-arrow \
     2>&1 | grep -E '^(E:|Get:|Setting up|0 upgraded|[0-9]+ upgraded)' || true
 " || warn "Alguns pacotes apt não encontrados — serão instalados via CRAN"
 ok "Pacotes apt instalados"
@@ -203,8 +204,8 @@ pkgs_order <- c(
   "webutils",     # dep do plumber
   "httpuv",       # dep do plumber — usa libuv do sistema
   "plumber",      # servidor HTTP R
-  "nanoarrow",    # dep do geocodebr (leve)
-  "arrow",        # dep do geocodebr (pesado — pode demorar)
+  # arrow e nanoarrow instalados via apt (r-cran-arrow / r-cran-nanoarrow)
+  # duckdb instalado via duckdb r-universe (binário arm64)
   "duckdb",       # dep do geocodebr — binário via duckdb r-universe
   "geocodebr"     # pacote principal
 )
