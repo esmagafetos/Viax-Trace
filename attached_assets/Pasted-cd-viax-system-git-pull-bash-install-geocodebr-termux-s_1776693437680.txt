@@ -1,0 +1,132 @@
+cd ~/viax-system
+git pull
+bash install-geocodebr-termux.sh
+remote: Enumerating objects: 5, done.
+remote: Counting objects: 100% (5/5), done.
+remote: Compressing objects: 100% (1/1), done.
+remote: Total 3 (delta 2), reused 3 (delta 2), pack-reused 0 (from 0)
+Unpacking objects: 100% (3/3), 876 bytes | 62.00 KiB/s, done.
+From https://github.com/esmagafetos/Viax-Scout
+   1103d7a..5af1df8  main       -> origin/main
+Updating 312c66a..5af1df8
+error: Your local changes to the following files would be overwritten by merge:
+        install-geocodebr-termux.sh
+Please commit your changes or stash them before you merge.
+Aborting
+
+ViaX:Trace — Instalador GeocodeR BR
+  Motor  : CNEFE / IBGE (geocodebr / IPEA)
+  Método : proot-distro (Ubuntu) + R nativo
+  Porta  : 8002
+
+[aviso] Espaço necessário: ~2 GB (Ubuntu) + ~500 MB (R + pacotes) + ~1 GB (CNEFE cache)
+[aviso] Tempo estimado   : 20-60 minutos (compilação + download)
+
+[info] Diretório da aplicação: /data/data/com.termux/files/home/viax-system
+
+==> Atualizando repositórios Termux
+Checking availability of current mirror:
+[*] https://mirror.quantum5.ca/termux/termux-main: ok
+Hit:1 https://mirror.quantum5.ca/termux/termux-main stable InRelease
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+All packages are up to date.
+
+==> Verificando R nativo
+[info] Tentando pkg install r-base (pode falhar — removido do Termux oficial)...
+Checking availability of current mirror:
+[*] https://mirror.quantum5.ca/termux/termux-main: ok
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+[info] r-base não disponível no Termux. Usando proot-distro (método recomendado).
+
+==> Instalando proot-distro
+Checking availability of current mirror:
+[*] https://mirror.quantum5.ca/termux/termux-main: ok
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+proot-distro is already the newest version (4.38.0).
+0 upgraded, 0 newly installed, 0 to remove and 0 not upgraded.
+[ok] proot-distro instalado
+
+==> Instalando Ubuntu 24.04 (imagem mínima ~200 MB download)
+
+Error: distribution 'ubuntu' is already installed.
+
+Log in:     proot-distro login ubuntu
+Reinstall:  proot-distro reset ubuntu
+Uninstall:  proot-distro remove ubuntu
+
+[erro] Falha ao instalar Ubuntu. Verifique conexão e espaço disponível.
+~/viax-system $ git pull
+Updating 312c66a..5af1df8
+error: Your local changes to the following files would be overwritten by merge:
+        install-geocodebr-termux.sh
+Please commit your changes or stash them before you merge.
+Aborting
+~/viax-system $ cd ~/viax-system
+git pull
+bash install-geocodebr-termux.sh
+Updating 312c66a..5af1df8
+error: Your local changes to the following files would be overwritten by merge:
+        install-geocodebr-termux.sh
+Please commit your changes or stash them before you merge.
+Aborting
+
+ViaX:Trace — Instalador GeocodeR BR
+  Motor  : CNEFE / IBGE (geocodebr / IPEA)
+  Método : proot-distro (Ubuntu) + R nativo
+  Porta  : 8002
+
+[aviso] Espaço necessário: ~2 GB (Ubuntu) + ~500 MB (R + pacotes) + ~1 GB (CNEFE cache)
+[aviso] Tempo estimado   : 20-60 minutos (compilação + download)
+
+[info] Diretório da aplicação: /data/data/com.termux/files/home/viax-system
+
+==> Atualizando repositórios Termux
+Checking availability of current mirror:
+[*] https://mirror.quantum5.ca/termux/termux-main: ok
+Hit:1 https://mirror.quantum5.ca/termux/termux-main stable InRelease
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+All packages are up to date.
+
+==> Verificando R nativo
+[info] Tentando pkg install r-base (pode falhar — removido do Termux oficial)...
+Checking availability of current mirror:
+[*] https://mirror.quantum5.ca/termux/termux-main: ok
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+[info] r-base não disponível no Termux. Usando proot-distro (método recomendado).
+
+==> Instalando proot-distro
+Checking availability of current mirror:
+[*] https://mirror.quantum5.ca/termux/termux-main: ok
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+proot-distro is already the newest version (4.38.0).
+0 upgraded, 0 newly installed, 0 to remove and 0 not upgraded.
+[ok] proot-distro instalado
+
+==> Instalando Ubuntu 24.04 (imagem mínima ~200 MB download)
+
+Error: distribution 'ubuntu' is already installed.
+
+Log in:     proot-distro login ubuntu
+Reinstall:  proot-distro reset ubuntu
+Uninstall:  proot-distro remove ubuntu
+
+[erro] Falha ao instalar Ubuntu. Verifique conexão e espaço disponível.
+~/viax-system $ git pull
+Updating 312c66a..5af1df8
+error: Your local changes to the following files would be overwritten by merge:
+        install-geocodebr-termux.sh
+Please commit your changes or stash them before you merge.
+Aborting
+~/viax-system $
