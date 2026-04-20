@@ -81,7 +81,8 @@ install_via_proot() {
   success "proot-distro instalado"
 
   header "Instalando Ubuntu 24.04 (imagem mínima ~200 MB download)"
-  if proot-distro list 2>/dev/null | grep -q "ubuntu.*installed"; then
+  UBUNTU_ROOTFS="${PREFIX}/var/lib/proot-distro/installed-rootfs/ubuntu"
+  if [[ -d "$UBUNTU_ROOTFS/usr" ]]; then
     info "Ubuntu já instalado no proot-distro"
   else
     proot-distro install ubuntu || die "Falha ao instalar Ubuntu. Verifique conexão e espaço disponível."
