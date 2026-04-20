@@ -1,0 +1,111 @@
+~/viax-system $ cd ~/viax-system
+git checkout -- install-geocodebr-termux.sh
+git pull
+bash install-geocodebr-termux.sh
+Already up to date.
+
+ViaX:Trace — GeocodeR BR  (proot-distro + Ubuntu + R)
+
+Espaço: ~3.5 GB livres necessários   Tempo: 20-60 min
+
+[..] Instalando proot-distro...
+Checking availability of current mirror:
+[*] https://mirror.quantum5.ca/termux/termux-main: ok
+Hit:1 https://mirror.quantum5.ca/termux/termux-main stable InRelease
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+All packages are up to date.
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+proot-distro is already the newest version (4.38.0).
+0 upgraded, 0 newly installed, 0 to remove and 0 not upgraded.
+[ok] proot-distro pronto
+[..] Verificando Ubuntu no proot-distro...
+[ok] Ubuntu disponível
+[..] Instalando R e dependências dentro do Ubuntu...
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+r-base is already the newest version (4.5.1-1).
+r-base-dev is already the newest version (4.5.1-1).
+libcurl4-openssl-dev is already the newest version (8.14.1-2ubuntu1.2).
+libssl-dev is already the newest version (3.5.3-1ubuntu3.3).
+libxml2-dev is already the newest version (2.14.5+dfsg-0.2ubuntu0.1).
+libgdal-dev is already the newest version (3.10.3+dfsg-1build2).
+libgeos-dev is already the newest version (3.13.1-1).
+libproj-dev is already the newest version (9.6.0-1).
+libudunits2-dev is already the newest version (2.2.28-7build1).
+build-essential is already the newest version (12.12ubuntu1).
+ca-certificates is already the newest version (20250419).
+Solving dependencies... Done
+0 upgraded, 0 newly installed, 0 to remove and 28 not upgraded.
+[ok] R instalado
+[..] Instalando pacotes R (plumber, geocodebr, future) — pode demorar...
+Instalando plumber...
+Installing package into ‘/usr/local/lib/R/site-library’
+(as ‘lib’ is unspecified)
+also installing the dependencies ‘pillar’, ‘memoise’, ‘sass’, ‘fs’, ‘pkgbuild’, ‘purrr’, ‘tidyselect’, ‘vctrs’, ‘geometries’, ‘jsonify’, ‘sfheaders’, ‘knitr’, ‘systemfonts’, ‘textshaping’, ‘hms’, ‘tibble’, ‘vroom’, ‘tzdb’, ‘cellranger’, ‘progress’, ‘bslib’, ‘s2’, ‘units’, ‘xml2’, ‘hunspell’, ‘callr’, ‘pkgload’, ‘processx’, ‘waldo’, ‘httpuv’, ‘lifecycle’, ‘promises’, ‘sodium’, ‘stringi’, ‘webutils’, ‘arrow’, ‘coro’, ‘future’, ‘geojsonsf’, ‘htmlwidgets’, ‘later’, ‘ragg’, ‘readr’, ‘readxl’, ‘redoc’, ‘rmarkdown’, ‘sf’, ‘spelling’, ‘svglite’, ‘testthat’, ‘visNetwork’
+
+trying URL 'https://cloud.r-project.org/src/contrib/pillar_1.11.1.tar.gz'
+trying URL 'https://cloud.r-project.org/src/contrib/memoise_2.0.1.tar.gz'
+trying URL 'https://cloud.r-project.org/src/contrib/sass_0.4.10.tar.gz'
+trying URL 'https://cloud.r-project.org/src/contrib/fs_2.1.0.tar.gz'
+trying URL 'https://cloud.r-project.org/src/contrib/pkgbuild_1.4.8.tar.gz'
+trying URL 'https://cloud.r-project.org/src/contrib/purrr_1.2.2.tar.gz'
+trying URL 'https://cloud.r-project.org/src/contrib/tidyselect_1.2.1.tar.gz'
+trying URL 'https://cloud.r-project.org/src/contrib/vctrs_0.7.3.tar.gz'
+trying URL 'https://cloud.r-project.org/src/contrib/geometries_0.2.5.tar.gz'
+trying URL 'https://cloud.r-project.org/src/contrib/jsonify_1.2.3.tar.gz'
+trying URL 'https://cloud.r-project.org/src/contrib/sfheaders_0.4.5.tar.gz'
+trying URL 'https://cloud.r-project.org/src/contrib/knitr_1.51.tar.gz'
+trying URL 'https://cloud.r-project.org/src/contrib/systemfonts_1.3.2.tar.gz'
+trying URL 'https://cloud.r-project.org/src/contrib/textshaping_1.0.5.tar.gz'
+trying URL 'https://cloud.r-project.org/src/contrib/hms_1.1.4.tar.gz'
+trying URL 'https://cloud.r-project.org/src/contrib/tibble_3.3.1.tar.gz'
+trying URL 'https://cloud.r-project.org/src/contrib/vroom_1.7.1.tar.gz'
+trying URL 'https://cloud.r-project.org/src/contrib/tzdb_0.5.0.tar.gz'
+trying URL 'https://cloud.r-project.org/src/contrib/cellranger_1.1.0.tar.gz'
+trying URL 'https://cloud.r-project.org/src/contrib/progress_1.2.3.tar.gz'
+trying URL 'https://cloud.r-project.org/src/contrib/bslib_0.10.0.tar.gz'
+trying URL 'https://cloud.r-project.org/src/contrib/s2_1.1.9.tar.gz'
+trying URL 'https://cloud.r-project.org/src/contrib/units_1.0-1.tar.gz'
+trying URL 'https://cloud.r-project.org/src/contrib/xml2_1.5.2.tar.gz'
+trying URL 'https://cloud.r-project.org/src/contrib/hunspell_3.0.6.tar.gz'
+trying URL 'https://cloud.r-project.org/src/contrib/callr_3.7.6.tar.gz'
+trying URL 'https://cloud.r-project.org/src/contrib/pkgload_1.5.1.tar.gz'
+trying URL 'https://cloud.r-project.org/src/contrib/processx_3.8.7.tar.gz'
+trying URL 'https://cloud.r-project.org/src/contrib/waldo_0.6.2.tar.gz'
+trying URL 'https://cloud.r-project.org/src/contrib/httpuv_1.6.17.tar.gz'
+trying URL 'https://cloud.r-project.org/src/contrib/lifecycle_1.0.5.tar.gz'
+trying URL 'https://cloud.r-project.org/src/contrib/promises_1.5.0.tar.gz'
+trying URL 'https://cloud.r-project.org/src/contrib/sodium_1.4.0.tar.gz'
+trying URL 'https://cloud.r-project.org/src/contrib/stringi_1.8.7.tar.gz'
+trying URL 'https://cloud.r-project.org/src/contrib/webutils_1.2.2.tar.gz'
+trying URL 'https://cloud.r-project.org/src/contrib/arrow_23.0.1.2.tar.gz'
+trying URL 'https://cloud.r-project.org/src/contrib/coro_1.1.0.tar.gz'
+trying URL 'https://cloud.r-project.org/src/contrib/future_1.70.0.tar.gz'
+trying URL 'https://cloud.r-project.org/src/contrib/geojsonsf_2.0.5.tar.gz'
+trying URL 'https://cloud.r-project.org/src/contrib/htmlwidgets_1.6.4.tar.gz'
+trying URL 'https://cloud.r-project.org/src/contrib/later_1.4.8.tar.gz'
+trying URL 'https://cloud.r-project.org/src/contrib/ragg_1.5.2.tar.gz'
+trying URL 'https://cloud.r-project.org/src/contrib/readr_2.2.0.tar.gz'
+trying URL 'https://cloud.r-project.org/src/contrib/readxl_1.4.5.tar.gz'
+trying URL 'https://cloud.r-project.org/src/contrib/redoc_2.0.0.75.tar.gz'
+trying URL 'https://cloud.r-project.org/src/contrib/rmarkdown_2.31.tar.gz'
+trying URL 'https://cloud.r-project.org/src/contrib/sf_1.1-0.tar.gz'
+trying URL 'https://cloud.r-project.org/src/contrib/spelling_2.3.2.tar.gz'
+trying URL 'https://cloud.r-project.org/src/contrib/svglite_2.2.2.tar.gz'
+trying URL 'https://cloud.r-project.org/src/contrib/testthat_3.3.2.tar.gz'
+trying URL 'https://cloud.r-project.org/src/contrib/visNetwork_2.1.4.tar.gz'
+trying URL 'https://cloud.r-project.org/src/contrib/plumber_1.3.3.tar.gz'
+begin installing package ‘memoise’
+begin installing package ‘fs’
+begin installing package ‘geometries’
+begin installing package ‘jsonify’
+begin installing package ‘knitr’
+begin installing package ‘tzdb’
+begin installing package ‘s2’
+
+[Process completed (signal 9) - press Enter]

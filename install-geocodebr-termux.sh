@@ -43,20 +43,38 @@ proot-distro login ubuntu -- bash -c "
 ok "R instalado"
 
 # ---------------------------------------------------------------------------
-inf "Instalando pacotes R (plumber, geocodebr, future) — pode demorar..."
+inf "Instalando pacotes R via binários pré-compilados (sem compilação)..."
+
+# Instala via apt o que estiver disponível (mais rápido, sem compilação)
+proot-distro login ubuntu -- bash -c "
+  export DEBIAN_FRONTEND=noninteractive
+  apt-get install -y --no-install-recommends \
+    r-cran-jsonlite r-cran-future r-cran-promises r-cran-httr \
+    r-cran-curl r-cran-xml2 r-cran-stringi r-cran-stringr \
+    r-cran-dplyr r-cran-tidyr r-cran-rlang r-cran-cli \
+    r-cran-glue r-cran-lifecycle r-cran-vctrs r-cran-pillar \
+    r-cran-tibble r-cran-sf r-cran-units 2>/dev/null || true
+"
+
+# Usa PPM (Posit Package Manager) — binários para Ubuntu 24.04 Noble, sem compilar
 proot-distro login ubuntu -- Rscript - <<'REOF'
-options(repos = c(CRAN = "https://cloud.r-project.org/"),
-        Ncpus = max(1L, parallel::detectCores() - 1L))
+options(
+  repos = c(
+    PPM  = "https://packagemanager.posit.co/cran/__linux__/noble/latest",
+    CRAN = "https://cloud.r-project.org/"
+  ),
+  Ncpus = max(1L, parallel::detectCores() - 1L)
+)
 pkgs <- c("plumber","geocodebr","future","promises","jsonlite")
 for (p in pkgs) {
   if (!requireNamespace(p, quietly=TRUE)) {
     cat(sprintf("Instalando %s...\n", p))
     install.packages(p, dependencies=TRUE)
-  } else cat(sprintf("[ok] %s\n", p))
+  } else cat(sprintf("[ok] %s ja instalado\n", p))
 }
 miss <- pkgs[!sapply(pkgs, requireNamespace, quietly=TRUE)]
 if (length(miss)) { cat("FALHA:", paste(miss, collapse=", "), "\n"); quit(status=1) }
-cat("Todos os pacotes instalados!\n")
+cat("Todos os pacotes prontos!\n")
 REOF
 ok "Pacotes R prontos"
 
