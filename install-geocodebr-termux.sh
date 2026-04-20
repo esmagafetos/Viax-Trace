@@ -139,9 +139,24 @@ inf "Esta etapa envolve compilação — pode demorar 30-60 min na primeira vez.
 
 mkdir -p "$UBUNTU_WORK"
 cat > "$UBUNTU_ROOT/root/viax-geocodebr/_install_pkgs.R" << RSCRIPT
+# ── Variáveis de ambiente para arrow usar binário pré-compilado ───────────────
+# LIBARROW_BINARY=true  → baixa binário C++ em vez de compilar (muito mais rápido)
+# NOT_CRAN=true         → habilita o download de binários do Apache Arrow
+Sys.setenv(
+  LIBARROW_BINARY        = "true",
+  NOT_CRAN               = "true",
+  ARROW_R_DEV            = "false",
+  LIBARROW_MINIMAL       = "false"
+)
+
 # ── Configuração de repositórios ─────────────────────────────────────────────
+# ARROW  → R-universe oficial do Apache Arrow (binários arm64 pré-compilados)
+# DUCKDB → R-universe oficial do DuckDB       (binários arm64 pré-compilados)
+# PPM    → Posit Package Manager              (binários Ubuntu noble)
+# CRAN   → fallback geral
 options(
   repos = c(
+    ARROW  = "https://apache.r-universe.dev",
     DUCKDB = "https://duckdb.r-universe.dev",
     PPM    = "${PPM_URL}",
     CRAN   = "https://cloud.r-project.org"
