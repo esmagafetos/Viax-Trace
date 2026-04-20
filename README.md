@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/banner.png" alt="ViaX: System Banner" width="100%" />
+<img src="docs/banner.png" alt="ViaX:Trace — Auditoria Inteligente de Rotas" width="100%" style="border-radius:12px;display:block;" />
 
 <br />
 <br />

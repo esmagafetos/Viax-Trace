@@ -145,7 +145,13 @@ export function GitHubBanner() {
         <img
           src="/github-banner.png"
           alt="ViaX:Trace — GitHub"
-          style={{ width: "100%", height: "auto", display: "block" }}
+          style={{
+            width: "100%",
+            height: "clamp(180px, 25vw, 340px)",
+            display: "block",
+            objectFit: "cover",
+            objectPosition: "center center",
+          }}
         />
       </div>
     </a>
