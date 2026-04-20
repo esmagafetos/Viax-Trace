@@ -81,13 +81,13 @@ install_via_proot() {
   success "proot-distro instalado"
 
   header "Instalando Ubuntu 24.04 (imagem mínima ~200 MB download)"
-  UBUNTU_ROOTFS="${PREFIX}/var/lib/proot-distro/installed-rootfs/ubuntu"
-  if [[ -d "$UBUNTU_ROOTFS/usr" ]]; then
-    info "Ubuntu já instalado no proot-distro"
-  else
-    proot-distro install ubuntu || die "Falha ao instalar Ubuntu. Verifique conexão e espaço disponível."
-    success "Ubuntu instalado"
-  fi
+  # Tenta instalar; "already installed" retorna erro — ignoramos com || true
+  proot-distro install ubuntu 2>/dev/null || true
+
+  # Verifica acesso real ao Ubuntu (independente do código de saída do install)
+  proot-distro login ubuntu -- true 2>/dev/null \
+    || die "Não foi possível acessar o Ubuntu. Tente: proot-distro reset ubuntu"
+  success "Ubuntu disponível no proot-distro"
 
   header "Atualizando Ubuntu e instalando R"
   info "Atualizando apt e instalando dependências de sistema..."
