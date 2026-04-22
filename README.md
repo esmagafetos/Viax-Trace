@@ -358,3 +358,4 @@ Distribuído sob a licença **MIT**. Veja [LICENSE](LICENSE) para detalhes.
 Desenvolvido por [esmagafetos](https://github.com/esmagafetos) · [Releases](https://github.com/esmagafetos/Viax-Scout/releases) · [Issues](https://github.com/esmagafetos/Viax-Scout/issues)
 
 </div>
+
