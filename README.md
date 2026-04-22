@@ -1,9 +1,8 @@
 <div align="center">
 
-<img src="docs/banner.png" alt="ViaX:Trace — Auditoria Inteligente de Rotas" width="100%" style="border-radius:12px;display:block;" />
+<img src="docs/banner.png" alt="ViaX:Trace — Auditoria Inteligente de Rotas Logísticas" width="100%" />
 
-<br />
-<br />
+<br/>
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-orange.svg?style=flat-square)](https://opensource.org/licenses/MIT)
 [![Node.js](https://img.shields.io/badge/Node.js-20%2B-339933?style=flat-square&logo=node.js&logoColor=white)](https://nodejs.org)
@@ -11,25 +10,26 @@
 [![React](https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=black)](https://react.dev)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-14%2B-4169E1?style=flat-square&logo=postgresql&logoColor=white)](https://postgresql.org)
 [![pnpm](https://img.shields.io/badge/pnpm-workspace-F69220?style=flat-square&logo=pnpm&logoColor=white)](https://pnpm.io)
+[![Express](https://img.shields.io/badge/Express-5-000000?style=flat-square&logo=express&logoColor=white)](https://expressjs.com)
 
-**Auditoria inteligente de rotas de entrega — valide planilhas XLSX/CSV contra coordenadas GPS reais**
+**Valide planilhas XLSX/CSV contra coordenadas GPS reais em tempo real**
 
-[Funcionalidades](#-funcionalidades) · [Screenshots](#-screenshots) · [Instalação](#-instalação) · [Configuração](#️-configuração) · [Arquitetura](#-arquitetura) · [Contribuindo](#-contribuindo)
+[Funcionalidades](#-funcionalidades) · [Arquitetura](#-arquitetura) · [Instalação](#-instalação) · [Configuração](#️-configuração) · [Screenshots](#-screenshots) · [Contribuindo](#-contribuindo)
 
 </div>
 
 ---
 
-## Sobre o projeto
+## Sobre
 
-O **ViaX:Trace** é uma plataforma SaaS de auditoria logística que verifica automaticamente se os endereços registrados em planilhas de rotas de entrega correspondem às coordenadas GPS coletadas em campo.
+**ViaX:Trace** é uma plataforma SaaS de auditoria logística que valida automaticamente planilhas de rotas de entrega (XLSX/CSV) comparando os endereços registrados com coordenadas GPS coletadas em campo.
 
-O sistema detecta **nuances** — divergências entre o endereço informado e o local real de coleta — e gera relatórios operacionais detalhados, ajudando gestores de logística a identificar fraudes, erros de digitação e pontos de coleta incorretos em segundos.
+O sistema detecta **nuances** — divergências entre o endereço informado e o ponto GPS real — e gera relatórios detalhados, ajudando gestores a identificar fraudes, erros de digitação e pontos de entrega incorretos em segundos, com resultados transmitidos em tempo real via SSE.
 
 ```
-Planilha XLSX/CSV → Parser de endereço → Geocodificação reversa → Comparação → Relatório
-       ↓                    ↓                      ↓                  ↓
-  Endereço + GPS     Rua extraída          Nome oficial da rua   Similaridade + distância
+Planilha XLSX/CSV  →  Parser de endereço  →  Geocodificação reversa  →  Comparação  →  Relatório
+        ↓                      ↓                        ↓                     ↓
+ Endereço + GPS          Rua extraída            Nome oficial da via     Similaridade + distância
 ```
 
 ---
@@ -38,53 +38,19 @@ Planilha XLSX/CSV → Parser de endereço → Geocodificação reversa → Compa
 
 | Funcionalidade | Descrição |
 |---|---|
-| **Upload XLSX / CSV** | Suporte a planilhas com endereço, latitude, longitude, cidade, bairro e CEP |
-| **Parser embutido** | Extrai logradouro, número, travessa, POI e CEP via regex adaptado ao português BR |
-| **Parser via IA** | Alternativa usando OpenAI, Anthropic ou Google Gemini |
-| **Geocodificação brasileira** | BrasilAPI v2 (IBGE/Correios) + AwesomeAPI CEP como fontes primárias |
-| **Geocodificação global** | Photon (sem rate limit), Overpass API e Nominatim (OSM) como fallback |
-| **GeocodeR BR (CNEFE/IBGE)** | Microserviço R opcional — precisão máxima para endereços brasileiros via base CNEFE do IBGE |
+| **Upload XLSX / CSV** | Planilhas com endereço, lat/lon, cidade, bairro e CEP — até 10 MB |
+| **Parser embutido** | Regex calibrado para português BR — extrai logradouro, número, POI, travessa e CEP |
+| **Parser via IA** | Alternativa com OpenAI, Anthropic ou Google Gemini para endereços complexos |
+| **Geocodificação BR** | BrasilAPI v2 (IBGE/Correios) + AwesomeAPI CEP como fontes primárias |
+| **Geocodificação global** | Photon (sem rate limit) → Overpass API → Nominatim (OSM) |
+| **GeocodeR BR (CNEFE/IBGE)** | Microserviço R opcional — precisão máxima via base CNEFE do IBGE |
 | **Google Maps premium** | Integração opcional para máxima precisão global |
-| **Detecção de nuances** | Similaridade bigram Jaccard + distância Haversine configurável |
-| **Tolerância configurável** | Raio de aceitação em metros ajustável por conta |
-| **Dashboard** | Visão geral de análises, nuances detectadas e controle financeiro |
+| **Detecção de nuances** | Similaridade bigram Jaccard + distância Haversine configurável por conta |
+| **Streaming em tempo real** | Progresso linha a linha via Server-Sent Events (SSE) |
+| **Dashboard** | Visão geral de análises, nuances, distâncias e controle financeiro |
 | **Histórico completo** | Listagem e download de relatórios CSV de todas as análises |
 | **Autenticação segura** | Sessões com bcrypt, avatar e perfil de usuário |
-| **Modo escuro / claro** | Tema automático com preferência salva |
-
----
-
-## Screenshots
-
-### Login
-| Claro | Escuro |
-|:-----:|:------:|
-| ![Login claro](docs/screenshots/login.jpg) | ![Login escuro](docs/screenshots/login-dark.jpg) |
-
-### Cadastro
-| Claro | Escuro |
-|:-----:|:------:|
-| ![Cadastro claro](docs/screenshots/register.jpg) | ![Cadastro escuro](docs/screenshots/register-dark.jpg) |
-
-### Dashboard
-| Claro | Escuro |
-|:-----:|:------:|
-| ![Dashboard claro](docs/screenshots/dashboard.jpg) | ![Dashboard escuro](docs/screenshots/dashboard-dark.jpg) |
-
-### Processar Rota
-| Claro | Escuro |
-|:-----:|:------:|
-| ![Processar claro](docs/screenshots/processing.jpg) | ![Processar escuro](docs/screenshots/processing-dark.jpg) |
-
-### Histórico de Análises
-| Claro | Escuro |
-|:-----:|:------:|
-| ![Histórico claro](docs/screenshots/history.jpg) | ![Histórico escuro](docs/screenshots/history-dark.jpg) |
-
-### Configurações
-| Claro | Escuro |
-|:-----:|:------:|
-| ![Config claro](docs/screenshots/settings.jpg) | ![Config escuro](docs/screenshots/settings-dark.jpg) |
+| **Tema escuro / claro** | Preferência salva com alternância instantânea |
 
 ---
 
@@ -97,19 +63,21 @@ viax-scout/                          ← raiz do monorepo (pnpm workspaces)
 │   ├── api-server/                  ← Express 5 · porta 8080
 │   │   └── src/
 │   │       ├── lib/
-│   │       │   ├── geocoder.ts      ← pipeline completo de geocodificação
-│   │       │   └── logger.ts        ← pino logger
+│   │       │   ├── geocoder.ts      ← pipeline completo de geocodificação multi-camada
+│   │       │   └── logger.ts        ← pino (JSON estruturado)
+│   │       ├── middlewares/         ← auth, session, error handler
 │   │       └── routes/
-│   │           ├── auth.ts          ← /api/auth/*
+│   │           ├── auth.ts          ← /api/auth/*  (login, register, logout, me)
 │   │           ├── process.ts       ← /api/process/upload (SSE streaming)
 │   │           ├── analyses.ts      ← /api/analyses/*
 │   │           ├── dashboard.ts     ← /api/dashboard/*
-│   │           └── users.ts         ← /api/users/*
+│   │           └── users.ts         ← /api/users/*  (perfil, avatar)
 │   │
 │   └── viax-scout/                  ← React 19 + Vite 7 · porta 5173
 │       └── src/
-│           ├── pages/               ← Login, Register, Dashboard, Process, History, Settings
-│           ├── components/          ← Layout, Toast, UI primitives
+│           ├── pages/               ← Login, Register, Setup, Dashboard,
+│           │                           Process, History, Settings, Docs
+│           ├── components/          ← Layout, ViaXLogo, UI primitives
 │           └── contexts/            ← AuthContext
 │
 └── lib/
@@ -122,33 +90,64 @@ viax-scout/                          ← raiz do monorepo (pnpm workspaces)
 ### Pipeline de Geocodificação
 
 ```
-CEP detectado?
-  ├─ SIM → BrasilAPI v2 (IBGE/Correios) → AwesomeAPI CEP
-  └─ NÃO → continua no fluxo global
+Endereço recebido
+  │
+  ├─ CEP detectado? ──► BrasilAPI v2 (IBGE/Correios) → AwesomeAPI CEP
+  │
+  └─ GPS fornecido? ──► Geocodificação reversa (GPS → nome de via):
+                          1. Photon (Komoot) — rápido, sem rate limit
+                          2. Overpass API   — consulta OSM, raio 40 m → 90 m
+                          3. Nominatim      — fallback OSM completo
+                        │
+                        └─ Geocodificação direta (endereço → coordenada):
+                             4. Photon
+                             5. Nominatim (1 req/s)
+                             6. GeocodeR BR — CNEFE/IBGE (se GEOCODEBR_URL definido)
+                             7. Google Maps API — fallback premium (se GOOGLE_MAPS_API_KEY)
 
-GPS fornecido? → Geocodificação reversa:
-  Photon (Komoot) → Overpass API → Nominatim (OSM)
-
-Sem GPS ou reverso inconclusivo → Geocodificação direta:
-  Photon → Nominatim (rate-limited 1 req/s)
-  └─ Fallback final: GeocodeR BR (CNEFE/IBGE) — se GEOCODEBR_URL configurado
-
-Modo GeocodeR BR (instância "geocodebr"):
-  Microserviço R local via pacote geocodebr do IPEA
-  Fonte: CNEFE — cadastro nacional de endereços do IBGE
-  Precisão máxima para cidades e municípios brasileiros
-
-Modo premium:
-  Google Maps API (reverso + direto, máxima precisão global)
+Comparação final:
+  Similaridade Jaccard bigram (limiar padrão: 68%) + distância Haversine
+  Normalização: siglas (Av./Avenida), POIs, vias secundárias (Travessa, Passagem)
 ```
+
+---
+
+## Screenshots
+
+### Login
+| Claro | Escuro |
+|:---:|:---:|
+| ![Login claro](docs/screenshots/login.jpg) | ![Login escuro](docs/screenshots/login-dark.jpg) |
+
+### Dashboard
+| Claro | Escuro |
+|:---:|:---:|
+| ![Dashboard claro](docs/screenshots/dashboard.jpg) | ![Dashboard escuro](docs/screenshots/dashboard-dark.jpg) |
+
+### Processar Rota
+| Claro | Escuro |
+|:---:|:---:|
+| ![Processar claro](docs/screenshots/processing.jpg) | ![Processar escuro](docs/screenshots/processing-dark.jpg) |
+
+### Histórico de Análises
+| Claro | Escuro |
+|:---:|:---:|
+| ![Histórico claro](docs/screenshots/history.jpg) | ![Histórico escuro](docs/screenshots/history-dark.jpg) |
+
+### Configurações
+| Claro | Escuro |
+|:---:|:---:|
+| ![Config claro](docs/screenshots/settings.jpg) | ![Config escuro](docs/screenshots/settings-dark.jpg) |
 
 ---
 
 ## Pré-requisitos
 
-- **Node.js** 20 ou superior
-- **pnpm** 9 ou superior — `npm install -g pnpm`
-- **PostgreSQL** 14 ou superior
+| Dependência | Versão mínima |
+|---|---|
+| Node.js | 20 |
+| pnpm | 9 |
+| PostgreSQL | 14 |
 
 ---
 
@@ -161,7 +160,7 @@ Modo premium:
 curl -fsSL https://raw.githubusercontent.com/esmagafetos/Viax-Scout/main/install.sh | bash
 ```
 
-**Windows (PowerShell — executar como Administrador)**
+**Windows (PowerShell — Executar como Administrador)**
 ```powershell
 iwr -useb https://raw.githubusercontent.com/esmagafetos/Viax-Scout/main/install.ps1 | iex
 ```
@@ -171,28 +170,13 @@ iwr -useb https://raw.githubusercontent.com/esmagafetos/Viax-Scout/main/install.
 curl -fsSL https://raw.githubusercontent.com/esmagafetos/Viax-Scout/main/install-termux.sh | bash
 ```
 
-O instalador principal configura Node.js, PostgreSQL e a API. Para o motor **GeocodeR BR** (precisão máxima, fonte CNEFE/IBGE), execute o instalador standalone após a instalação principal:
-
-```bash
-bash ~/viax-system/install-geocodebr-termux.sh
-```
-
-> **Por que um instalador separado?** O pacote `r-base` foi removido do repositório oficial do Termux. O instalador usa **proot-distro** para criar um ambiente Ubuntu dentro do Termux — sem necessidade de root — onde `apt install r-base` funciona normalmente. O processo leva 20-60 minutos incluindo compilação dos pacotes R.
-
-Após instalar, inicie o microserviço:
-
-```bash
-# Inicia o GeocodeR BR (porta 8002, Ubuntu dentro do Termux)
-bash ~/viax-system/start-geocodebr.sh
-```
-
-Ative na interface em **Configurações → Instâncias → GeocodeR BR** e adicione ao `.env` da API:
-
-```env
-GEOCODEBR_URL=http://localhost:8002
-```
-
-> **No primeiro início**, o geocodebr baixa os dados do CNEFE (~1-2 GB). Esse download ocorre uma única vez.
+> **GeocodeR BR (opcional):** Para precisão máxima via CNEFE/IBGE, instale o microserviço R após a instalação principal:
+> ```bash
+> bash ~/viax-system/install-geocodebr-termux.sh
+> # Após instalar, inicie com:
+> bash ~/viax-system/start-geocodebr.sh
+> ```
+> O instalador usa `proot-distro` para criar um ambiente Ubuntu isolado dentro do Termux (sem root). Na primeira execução, o geocodebr baixa os dados do CNEFE (~1–2 GB).
 
 ---
 
@@ -210,14 +194,14 @@ pnpm install
 cp .env.example .env
 # Edite o .env com as credenciais do banco de dados
 
-# 4. Aplique o schema no banco de dados
+# 4. Aplique o schema no banco
 pnpm --filter @workspace/db run push
 
 # 5. Inicie em modo de desenvolvimento
 pnpm run dev
 ```
 
-Após iniciar, o sistema estará disponível em:
+Após iniciar:
 - **Frontend:** http://localhost:5173
 - **API:** http://localhost:8080
 
@@ -234,94 +218,58 @@ docker compose logs -f api
 
 ## Configuração
 
-Crie um arquivo `.env` na raiz do projeto:
+Crie um arquivo `.env` na raiz do projeto (ou copie `.env.example`):
 
 ```env
-# Banco de dados (obrigatório)
+# ── Obrigatório ─────────────────────────────────────────────────────────────
 DATABASE_URL=postgresql://usuario:senha@localhost:5432/viax_scout
+SESSION_SECRET=sua_chave_secreta_longa_e_aleatoria
 
-# Sessão (obrigatório — use uma string longa e aleatória)
-SESSION_SECRET=sua_chave_secreta_aqui
-
-# Google Maps API (opcional — para modo premium)
+# ── Geocodificação premium (opcional) ───────────────────────────────────────
 GOOGLE_MAPS_API_KEY=
 
-# GeocodeR BR — microserviço R/CNEFE (opcional — para máxima precisão em endereços BR)
-# Suba o container com: docker run -p 8002:8002 viax-geocodebr
-# Ou use o instalador Termux com R: bash ~/viax-system/start-geocodebr.sh
+# ── GeocodeR BR — microserviço R/CNEFE (opcional) ───────────────────────────
 GEOCODEBR_URL=
 
-# Parser via IA (opcional)
+# ── Parser via IA (opcional) ─────────────────────────────────────────────────
 OPENAI_API_KEY=
 ANTHROPIC_API_KEY=
 GOOGLE_AI_API_KEY=
 ```
 
-### Configurações da interface
+### Modos de geocodificação (configuráveis via interface)
 
-| Seção | Opção | Descrição |
+| Modo | Fonte | Indicado para |
 |---|---|---|
-| **Instâncias** | `builtin` | Geocodificação gratuita — Photon + Overpass + Nominatim (OSM) |
-| **Instâncias** | `geocodebr` | GeocodeR BR — CNEFE/IBGE via microserviço R local (precisão máxima BR) |
-| **Instâncias** | `googlemaps` | Google Maps API — máxima precisão global, pay-per-use |
-| **Parser** | `embutido` | Regex otimizado para português BR |
-| **Parser** | `ia` | LLM para endereços complexos ou ambíguos |
-| **Tolerância** | raio em metros | Define o limiar de detecção de nuances |
+| `builtin` | Photon + Overpass + Nominatim (OSM) | Uso geral — gratuito, sem rate limit |
+| `geocodebr` | GeocodeR BR (CNEFE/IBGE via R) | Máxima precisão para endereços brasileiros |
+| `googlemaps` | Google Maps API | Precisão máxima global, pay-per-use |
 
 ---
 
-## Uso
+## Formato da planilha
 
-### 1. Criar conta
-
-Acesse a interface e clique em **Criar conta**. O primeiro usuário registrado não requer aprovação.
-
-### 2. Preparar a planilha
-
-O sistema aceita `.xlsx` ou `.csv` com as seguintes colunas:
-
-| Coluna | Tipo | Obrigatório | Descrição |
+| Coluna | Tipo | Obrigatório | Aliases aceitos |
 |---|---|---|---|
-| `endereco` / `address` | texto | Sim | Endereço completo da entrega |
-| `lat` / `latitude` | número | Não | Latitude do GPS coletado |
-| `lon` / `lng` / `longitude` | número | Não | Longitude do GPS coletado |
-| `cidade` / `city` | texto | Não | Cidade (melhora a precisão) |
-| `bairro` / `neighborhood` | texto | Não | Bairro (melhora a precisão) |
-| `cep` / `zipcode` | texto | Não | CEP — ativa geocodificação brasileira |
-
-### 3. Processar
-
-Vá até **Processar**, faça o upload e acompanhe o progresso linha a linha em tempo real via streaming.
-
-### 4. Analisar o relatório
-
-Cada linha retorna:
-
-| Campo | Descrição |
-|---|---|
-| `status` | `ok` ou `nuance` |
-| `rua_extraida` | O que o sistema interpretou do campo de endereço |
-| `rua_oficial` | O nome retornado pelo geocodificador |
-| `similaridade` | Índice de 0 a 1 (1 = idêntico) |
-| `distancia` | Metros entre endereço informado e GPS coletado |
-| `motivo` | Descrição da divergência quando detectada |
-
-O relatório completo pode ser baixado em CSV no **Histórico**.
+| Endereço | texto | **Sim** | `endereco`, `endereço`, `address` |
+| Latitude | número | Não | `lat`, `latitude` |
+| Longitude | número | Não | `lon`, `lng`, `longitude` |
+| Cidade | texto | Não | `cidade`, `city` |
+| Bairro | texto | Não | `bairro`, `neighborhood` |
+| CEP | texto | Não | `cep`, `zipcode` — ativa fontes brasileiras |
 
 ---
 
 ## Desenvolvimento
 
-### Comandos úteis
-
 ```bash
-# Iniciar todos os serviços
+# Todos os serviços em paralelo
 pnpm run dev
 
-# Typecheck de todo o monorepo
+# Typecheck completo do monorepo
 pnpm run typecheck
 
-# Build completo
+# Build de produção
 pnpm run build
 
 # Regenerar hooks e schemas a partir do openapi.yaml
@@ -329,23 +277,17 @@ pnpm --filter @workspace/api-spec run codegen
 
 # Aplicar alterações de schema no banco
 pnpm --filter @workspace/db run push
-
-# Executar apenas o servidor API
-pnpm --filter @workspace/api-server run dev
-
-# Executar apenas o frontend
-PORT=5173 BASE_PATH=/ pnpm --filter @workspace/viax-scout run dev
 ```
 
-### Adicionar um novo endpoint
+### Adicionando um novo endpoint
 
-1. Atualize `lib/api-spec/openapi.yaml` com o novo endpoint
+1. Atualize `lib/api-spec/openapi.yaml` com a definição do endpoint
 2. Execute `pnpm --filter @workspace/api-spec run codegen` para gerar tipos e hooks
 3. Implemente a rota em `artifacts/api-server/src/routes/`
 4. Registre-a em `artifacts/api-server/src/routes/index.ts`
-5. Use o hook gerado no frontend via `@workspace/api-client-react`
+5. Consuma o hook gerado via `@workspace/api-client-react` no frontend
 
-### Alterar o schema do banco
+### Alterando o schema do banco
 
 1. Edite os arquivos em `lib/db/src/schema/`
 2. Execute `pnpm --filter @workspace/db run push`
@@ -357,7 +299,7 @@ PORT=5173 BASE_PATH=/ pnpm --filter @workspace/viax-scout run dev
 | Camada | Tecnologia | Versão |
 |---|---|---|
 | Runtime | Node.js | 20+ |
-| Gerenciador | pnpm workspaces | 9+ |
+| Monorepo | pnpm workspaces | 9+ |
 | Linguagem | TypeScript | 5.9 |
 | **Frontend** | React + Vite | 19 + 7 |
 | Roteamento | Wouter | — |
@@ -366,14 +308,14 @@ PORT=5173 BASE_PATH=/ pnpm --filter @workspace/viax-scout run dev
 | Animações | Framer Motion | — |
 | **Backend** | Express | 5 |
 | Logger | Pino | — |
+| Upload | Multer | — |
+| Parsing XLSX | xlsx | — |
 | **Banco de dados** | PostgreSQL | 14+ |
 | ORM | Drizzle ORM | — |
 | Validação | Zod | 3 |
 | Auth | express-session + bcryptjs | — |
-| Upload | Multer | — |
-| Parsing XLSX | xlsx | — |
-| **Geocodificação BR** | BrasilAPI v2 + AwesomeAPI CEP | — |
-| **Geocodificação global** | Photon + Overpass + Nominatim (OSM) | — |
+| **Geocod. BR** | BrasilAPI v2 + AwesomeAPI CEP | — |
+| **Geocod. global** | Photon + Overpass + Nominatim | — |
 | **GeocodeR BR** | geocodebr (IPEA) + Plumber + R | 4.4+ |
 | API codegen | Orval | — |
 
@@ -381,21 +323,27 @@ PORT=5173 BASE_PATH=/ pnpm --filter @workspace/viax-scout run dev
 
 ## Contribuindo
 
-Contribuições são bem-vindas. Siga os passos:
+Contribuições são bem-vindas! Leia o [guia de contribuição](.github/CONTRIBUTING.md) antes de começar.
 
-1. Faça um fork do repositório
-2. Crie uma branch: `git checkout -b feat/nome-da-feature`
-3. Implemente suas alterações seguindo o padrão do projeto
-4. Execute o typecheck: `pnpm run typecheck`
-5. Faça commit seguindo [Conventional Commits](https://www.conventionalcommits.org/): `git commit -m "feat: descrição"`
-6. Abra um Pull Request descrevendo o que foi feito e por quê
+```bash
+# Fork → clone → branch
+git checkout -b feat/nome-da-feature
+
+# Implemente, então valide
+pnpm run typecheck
+
+# Commit seguindo Conventional Commits
+git commit -m "feat: descrição curta da mudança"
+
+# Abra um Pull Request usando o template em .github/PULL_REQUEST_TEMPLATE.md
+```
 
 ### Reportar bugs
 
-Abra uma [issue](https://github.com/esmagafetos/Viax-Scout/issues) com:
-- Descrição do problema e passos para reproduzir
+Abra uma [issue](https://github.com/esmagafetos/Viax-Scout/issues/new?template=bug_report.md) descrevendo:
+- Passos para reproduzir
 - Comportamento esperado vs. observado
-- Versão do sistema e sistema operacional
+- Versão do Node.js e sistema operacional
 
 ---
 

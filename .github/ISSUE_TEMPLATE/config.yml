@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Documentação
+    url: https://github.com/esmagafetos/Viax-Scout#readme
+    about: Leia a documentação antes de abrir uma issue

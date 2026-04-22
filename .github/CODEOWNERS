@@ -1,0 +1,14 @@
+# Responsáveis por revisão de código
+# Todos os arquivos — revisão obrigatória pelo mantenedor principal
+* @esmagafetos
+
+# Infraestrutura e CI
+/.github/ @esmagafetos
+/docker-compose.yml @esmagafetos
+/Dockerfile.* @esmagafetos
+
+# Schema do banco — revisão criteriosa
+/lib/db/ @esmagafetos
+
+# Especificação da API — toda mudança requer revisão
+/lib/api-spec/ @esmagafetos
