@@ -25,8 +25,8 @@ export default function SettingsScreen() {
 
         <Card style={{ gap: 6 }}>
           <H2>Perfil</H2>
-          <Muted>{user?.name ?? user?.username}</Muted>
-          {user?.email && <Muted>{user.email}</Muted>}
+          <Muted>{user?.name ?? user?.email}</Muted>
+          {user?.name && user?.email && <Muted>{user.email}</Muted>}
         </Card>
 
         <Pressable onPress={() => router.push('/setup')}>
