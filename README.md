@@ -149,7 +149,7 @@ Comparação final:
 | Dependência | Versão mínima |
 |---|---|
 | Node.js | 20 |
-| pnpm | 9 |
+| pnpm | 10 |
 | PostgreSQL | 14 |
 
 ---

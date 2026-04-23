@@ -50,15 +50,17 @@ pnpm workspace monorepo with React+Vite frontend and Express API backend.
 
 ## Stack
 
-- **Monorepo tool**: pnpm workspaces
+- **Monorepo tool**: pnpm workspaces (catalog + minimumReleaseAge=1440 supply-chain guard)
 - **Node.js version**: 24
-- **Package manager**: pnpm
+- **Package manager**: pnpm 10.26.1 (pinned via `packageManager` field)
 - **TypeScript version**: 5.9
 - **API framework**: Express 5
 - **Database**: PostgreSQL + Drizzle ORM (`lib/db`)
 - **Validation**: Zod (`zod/v4`), `drizzle-zod`
 - **API codegen**: Orval (from `lib/api-spec/openapi.yaml`)
-- **Frontend**: React 19, Vite 7, TanStack Query, Wouter router, Tailwind CSS v4
+- **Frontend**: React 19.1.0 (pinned for Expo compat), Vite 7, TanStack Query, Wouter router, Tailwind CSS v4
+- **Mobile**: Expo SDK 54 + React Native 0.81 + expo-router 6 (`artifacts/viax-mobile`)
+- **Geocoder microservice**: R 4.5 + Plumber + geocodebr (IPEA/CNEFE) (`artifacts/geocodebr-service`)
 
 ## Key Commands
 
