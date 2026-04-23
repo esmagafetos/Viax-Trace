@@ -1,0 +1,103 @@
+Run set -o pipefail
+  set -o pipefail
+  eas build \
+    --platform android \
+    --profile preview \
+    --non-interactive \
+    --json \
+    --wait 2>&1 | tee build-output.json
+  echo "---- last 5 lines of build-output.json ----"
+  tail -n 5 build-output.json
+  shell: /usr/bin/bash -e {0}
+  env:
+    PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+    EXPO_TOKEN: ***
+    EXPO_PUBLIC_API_URL: 
+Resolved "preview" environment for the build. Learn more: https://docs.expo.dev/eas/environment-variables/#setting-the-environment-for-your-builds
+No environment variables with visibility "Plain text" and "Sensitive" found for the "preview" environment on EAS.
+Environment variables loaded from the "preview" build profile "env" configuration: EXPO_PUBLIC_API_URL.
+
+No remote versions are configured for this project, versionCode will be initialized based on the value from the local project.
+- Initializing versionCode with 2.
+✔ Initialized versionCode with 2.
+
+
+The build profile "preview" has specified the channel "preview", but the "expo-updates" package hasn't been installed. To use channels for your builds, install the "expo-updates" package by running "npx expo install expo-updates" followed by "eas update:configure".
+android.versionCode field in app config is ignored when version source is set to remote, but this value will still be in the manifest available via expo-constants. It's recommended to remove this value from app config.
+✔ Using remote Android credentials (Expo server)
+✔ Created keystore
+
+Compressing project files and uploading to EAS Build. Learn more: https://expo.fyi/eas-build-archive
+- Compressing project files
+- Uploading to EAS Build (0 / 133 MB)
+✔ Uploaded to EAS 
+- Computing project fingerprint
+✔ Computed project fingerprint
+
+See logs: https://expo.dev/accounts/dawlsant/projects/workspace/builds/8c6959fe-b2b3-4422-86ee-07250d3353b0
+
+Waiting for build to complete. You can press Ctrl+C to exit.
+- Waiting for build to complete.
+  Build queued...
+
+Start builds sooner in the priority queue.
+Sign up for a paid plan at https://expo.dev/accounts/dawlsant/settings/billing
+
+Waiting in Free tier queue
+
+- Build is about to start
+✖ Build failed
+[
+  {
+    "id": "8c6959fe-b2b3-4422-86ee-07250d3353b0",
+    "status": "ERRORED",
+    "platform": "ANDROID",
+    "error": {
+      "errorCode": "UNKNOWN_ERROR",
+      "message": "Unknown error. See logs of the Bundle JavaScript build phase for more information."
+    },
+    "artifacts": {},
+    "fingerprint": {
+      "id": "019dbb53-420b-73a1-aa0a-a7b027c65de9",
+      "hash": "acf168d1c71f246498e4d315b945aeaa7b1722d1"
+    },
+    "initiatingActor": {
+      "id": "c108cf7f-f380-423c-bd07-a2cb3a5021bb",
+      "displayName": "dawlsant"
+    },
+    "logFiles": [
+      "https://job-logs.eascdn.net/production/8c6959fe-b2b3-4422-86ee-07250d3353b0/1776964289762-a2f49553-7289-4ab4-b684-f3b0087e4a42.txt?X-Goog-Algorithm=GOOG4-RSA-SHA256&X-Goog-Credential=www-production%40exponentjs.iam.gserviceaccount.com%2F20260423%2Fauto%2Fstorage%2Fgoog4_request&X-Goog-Date=20260423T190947Z&X-Goog-Expires=900&X-Goog-SignedHeaders=host&X-Goog-Signature=219c358fbf24aeaeb7f10082b3792f0f9d6f6653817f185090b9506cfc83832afc63519722e664b9db05a027583bfd2b298bb8b4a3837146f73c58ec2c7d08f87888e70ddca7609664d3ace860c25ddfc52d86812d157a81b94b114e7c4354b5c187e3634c88dc53b974326866570c179b6cacaaa5b686fd953d6282237a0193167bbddb6eb212b675e472810148f63f4be3ec07b0a310bb7ba125f0ac47434c84a3bc3a00ce0838f7fcf4b6f3f2c9247b29047d0da867a074c47d08767760a7fa232ed67ad0e8a0df82b9ae3b3c26689e48fe55e5d928609abcade67cf1a6b88f08a1c6157d4b9b8c6a32f9d303427cd2f1847a3edfd7ad04b6e16344bbd5de",
+      "https://job-logs.eascdn.net/production/8c6959fe-b2b3-4422-86ee-07250d3353b0/1776971308277-444944ac-61ad-4c18-ae86-cd2a0e0fc1e4.txt?X-Goog-Algorithm=GOOG4-RSA-SHA256&X-Goog-Credential=www-production%40exponentjs.iam.gserviceaccount.com%2F20260423%2Fauto%2Fstorage%2Fgoog4_request&X-Goog-Date=20260423T190947Z&X-Goog-Expires=900&X-Goog-SignedHeaders=host&X-Goog-Signature=08db65de964e39ef373ccde8f936bb0a0c9709be7d34c0ebe6afd3b907053008348ddb6881a9487d121d7cf2c7a462153b6d311ea5b9bf2e90888221cc376aa3567024f98041c05597551992d1516c5ff2cdea7b8ab2dd797ba56ec3722c7e137c04476bc2be00c31fefde97326437dda6838b074034426f0381a92eda9abc2b5c0f5a9c8d1918c8f77b8f7e9f3236149a9c2ba95c94be17eb5df0a53becacf35209ea243dd00136e9184f1040116d147c404cbd77daead30ee066daca5d1c15c21855f9624c860671f8dde1a5a6810f53972f06dbd58b5614dec6650eceff447c7da2bb9d35db41b88eafaa4736c60ce68691cee2cb865636cb2e995477a076",
+      "https://job-logs.eascdn.net/production/8c6959fe-b2b3-4422-86ee-07250d3353b0/1776971308521-fd9e5137-c8ff-44fc-9b4b-2a9fda043e81.txt?X-Goog-Algorithm=GOOG4-RSA-SHA256&X-Goog-Credential=www-production%40exponentjs.iam.gserviceaccount.com%2F20260423%2Fauto%2Fstorage%2Fgoog4_request&X-Goog-Date=20260423T190947Z&X-Goog-Expires=900&X-Goog-SignedHeaders=host&X-Goog-Signature=08313a22e9acc189f0769aeaceceb671a4af8c296303d2a8b2a9acd4215ced40bddf466f5e3661a1925e31dc27f6e0e0c424217d241c8868b92e8456fb0252364c0b3dc3d3288015cd3f4971b52fda938452a997a4a7894de8a121eb57b8d3e4533ee488bb69d72a8b5809644399ff86e4ae0319bc6dadc45e52572a73a28033a24f964d61df2ba523048ef8940c867ca27097a5a45e485f80ef382df960429379b2606212267aff6f1178031fcf9a7c8dee2622d04ac67cf9677a676b729b5be6f5162ba0d145f75518f58b95e09b5f58bed3502b0e618a0cd8c9eb69df2d2cf6925ed5f597b6f34beccd40754000e6cb7b6450931c77022e7a14a69527d76d",
+      "https://job-logs.eascdn.net/production/8c6959fe-b2b3-4422-86ee-07250d3353b0/1776971308702-c5bece00-c201-4531-942b-1e219f9b3498.txt?X-Goog-Algorithm=GOOG4-RSA-SHA256&X-Goog-Credential=www-production%40exponentjs.iam.gserviceaccount.com%2F20260423%2Fauto%2Fstorage%2Fgoog4_request&X-Goog-Date=20260423T190947Z&X-Goog-Expires=900&X-Goog-SignedHeaders=host&X-Goog-Signature=75d87f09728c74fee3a48546b4c35fa84236d941b0c954ebd078e5d2b4bd2d7442b1bc16a560c06dcc9d99f9fc57e77600c1ca69f9a53328d28da477c7447b0c08a8cc6287bdda3b4766051b79a63d1d7850cf0c11c7921a66328c84192e9d98c5f228f5d4f4b62fc84bc128b79f0107c6aa6bcc40a89104915dec2015ab3208962f09cfd3167648b71d3444cf576da05a9fd91aa345ecf486306a0820ecb0e4c0da6f39716d7bea7a86448a0909b0cd32e935e2b505551a0797c7e3e152449962ea39d1a9bcefbe878b7a86a30135cd94e83eefa8451e969d677e9766d6777a9a435506f8d9b156ec5962337560bdb04113288ef545b394590c1ef653ee6cfb"
+    ],
+    "project": {
+      "id": "323f3ec3-5a87-4888-93bc-eb6488e2e32e",
+      "name": "workspace",
+      "slug": "workspace",
+      "ownerAccount": {
+        "id": "94a00ddf-7e8a-4880-832c-cbdb7da2d49c",
+        "name": "dawlsant"
+      }
+    },
+    "distribution": "INTERNAL",
+    "buildProfile": "preview",
+    "sdkVersion": "54.0.0",
+    "appVersion": "1.0.1",
+    "appBuildVersion": "2",
+    "gitCommitHash": "7a81fac4e7a2cf34899b5c7059f50d1b0885859a",
+    "gitCommitMessage": "fix(mobile): align slug with EAS project (workspace)",
+    "priority": "NORMAL",
+    "createdAt": "2026-04-23T17:11:28.931Z",
+    "updatedAt": "2026-04-23T19:09:43.630Z",
+    "completedAt": "2026-04-23T19:09:40.639Z",
+    "expirationDate": "2026-05-07T17:11:29.021Z",
+    "isForIosSimulator": false,
+    "metrics": {
+      "buildWaitTime": 391,
+      "buildQueueTime": 7058887,
+      "buildDuration": 31993
+    }
+  }
+]
+Error: Process completed with exit code 1.
