@@ -50,6 +50,7 @@ Planilha XLSX/CSV  →  Parser de endereço  →  Geocodificação reversa  → 
 | **Streaming em tempo real** | Progresso linha a linha via Server-Sent Events (SSE) |
 | **Dashboard** | Visão geral de análises, nuances, distâncias e controle financeiro |
 | **Histórico completo** | Listagem e download de relatórios CSV de todas as análises |
+| **Ferramenta de Condomínios** | Ordenação inteligente de rotas dentro de condomínios mapeados (Quadra/Lote) — disponível na aba *Ferramenta* |
 | **Autenticação segura** | Sessões com bcrypt, avatar e perfil de usuário |
 | **Tema escuro / claro** | Preferência salva com alternância instantânea |
 
@@ -72,12 +73,13 @@ viax-scout/                          ← raiz do monorepo (pnpm workspaces)
 │   │           ├── process.ts       ← /api/process/upload (SSE streaming)
 │   │           ├── analyses.ts      ← /api/analyses/*
 │   │           ├── dashboard.ts     ← /api/dashboard/*
+│   │           ├── condominium.ts   ← /api/condominium/*  (ordenação Quadra/Lote)
 │   │           └── users.ts         ← /api/users/*  (perfil, avatar)
 │   │
 │   └── viax-scout/                  ← React 19 + Vite 7 · porta 5173
 │       └── src/
 │           ├── pages/               ← Login, Register, Setup, Dashboard,
-│           │                           Process, History, Settings, Docs
+│           │                           Process, History, Tool, Settings, Docs
 │           ├── components/          ← Layout, ViaXLogo, UI primitives
 │           └── contexts/            ← AuthContext
 │
@@ -213,6 +215,34 @@ Após iniciar:
 ```bash
 docker compose up -d
 docker compose logs -f api
+```
+
+---
+
+## Atualização
+
+Sempre que novas funcionalidades forem publicadas no repositório (por exemplo, a **Ferramenta de Condomínios**, novas rotas da API ou alterações no banco), use o script de atualização gerado pelo instalador. Ele faz `git pull`, reinstala dependências, aplica o schema e recompila a API automaticamente.
+
+**Linux / macOS**
+```bash
+bash ~/viax-system/update.sh
+bash ~/viax-system/start.sh
+```
+
+**Android — Termux**
+```bash
+bash ~/viax-system/update.sh
+bash ~/viax-system/start.sh
+```
+
+> O `start.sh` também detecta automaticamente quando o código-fonte é mais recente que o build da API e recompila antes de iniciar — útil quando a aba *Ferramenta* aparece sem condomínios listados depois de um `git pull`.
+
+**Manual**
+```bash
+git pull
+pnpm install
+pnpm --filter @workspace/db run push
+pnpm --filter @workspace/api-server run build
 ```
 
 ---

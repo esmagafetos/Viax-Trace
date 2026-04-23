@@ -183,6 +183,25 @@ PG_DATA="${PREFIX}/var/lib/postgresql"
 echo "Iniciando PostgreSQL..."
 pg_ctl start -D "$PG_DATA" -l "$PG_DATA/postgresql.log" -w -t 30 2>/dev/null || true
 
+# Auto-rebuild da API se o codigo-fonte for mais recente que o build
+# (necessario apos um 'git pull' que adiciona rotas novas, ex.: condominios)
+API_DIST="artifacts/api-server/dist/index.mjs"
+NEEDS_BUILD=false
+if [[ ! -f "$API_DIST" ]]; then
+  NEEDS_BUILD=true
+else
+  NEWEST_SRC=$(find artifacts/api-server/src lib -name '*.ts' -newer "$API_DIST" -print -quit 2>/dev/null)
+  [[ -n "$NEWEST_SRC" ]] && NEEDS_BUILD=true
+fi
+if [[ "$NEEDS_BUILD" == "true" ]]; then
+  echo "Detectadas alteracoes — recompilando API..."
+  pnpm --filter @workspace/api-server run build || {
+    echo "[erro] Falha ao compilar API. Execute: bash update.sh"
+    exit 1
+  }
+  pnpm --filter @workspace/db run push 2>/dev/null || true
+fi
+
 echo "Iniciando API..."
 PORT=8080 node artifacts/api-server/dist/index.mjs &
 API_PID=$!
@@ -266,6 +285,48 @@ echo "ViaX:Trace encerrado."
 STOPSCRIPT
 chmod +x "$APP_DIR/stop.sh"
 
+# update.sh — sincroniza com a ultima versao do repositorio (git pull + rebuild)
+cat > "$APP_DIR/update.sh" <<'UPDATESCRIPT'
+#!/usr/bin/env bash
+# =============================================================================
+#  ViaX:Trace — Atualizador (Termux)
+#  Use sempre que houver novas funcionalidades no repositorio,
+#  por exemplo: ferramenta de condominios, novas rotas da API, etc.
+# =============================================================================
+set -e
+cd "$(dirname "$0")"
+
+CYAN='\033[0;36m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; NC='\033[0m'
+
+echo -e "${CYAN}==> Parando servicos em execucao...${NC}"
+bash ./stop.sh 2>/dev/null || true
+
+echo -e "${CYAN}==> Atualizando codigo (git pull)...${NC}"
+git fetch origin
+git reset --hard origin/main
+
+# Reaplica os overrides Android no pnpm-workspace.yaml apos o pull
+sed -i '/android/d' pnpm-workspace.yaml 2>/dev/null || true
+
+echo -e "${CYAN}==> Iniciando PostgreSQL...${NC}"
+PG_DATA="${PREFIX}/var/lib/postgresql"
+pg_ctl start -D "$PG_DATA" -l "$PG_DATA/postgresql.log" -w -t 30 2>/dev/null || true
+
+echo -e "${CYAN}==> Instalando dependencias atualizadas...${NC}"
+pnpm install --no-frozen-lockfile
+
+echo -e "${CYAN}==> Aplicando alteracoes do schema do banco...${NC}"
+set -a; source .env; set +a
+pnpm --filter @workspace/db run push || echo -e "${YELLOW}[aviso] push do schema falhou${NC}"
+
+echo -e "${CYAN}==> Recompilando API...${NC}"
+pnpm --filter @workspace/api-server run build
+
+echo ""
+echo -e "${GREEN}Atualizacao concluida! Inicie com: bash start.sh${NC}"
+UPDATESCRIPT
+chmod +x "$APP_DIR/update.sh"
+
 success "Scripts criados"
 
 # ---------------------------------------------------------------------------
@@ -281,6 +342,9 @@ echo -e "  ${CYAN}${BOLD}bash ~/viax-system/start.sh${NC}"
 echo ""
 echo -e "  Para parar:"
 echo -e "  ${CYAN}bash ~/viax-system/stop.sh${NC}"
+echo ""
+echo -e "  Para atualizar (puxar ultima versao + recompilar):"
+echo -e "  ${CYAN}bash ~/viax-system/update.sh${NC}"
 echo ""
 if [[ "$GEOCODEBR_AVAILABLE" == true ]]; then
   echo -e "  ${GREEN}GeocodeR BR disponivel!${NC} Para ativar (precisao maxima BR):"

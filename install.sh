@@ -248,6 +248,22 @@ if command -v docker &>/dev/null && [[ -z "\${GEOCODEBR_URL:-}" ]]; then
     echo "[aviso] geocodebr não iniciado — Docker pode não estar disponível"
 fi
 
+# Auto-rebuild da API se o codigo-fonte for mais recente que o build
+# (necessario apos um 'git pull' que adiciona rotas novas, ex.: condominios)
+API_DIST="artifacts/api-server/dist/index.mjs"
+NEEDS_BUILD=false
+if [[ ! -f "\$API_DIST" ]]; then
+  NEEDS_BUILD=true
+else
+  NEWEST_SRC=\$(find artifacts/api-server/src lib -name '*.ts' -newer "\$API_DIST" -print -quit 2>/dev/null)
+  [[ -n "\$NEWEST_SRC" ]] && NEEDS_BUILD=true
+fi
+if [[ "\$NEEDS_BUILD" == "true" ]]; then
+  echo "Detectadas alteracoes — recompilando API..."
+  pnpm --filter @workspace/api-server run build
+  pnpm --filter @workspace/db run push 2>/dev/null || true
+fi
+
 echo "Iniciando API em http://localhost:${API_PORT} ..."
 PORT=${API_PORT} pnpm --filter @workspace/api-server run start &
 API_PID=\$!
@@ -272,6 +288,40 @@ STARTSCRIPT
 chmod +x "$START_SCRIPT"
 success "Script de início criado: $START_SCRIPT"
 
+# update.sh — sincroniza com a ultima versao (git pull + rebuild)
+UPDATE_SCRIPT="$APP_DIR/update.sh"
+cat > "$UPDATE_SCRIPT" <<UPDATESCRIPT
+#!/usr/bin/env bash
+# =============================================================================
+#  ViaX:Trace — Atualizador (Linux/macOS)
+#  Use sempre que houver novas funcionalidades no repositorio,
+#  por exemplo: ferramenta de condominios, novas rotas da API, etc.
+# =============================================================================
+set -e
+cd "$APP_DIR"
+
+CYAN='\\033[0;36m'; GREEN='\\033[0;32m'; YELLOW='\\033[1;33m'; NC='\\033[0m'
+
+echo -e "\${CYAN}==> Atualizando codigo (git pull)...\${NC}"
+git fetch origin
+git reset --hard origin/main
+
+echo -e "\${CYAN}==> Instalando dependencias atualizadas...\${NC}"
+pnpm install
+
+echo -e "\${CYAN}==> Aplicando alteracoes do schema do banco...\${NC}"
+set -a; source .env; set +a
+pnpm --filter @workspace/db run push || echo -e "\${YELLOW}[aviso] push do schema falhou\${NC}"
+
+echo -e "\${CYAN}==> Recompilando API...\${NC}"
+pnpm --filter @workspace/api-server run build
+
+echo ""
+echo -e "\${GREEN}Atualizacao concluida! Inicie com: bash $START_SCRIPT\${NC}"
+UPDATESCRIPT
+chmod +x "$UPDATE_SCRIPT"
+success "Script de atualização criado: $UPDATE_SCRIPT"
+
 # ---------------------------------------------------------------------------
 # PRONTO
 # ---------------------------------------------------------------------------
@@ -282,6 +332,9 @@ echo -e "${GREEN}${BOLD}╚═════════════════�
 echo ""
 echo -e "  Para iniciar o sistema:"
 echo -e "  ${CYAN}${BOLD}bash $START_SCRIPT${NC}"
+echo ""
+echo -e "  Para atualizar (puxar última versão + recompilar):"
+echo -e "  ${CYAN}bash $UPDATE_SCRIPT${NC}"
 echo ""
 echo -e "  Ou manualmente:"
 echo -e "  ${CYAN}cd $APP_DIR && PORT=${API_PORT} pnpm --filter @workspace/api-server run start &${NC}"
