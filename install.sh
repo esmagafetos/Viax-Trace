@@ -164,7 +164,7 @@ success "Banco '$DB_NAME' pronto"
 
 # Obter DATABASE_URL
 if [[ "$OS" == "macos" ]]; then
-  DATABASE_URL="postgresql://$(whoami)@localhost:5432/$DB_NAME"
+  DATABASE_URL="postgresql://${DB_USER}@localhost:5432/${DB_NAME}"
 else
   if read -rsp "Senha do PostgreSQL (deixe em branco para sem senha): " PG_PASS; then
     echo ""
