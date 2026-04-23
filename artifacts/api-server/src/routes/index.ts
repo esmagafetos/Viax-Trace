@@ -5,6 +5,7 @@ import usersRouter from "./users";
 import analysesRouter from "./analyses";
 import dashboardRouter from "./dashboard";
 import processRouter from "./process";
+import condominiumRouter from "./condominium";
 
 const router: IRouter = Router();
 
@@ -14,5 +15,6 @@ router.use(usersRouter);
 router.use(analysesRouter);
 router.use(dashboardRouter);
 router.use(processRouter);
+router.use(condominiumRouter);
 
 export default router;

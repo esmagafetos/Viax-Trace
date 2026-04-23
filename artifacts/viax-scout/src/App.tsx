@@ -6,6 +6,7 @@ import Register from "@/pages/Register";
 import Setup from "@/pages/Setup";
 import Dashboard from "@/pages/Dashboard";
 import Process from "@/pages/Process";
+import Tool from "@/pages/Tool";
 import History from "@/pages/History";
 import Settings from "@/pages/Settings";
 import Docs from "@/pages/Docs";
@@ -96,6 +97,7 @@ function AppRoutes() {
         <Route path="/setup" component={() => <ProtectedRoute component={Setup} />} />
         <Route path="/dashboard" component={() => <ProtectedRoute component={Dashboard} />} />
         <Route path="/process" component={() => <ProtectedRoute component={Process} />} />
+        <Route path="/tool" component={() => <ProtectedRoute component={Tool} />} />
         <Route path="/history" component={() => <ProtectedRoute component={History} />} />
         <Route path="/settings" component={() => <ProtectedRoute component={Settings} />} />
         <Route path="/docs" component={() => <ProtectedRoute component={Docs} />} />

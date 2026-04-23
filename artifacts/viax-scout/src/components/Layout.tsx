@@ -31,6 +31,11 @@ const NAV_ICONS: Record<string, React.ReactNode> = {
       <path d="M12 2a7 7 0 0 0-4 12.75V16h8v-1.25A7 7 0 0 0 12 2Z" />
     </svg>
   ),
+  "/tool": (
+    <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+    </svg>
+  ),
   "/history": (
     <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M3 12a9 9 0 1 0 3-6.7" /><path d="M3 4v5h5" /><path d="M12 7v5l3 2" />
@@ -75,6 +80,7 @@ export default function Layout({ children, showNav = true }: LayoutProps) {
   const navLinks = [
     { href: "/dashboard", label: "Dashboard" },
     { href: "/process", label: "Processar" },
+    { href: "/tool", label: "Ferramenta" },
     { href: "/history", label: "Histórico" },
     { href: "/docs", label: "Docs" },
   ];
