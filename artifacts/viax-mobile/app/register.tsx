@@ -1,12 +1,47 @@
 import { useState } from 'react';
-import { View, ScrollView, StyleSheet, KeyboardAvoidingView, Platform, Pressable, Text } from 'react-native';
+import {
+  View,
+  ScrollView,
+  StyleSheet,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  Text,
+} from 'react-native';
 import { Link, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '@/lib/auth';
 import { useColors } from '@/hooks/useColors';
-import { Button, Card, H1, Input, Label, Muted } from '@/components/ui';
+import {
+  Button,
+  Card,
+  CardBody,
+  CardHeader,
+  FieldError,
+  Input,
+  Label,
+  Muted,
+  PasswordInput,
+  PasswordStrength,
+  ThemeToggle,
+} from '@/components/ui';
 import { ViaXLogo } from '@/components/ViaXLogo';
 import { hasApiUrl } from '@/lib/api';
+
+function validateEmail(email: string): string | null {
+  if (!email) return 'Email é obrigatório.';
+  const re = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+  if (!re.test(email)) return 'Formato de email inválido.';
+  return null;
+}
+
+function validatePassword(password: string): string | null {
+  if (!password) return 'Senha é obrigatória.';
+  if (password.length < 8) return 'A senha deve ter pelo menos 8 caracteres.';
+  if (!/[A-Za-z]/.test(password)) return 'A senha deve conter pelo menos uma letra.';
+  if (!/[0-9]/.test(password)) return 'A senha deve conter pelo menos um número.';
+  return null;
+}
 
 export default function RegisterScreen() {
   const c = useColors();
@@ -14,23 +49,37 @@ export default function RegisterScreen() {
   const { register } = useAuth();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
-  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [birthDate, setBirthDate] = useState('');
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [serverError, setServerError] = useState<string | null>(null);
+
+  const emailError = touched.email ? validateEmail(email) : null;
+  const passwordError = touched.password ? validatePassword(password) : null;
+  const nameError = touched.name && !name.trim() ? 'Nome é obrigatório.' : null;
 
   const onSubmit = async () => {
+    setTouched({ name: true, email: true, password: true });
+    setServerError(null);
+
     if (!hasApiUrl()) {
-      setError('Configure o servidor antes de criar conta.');
+      setServerError('Configure o servidor antes de criar conta.');
       return;
     }
+    const eErr = validateEmail(email);
+    const pErr = validatePassword(password);
+    if (!name.trim() || eErr || pErr) {
+      setServerError(eErr ?? pErr ?? 'Preencha todos os campos obrigatórios.');
+      return;
+    }
+
     setSubmitting(true);
-    setError(null);
     try {
-      await register({ username: username.trim(), password, name: name.trim(), email: email.trim() });
+      await register({ name: name.trim(), email: email.trim(), password, birthDate: birthDate || null });
       router.replace('/setup');
     } catch (e: any) {
-      setError(e?.message ?? 'Falha no cadastro');
+      setServerError(e?.message ?? 'Erro ao criar conta.');
     } finally {
       setSubmitting(false);
     }
@@ -38,14 +87,14 @@ export default function RegisterScreen() {
 
   return (
     <SafeAreaView style={[styles.root, { backgroundColor: c.bg }]}>
+      <View style={styles.toggleWrap}>
+        <ThemeToggle />
+      </View>
+
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-          <View style={styles.header}>
-            <ViaXLogo />
-          </View>
-
           {!hasApiUrl() && (
-            <Card style={{ gap: 10, borderColor: c.accent }}>
+            <Card style={{ gap: 10, borderColor: c.accent, marginBottom: 14 }}>
               <Text style={{ color: c.accent, fontFamily: 'Poppins_600SemiBold', fontSize: 13 }}>
                 Servidor não configurado
               </Text>
@@ -54,52 +103,83 @@ export default function RegisterScreen() {
             </Card>
           )}
 
-          <Card style={{ gap: 14 }}>
-            <H1>Criar conta</H1>
-            <Muted>Cadastre-se para começar a auditar suas rotas.</Muted>
-
-            <View style={{ gap: 4 }}>
-              <Label>Nome</Label>
-              <Input value={name} onChangeText={setName} placeholder="Seu nome" />
+          <Card style={{ padding: 0, overflow: 'hidden' }}>
+            <View style={{ paddingHorizontal: 18, paddingTop: 22, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: c.border, gap: 10 }}>
+              <ViaXLogo size="md" showTagline />
+              <Muted>Crie sua conta gratuita</Muted>
             </View>
 
-            <View style={{ gap: 4 }}>
-              <Label>E-mail</Label>
-              <Input
-                value={email}
-                onChangeText={setEmail}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                placeholder="voce@dominio.com"
-              />
-            </View>
+            <CardBody>
+              <View>
+                <Label>Nome completo</Label>
+                <Input
+                  value={name}
+                  onChangeText={setName}
+                  onBlur={() => setTouched((t) => ({ ...t, name: true }))}
+                  placeholder="Seu nome"
+                  hasError={!!nameError}
+                />
+                <FieldError>{nameError}</FieldError>
+              </View>
 
-            <View style={{ gap: 4 }}>
-              <Label>Usuário</Label>
-              <Input value={username} onChangeText={setUsername} autoCapitalize="none" placeholder="seu.usuario" />
-            </View>
+              <View>
+                <Label>Email</Label>
+                <Input
+                  value={email}
+                  onChangeText={setEmail}
+                  onBlur={() => setTouched((t) => ({ ...t, email: true }))}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  placeholder="seu@email.com"
+                  hasError={!!emailError}
+                />
+                <FieldError>{emailError}</FieldError>
+              </View>
 
-            <View style={{ gap: 4 }}>
-              <Label>Senha</Label>
-              <Input value={password} onChangeText={setPassword} secureTextEntry placeholder="••••••••" />
-            </View>
+              <View>
+                <Label>Senha</Label>
+                <PasswordInput
+                  value={password}
+                  onChangeText={setPassword}
+                  onBlur={() => setTouched((t) => ({ ...t, password: true }))}
+                  placeholder="Mínimo 8 caracteres"
+                />
+                <PasswordStrength password={password} />
+                <FieldError>{passwordError}</FieldError>
+              </View>
 
-            {error && (
-              <Text style={{ color: '#dc2626', fontFamily: 'Poppins_500Medium', fontSize: 13 }}>{error}</Text>
-            )}
+              <View>
+                <Label>
+                  Data de nascimento <Text style={{ fontWeight: '400', opacity: 0.6 }}>(opcional)</Text>
+                </Label>
+                <Input
+                  value={birthDate}
+                  onChangeText={setBirthDate}
+                  placeholder="AAAA-MM-DD"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  keyboardType="numbers-and-punctuation"
+                />
+              </View>
 
-            <Button onPress={onSubmit} loading={submitting} disabled={!hasApiUrl()}>
-              Cadastrar
-            </Button>
+              {serverError && <FieldError>{serverError}</FieldError>}
 
-            <View style={styles.footerRow}>
-              <Muted>Já tem conta?</Muted>
-              <Link href="/" asChild>
-                <Pressable>
-                  <Text style={{ color: c.accent, fontFamily: 'Poppins_600SemiBold', fontSize: 13 }}> Entrar</Text>
-                </Pressable>
-              </Link>
-            </View>
+              <Button onPress={onSubmit} loading={submitting} disabled={!hasApiUrl()}>
+                Criar conta
+              </Button>
+
+              <View style={styles.footerRow}>
+                <Muted>Já tem conta?</Muted>
+                <Link href="/" asChild>
+                  <Pressable hitSlop={6}>
+                    <Text style={{ color: c.accent, fontFamily: 'Poppins_600SemiBold', fontSize: 13 }}>
+                      {' '}Entrar
+                    </Text>
+                  </Pressable>
+                </Link>
+              </View>
+            </CardBody>
           </Card>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -109,7 +189,7 @@ export default function RegisterScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  scroll: { padding: 20, gap: 14, justifyContent: 'center', flexGrow: 1 },
-  header: { alignItems: 'center', marginBottom: 8 },
-  footerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 4 },
+  toggleWrap: { position: 'absolute', top: 14, right: 14, zIndex: 10 },
+  scroll: { padding: 22, justifyContent: 'center', flexGrow: 1 },
+  footerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap' },
 });

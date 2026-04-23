@@ -41,9 +41,13 @@ pnpm workspace monorepo with React+Vite frontend and Express API backend.
 3. **ViaX Mobile** (`artifacts/viax-mobile`) — Expo (React Native) Android app, brand-matched to web
    - Stack: Expo SDK 54 + expo-router (file-based routing) + TanStack Query + Poppins fonts
    - Screens: Login, Register, **Setup**, Tabs (Dashboard, Processar, Histórico, Ajustes)
-   - **Mirrors the web Setup flow** (parser mode + geocoding instance + tolerance) and adds a mobile-only **"Configurar servidor"** section with step-by-step Termux install instructions and an **API Server** URL field
-   - API base URL is **set by the user in-app** and persisted in `expo-secure-store` (key `viax_api_url`). `lib/api.ts` exposes `initApiUrl/getApiUrl/setApiUrl/testApiUrl/hasApiUrl`. `EXPO_PUBLIC_API_URL` remains a build-time override fallback only.
-   - Auth: session cookie persisted in `expo-secure-store` (key `viax_session_cookie`)
+   - **Visual parity with web** — same warm amber palette (`#d4521a`), Poppins typography, 14px-radius cards with shadow, 99px pill buttons, uppercase letter-spaced labels, accent focus ring on inputs, eye toggle on PasswordInput, 4-segment PasswordStrength meter, floating top-right ThemeToggle pill
+   - Theme: `lib/theme.tsx` ThemeProvider (light/dark) persisted in `expo-secure-store` (key `viax_theme_mode`); `useColors()` reads from it
+   - Brand assets: real PNGs from `design-exports/` copied to `assets/brand/` (light, dark, banner, showcase); `components/ViaXLogo.tsx` exposes `LogoMark`, `ViaXLogo`, `GitHubBanner`, `FlatLogo`
+   - Shared UI primitives in `components/ui.tsx`: `Card`, `CardHeader`, `CardBody`, `H1/H2`, `Label`, `Input`, `PasswordInput`, `PasswordStrength`, `Button` (primary/ghost/dark, optional `iconRight`), `Pill`, `ThemeToggle`, `FieldError`
+   - **Mirrors the web Setup flow** (parser mode + geocoding instance + tolerance preset chips) and adds a mobile-only **"Configurar servidor"** section with step-by-step Termux install instructions, copyable command blocks, and a validated **API Server** URL field
+   - Register: client-side validators (email regex, password 8+/letra/número), live PasswordStrength bar, sends `{ name, email, password, birthDate }` matching the API's `RegisterBody` schema
+   - Auth: session cookie persisted in `expo-secure-store` (key `viax_session_cookie`); login uses `{ email, password }` (matches API's `LoginBody`)
    - Build: EAS Build profiles `development`, `preview` (APK debuggable) and `production` (APK release with `autoIncrement` of `versionCode`)
    - Release: GitHub Actions workflow `.github/workflows/mobile-release.yml` runs typecheck then builds APK on EAS and publishes a GitHub Release with the APK asset (uses `EXPO_TOKEN` secret). Supports `workflow_dispatch` with profile choice.
    - Android permissions: `INTERNET`, `ACCESS_NETWORK_STATE`, `READ_EXTERNAL_STORAGE`; `usesCleartextTraffic: true` so it can talk to local Termux servers over `http://` LAN IPs.

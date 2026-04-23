@@ -1,10 +1,29 @@
 import { useEffect, useState } from 'react';
-import { View, ScrollView, StyleSheet, KeyboardAvoidingView, Platform, Pressable, Text } from 'react-native';
+import {
+  View,
+  ScrollView,
+  StyleSheet,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  Text,
+} from 'react-native';
 import { Link, Redirect, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '@/lib/auth';
 import { useColors } from '@/hooks/useColors';
-import { Button, Card, H1, Input, Label, Muted } from '@/components/ui';
+import {
+  Button,
+  Card,
+  CardBody,
+  CardHeader,
+  Input,
+  Label,
+  Muted,
+  PasswordInput,
+  ThemeToggle,
+  FieldError,
+} from '@/components/ui';
 import { ViaXLogo } from '@/components/ViaXLogo';
 import { hasApiUrl, getApiUrl } from '@/lib/api';
 
@@ -12,13 +31,13 @@ export default function LoginScreen() {
   const c = useColors();
   const router = useRouter();
   const { user, loading, login } = useAuth();
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [serverConfigured, setServerConfigured] = useState(hasApiUrl());
 
-  useEffect(() => setError(null), [username, password]);
+  useEffect(() => setError(null), [email, password]);
   useEffect(() => setServerConfigured(hasApiUrl()), [user, loading]);
 
   if (loading) return null;
@@ -32,9 +51,9 @@ export default function LoginScreen() {
     setSubmitting(true);
     setError(null);
     try {
-      await login(username.trim(), password);
+      await login(email.trim(), password);
     } catch (e: any) {
-      setError(e?.message ?? 'Falha no login');
+      setError(e?.message ?? 'Credenciais inválidas.');
     } finally {
       setSubmitting(false);
     }
@@ -42,14 +61,18 @@ export default function LoginScreen() {
 
   return (
     <SafeAreaView style={[styles.root, { backgroundColor: c.bg }]}>
+      <View style={styles.toggleWrap}>
+        <ThemeToggle />
+      </View>
+
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-          <View style={styles.header}>
-            <ViaXLogo />
+          <View style={styles.logoWrap}>
+            <ViaXLogo size="md" showTagline />
           </View>
 
           {!serverConfigured && (
-            <Card style={{ gap: 10, borderColor: c.accent }}>
+            <Card style={{ gap: 10, borderColor: c.accent, marginBottom: 14 }}>
               <Text style={{ color: c.accent, fontFamily: 'Poppins_600SemiBold', fontSize: 13 }}>
                 Servidor não configurado
               </Text>
@@ -60,55 +83,60 @@ export default function LoginScreen() {
             </Card>
           )}
 
-          <Card style={{ gap: 14 }}>
-            <H1>Entrar</H1>
-            <Muted>Acesse sua conta para auditar rotas.</Muted>
+          <Card style={{ padding: 0, overflow: 'hidden' }}>
+            <CardHeader title="Acessar conta" subtitle="Entre com suas credenciais para continuar" />
 
-            <View style={{ gap: 4 }}>
-              <Label>Usuário</Label>
-              <Input
-                value={username}
-                onChangeText={setUsername}
-                autoCapitalize="none"
-                autoCorrect={false}
-                placeholder="seu.usuario"
-              />
-            </View>
+            <CardBody>
+              <View>
+                <Label>Email</Label>
+                <Input
+                  value={email}
+                  onChangeText={setEmail}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  placeholder="seu@email.com"
+                />
+              </View>
 
-            <View style={{ gap: 4 }}>
-              <Label>Senha</Label>
-              <Input
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry
-                placeholder="••••••••"
-              />
-            </View>
+              <View>
+                <Label>Senha</Label>
+                <PasswordInput value={password} onChangeText={setPassword} placeholder="••••••••" />
+              </View>
 
-            {error && (
-              <Text style={{ color: '#dc2626', fontFamily: 'Poppins_500Medium', fontSize: 13 }}>{error}</Text>
-            )}
+              {error && <FieldError>{error}</FieldError>}
 
-            <Button onPress={onSubmit} loading={submitting} disabled={!serverConfigured}>
-              Entrar
-            </Button>
+              <Button onPress={onSubmit} loading={submitting} disabled={!serverConfigured} iconRight="arrow-forward">
+                Entrar
+              </Button>
 
-            <View style={styles.footerRow}>
-              <Muted>Não tem conta?</Muted>
-              <Link href="/register" asChild>
-                <Pressable>
-                  <Text style={{ color: c.accent, fontFamily: 'Poppins_600SemiBold', fontSize: 13 }}> Criar conta</Text>
+              <View style={styles.footerRow}>
+                <Muted>Ainda não tem conta?</Muted>
+                <Link href="/register" asChild>
+                  <Pressable hitSlop={6}>
+                    <Text style={{ color: c.accent, fontFamily: 'Poppins_600SemiBold', fontSize: 13 }}>
+                      {' '}Criar conta grátis
+                    </Text>
+                  </Pressable>
+                </Link>
+              </View>
+
+              {serverConfigured && (
+                <Pressable onPress={() => router.push('/setup')} hitSlop={4}>
+                  <Text
+                    style={{
+                      color: c.textFaint,
+                      fontFamily: 'Poppins_400Regular',
+                      fontSize: 11,
+                      textAlign: 'center',
+                      marginTop: 4,
+                    }}
+                  >
+                    Servidor: {getApiUrl()} (alterar)
+                  </Text>
                 </Pressable>
-              </Link>
-            </View>
-
-            {serverConfigured && (
-              <Pressable onPress={() => router.push('/setup')}>
-                <Text style={{ color: c.textMuted, fontFamily: 'Poppins_400Regular', fontSize: 11, textAlign: 'center' }}>
-                  Servidor: {getApiUrl()} (alterar)
-                </Text>
-              </Pressable>
-            )}
+              )}
+            </CardBody>
           </Card>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -118,7 +146,8 @@ export default function LoginScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  scroll: { padding: 20, gap: 14, justifyContent: 'center', flexGrow: 1 },
-  header: { alignItems: 'center', marginBottom: 8 },
-  footerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 4 },
+  toggleWrap: { position: 'absolute', top: 14, right: 14, zIndex: 10 },
+  scroll: { padding: 22, justifyContent: 'center', flexGrow: 1 },
+  logoWrap: { alignItems: 'center', marginBottom: 18 },
+  footerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap' },
 });

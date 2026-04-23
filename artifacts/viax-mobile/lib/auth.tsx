@@ -3,17 +3,25 @@ import { apiRequest, clearSession } from './api';
 
 type User = {
   id: number;
-  username: string;
-  name?: string;
-  email?: string;
-  avatar?: string | null;
+  name: string;
+  email: string;
+  avatarUrl?: string | null;
+  birthDate?: string | null;
+  createdAt?: string;
+};
+
+type RegisterPayload = {
+  name: string;
+  email: string;
+  password: string;
+  birthDate?: string | null;
 };
 
 type AuthContextValue = {
   user: User | null;
   loading: boolean;
-  login: (username: string, password: string) => Promise<void>;
-  register: (data: { username: string; password: string; name: string; email: string }) => Promise<void>;
+  login: (email: string, password: string) => Promise<void>;
+  register: (data: RegisterPayload) => Promise<void>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
 };
@@ -40,15 +48,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })();
   }, []);
 
-  const login = async (username: string, password: string) => {
+  const login = async (email: string, password: string) => {
     await apiRequest('/api/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ username, password }),
+      body: JSON.stringify({ email, password }),
     });
     await refresh();
   };
 
-  const register = async (data: { username: string; password: string; name: string; email: string }) => {
+  const register = async (data: RegisterPayload) => {
     await apiRequest('/api/auth/register', {
       method: 'POST',
       body: JSON.stringify(data),

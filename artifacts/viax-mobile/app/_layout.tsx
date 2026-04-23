@@ -14,6 +14,8 @@ import {
 } from '@expo-google-fonts/poppins';
 import { AuthProvider } from '@/lib/auth';
 import { initApiUrl } from '@/lib/api';
+import { ThemeProvider, useTheme } from '@/lib/theme';
+import { useColors } from '@/hooks/useColors';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -22,6 +24,28 @@ const queryClient = new QueryClient({
     queries: { retry: 1, refetchOnWindowFocus: false },
   },
 });
+
+function ThemedStack() {
+  const { dark } = useTheme();
+  const c = useColors();
+  return (
+    <>
+      <StatusBar style={dark ? 'light' : 'dark'} />
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          animation: 'fade',
+          contentStyle: { backgroundColor: c.bg },
+        }}
+      >
+        <Stack.Screen name="index" />
+        <Stack.Screen name="register" />
+        <Stack.Screen name="setup" />
+        <Stack.Screen name="(tabs)" />
+      </Stack>
+    </>
+  );
+}
 
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
@@ -47,17 +71,13 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <QueryClientProvider client={queryClient}>
-          <AuthProvider>
-            <StatusBar style="auto" />
-            <Stack screenOptions={{ headerShown: false, animation: 'fade' }}>
-              <Stack.Screen name="index" />
-              <Stack.Screen name="register" />
-              <Stack.Screen name="setup" />
-              <Stack.Screen name="(tabs)" />
-            </Stack>
-          </AuthProvider>
-        </QueryClientProvider>
+        <ThemeProvider>
+          <QueryClientProvider client={queryClient}>
+            <AuthProvider>
+              <ThemedStack />
+            </AuthProvider>
+          </QueryClientProvider>
+        </ThemeProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );
