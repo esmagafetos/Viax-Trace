@@ -7,6 +7,15 @@ on:
       - 'artifacts/viax-mobile/**'
       - '.github/workflows/mobile-release.yml'
   workflow_dispatch:
+    inputs:
+      profile:
+        description: 'EAS build profile (preview or production)'
+        required: false
+        default: 'preview'
+        type: choice
+        options:
+          - preview
+          - production
 
 concurrency:
   group: mobile-release-${{ github.ref }}
@@ -50,24 +59,30 @@ jobs:
         working-directory: ${{ github.workspace }}
         run: pnpm install --frozen-lockfile
 
+      - name: Typecheck mobile
+        run: pnpm run typecheck
+
       - name: Resolve build metadata
         id: meta
         run: |
           SHORT_SHA=$(git rev-parse --short HEAD)
           BUILD_TS=$(date -u +%Y%m%d-%H%M%S)
-          TAG="mobile-v$(node -p "require('./package.json').version")-${BUILD_TS}-${SHORT_SHA}"
+          PROFILE="${{ github.event.inputs.profile || 'preview' }}"
+          VERSION=$(node -p "require('./package.json').version")
+          TAG="mobile-v${VERSION}-${BUILD_TS}-${SHORT_SHA}"
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
           echo "short_sha=${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+          echo "profile=${PROFILE}" >> "$GITHUB_OUTPUT"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
 
-      - name: Build APK on EAS (preview profile)
+      - name: Build APK on EAS
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-          EXPO_PUBLIC_API_URL: ${{ vars.EXPO_PUBLIC_API_URL }}
         run: |
           set -o pipefail
           eas build \
             --platform android \
-            --profile preview \
+            --profile "${{ steps.meta.outputs.profile }}" \
             --non-interactive \
             --json \
             --wait 2>&1 | tee build-output.json
@@ -89,7 +104,7 @@ jobs:
           ")
           echo "APK URL: $APK_URL"
           mkdir -p out
-          curl -fL "$APK_URL" -o "out/viax-trace-${{ steps.meta.outputs.short_sha }}.apk"
+          curl -fL "$APK_URL" -o "out/viax-trace-${{ steps.meta.outputs.version }}-${{ steps.meta.outputs.short_sha }}.apk"
           ls -lh out
 
       - name: Create GitHub Release
@@ -98,13 +113,22 @@ jobs:
           tag_name: ${{ steps.meta.outputs.tag }}
           name: ViaX:Trace Mobile ${{ steps.meta.outputs.tag }}
           body: |
-            Automated Android APK build.
+            ## ViaX:Trace Mobile — Android APK
 
-            - Commit: `${{ github.sha }}`
-            - Trigger: ${{ github.event_name }}
-            - Profile: `preview` (debuggable APK)
+            Build automatizado via EAS Build.
 
-            Install on Android devices with sideloading enabled.
+            - **Versão**: `${{ steps.meta.outputs.version }}`
+            - **Commit**: `${{ github.sha }}`
+            - **Trigger**: ${{ github.event_name }}
+            - **Profile**: `${{ steps.meta.outputs.profile }}`
+
+            ### Instalação
+
+            1. Baixe o `.apk` abaixo no seu Android.
+            2. Em **Configurações → Segurança**, autorize a instalação de fontes desconhecidas.
+            3. Toque no APK baixado para instalar.
+            4. Ao abrir o app, configure a URL do seu servidor ViaX:Trace
+               (rodando localmente via Termux ou em outro host) na tela inicial.
           files: artifacts/viax-mobile/out/*.apk
           draft: false
           prerelease: false

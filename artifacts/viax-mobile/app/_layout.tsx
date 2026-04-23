@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -13,6 +13,7 @@ import {
   Poppins_700Bold,
 } from '@expo-google-fonts/poppins';
 import { AuthProvider } from '@/lib/auth';
+import { initApiUrl } from '@/lib/api';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -29,14 +30,19 @@ export default function RootLayout() {
     Poppins_600SemiBold,
     Poppins_700Bold,
   });
+  const [apiReady, setApiReady] = useState(false);
 
   useEffect(() => {
-    if (fontsLoaded || fontError) {
+    initApiUrl().finally(() => setApiReady(true));
+  }, []);
+
+  useEffect(() => {
+    if ((fontsLoaded || fontError) && apiReady) {
       SplashScreen.hideAsync().catch(() => {});
     }
-  }, [fontsLoaded, fontError]);
+  }, [fontsLoaded, fontError, apiReady]);
 
-  if (!fontsLoaded && !fontError) return null;
+  if ((!fontsLoaded && !fontError) || !apiReady) return null;
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
@@ -47,6 +53,7 @@ export default function RootLayout() {
             <Stack screenOptions={{ headerShown: false, animation: 'fade' }}>
               <Stack.Screen name="index" />
               <Stack.Screen name="register" />
+              <Stack.Screen name="setup" />
               <Stack.Screen name="(tabs)" />
             </Stack>
           </AuthProvider>

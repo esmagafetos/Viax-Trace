@@ -2,7 +2,7 @@
   "expo": {
     "name": "ViaX:Trace",
     "slug": "workspace",
-    "version": "1.0.1",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "viaxtrace",
@@ -15,15 +15,17 @@
     },
     "android": {
       "package": "com.viax.trace",
-      "versionCode": 2,
+      "versionCode": 3,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#1a0e08"
       },
       "permissions": [
         "INTERNET",
+        "ACCESS_NETWORK_STATE",
         "READ_EXTERNAL_STORAGE"
-      ]
+      ],
+      "usesCleartextTraffic": true
     },
     "plugins": [
       "expo-router",

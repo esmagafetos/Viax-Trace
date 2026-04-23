@@ -40,11 +40,13 @@ pnpm workspace monorepo with React+Vite frontend and Express API backend.
    - Pages: Login, Register, Setup, Dashboard, Process, History, Settings
 3. **ViaX Mobile** (`artifacts/viax-mobile`) — Expo (React Native) Android app, brand-matched to web
    - Stack: Expo SDK 54 + expo-router (file-based routing) + TanStack Query + Poppins fonts
-   - Screens: Login, Register, Tabs (Dashboard, Processar, Histórico, Ajustes)
-   - Talks to API via `EXPO_PUBLIC_API_URL` (set in EAS build profile / GitHub Actions)
-   - Auth: session cookie persisted in `expo-secure-store`
-   - Build: EAS Build (`preview` profile = APK), triggered by push to `main`
-   - Release: GitHub Actions workflow `.github/workflows/mobile-release.yml` builds APK on EAS and publishes a GitHub Release with the APK asset (uses `EXPO_TOKEN` secret)
+   - Screens: Login, Register, **Setup**, Tabs (Dashboard, Processar, Histórico, Ajustes)
+   - **Mirrors the web Setup flow** (parser mode + geocoding instance + tolerance) and adds a mobile-only **"Configurar servidor"** section with step-by-step Termux install instructions and an **API Server** URL field
+   - API base URL is **set by the user in-app** and persisted in `expo-secure-store` (key `viax_api_url`). `lib/api.ts` exposes `initApiUrl/getApiUrl/setApiUrl/testApiUrl/hasApiUrl`. `EXPO_PUBLIC_API_URL` remains a build-time override fallback only.
+   - Auth: session cookie persisted in `expo-secure-store` (key `viax_session_cookie`)
+   - Build: EAS Build profiles `development`, `preview` (APK debuggable) and `production` (APK release with `autoIncrement` of `versionCode`)
+   - Release: GitHub Actions workflow `.github/workflows/mobile-release.yml` runs typecheck then builds APK on EAS and publishes a GitHub Release with the APK asset (uses `EXPO_TOKEN` secret). Supports `workflow_dispatch` with profile choice.
+   - Android permissions: `INTERNET`, `ACCESS_NETWORK_STATE`, `READ_EXTERNAL_STORAGE`; `usesCleartextTraffic: true` so it can talk to local Termux servers over `http://` LAN IPs.
 
 ## Stack
 

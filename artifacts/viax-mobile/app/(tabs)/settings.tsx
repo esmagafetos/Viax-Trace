@@ -29,9 +29,41 @@ export default function SettingsScreen() {
           {user?.email && <Muted>{user.email}</Muted>}
         </Card>
 
+        <Pressable onPress={() => router.push('/setup')}>
+          <Card style={{ gap: 6 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <Ionicons name="server-outline" size={18} color={c.accent} />
+                <View>
+                  <Text style={{ color: c.text, fontFamily: 'Poppins_600SemiBold', fontSize: 14 }}>API Server</Text>
+                  <Text style={{ color: c.textMuted, fontFamily: 'Poppins_400Regular', fontSize: 11 }} numberOfLines={1}>
+                    {getApiUrl() || 'Não configurado'}
+                  </Text>
+                </View>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={c.textMuted} />
+            </View>
+          </Card>
+        </Pressable>
+
+        <Pressable onPress={() => router.push('/setup')}>
+          <Card style={{ gap: 6 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <Ionicons name="settings-outline" size={18} color={c.accent} />
+                <View>
+                  <Text style={{ color: c.text, fontFamily: 'Poppins_600SemiBold', fontSize: 14 }}>
+                    Parser, motor e tolerância
+                  </Text>
+                  <Muted>Configurar geocodificação</Muted>
+                </View>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={c.textMuted} />
+            </View>
+          </Card>
+        </Pressable>
+
         <Card style={{ gap: 0 }}>
-          <Row icon="server-outline" label="API" value={getApiUrl()} />
-          <Divider />
           <Row icon="information-circle-outline" label="Versão" value={Constants.expoConfig?.version ?? '—'} />
           <Divider />
           <Pressable onPress={() => Linking.openURL('https://github.com')}>
@@ -59,7 +91,7 @@ function Row({
   label,
   value,
 }: {
-  icon: keyof typeof Ionicons.glyphMap;
+  icon: keyof typeof import('@expo/vector-icons').Ionicons.glyphMap;
   label: string;
   value: string;
 }) {
@@ -82,7 +114,7 @@ function Divider() {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  scroll: { padding: 18, gap: 16 },
+  scroll: { padding: 18, gap: 12 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10 },
   logout: {
     flexDirection: 'row',
@@ -92,5 +124,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 99,
     paddingVertical: 13,
+    marginTop: 8,
   },
 });
