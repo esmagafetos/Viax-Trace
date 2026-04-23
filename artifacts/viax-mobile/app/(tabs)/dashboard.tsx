@@ -11,6 +11,7 @@ import { AppHeader } from '@/components/AppHeader';
 import { ViaXLogo } from '@/components/ViaXLogo';
 import { Card } from '@/components/ui';
 import { formatBRL, formatDate, formatShortDate } from '@/lib/format';
+import { useResponsive } from '@/lib/responsive';
 
 type Summary = {
   totalAnalyses: number;
@@ -47,6 +48,7 @@ export default function DashboardScreen() {
   const c = useColors();
   const router = useRouter();
   const { user } = useAuth();
+  const { rs, cols, isCompact } = useResponsive();
   const [heroDismissed, setHeroDismissed] = useState(false);
 
   const summaryQ = useQuery<Summary>({
@@ -80,39 +82,42 @@ export default function DashboardScreen() {
     <SafeAreaView style={[styles.root, { backgroundColor: c.bg }]} edges={['top']}>
       <AppHeader />
       <ScrollView
-        contentContainerStyle={styles.scroll}
+        contentContainerStyle={[styles.scroll, { padding: rs(16), gap: rs(14), paddingBottom: rs(32) }]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refetchAll} tintColor={c.accent} />}
       >
         {/* Hero banner */}
         {!heroDismissed && <HeroBanner userName={firstName} onDismiss={() => setHeroDismissed(true)} onAction={() => router.push('/(tabs)/process')} />}
 
         <View>
-          <Text style={[styles.h1, { color: c.text }]}>Dashboard</Text>
-          <Text style={[styles.subtitle, { color: c.textFaint }]}>
+          <Text style={[styles.h1, { color: c.text, fontSize: rs(22) }]}>Dashboard</Text>
+          <Text style={[styles.subtitle, { color: c.textFaint, fontSize: rs(12) }]}>
             Resumo das suas análises e controle financeiro de rotas.
           </Text>
         </View>
 
-        {/* Stat tiles */}
+        {/* Stat tiles — mobile-first grid: 2 cols (xs/sm), 3 cols (md), 4 cols (lg) */}
         {s ? (
-          <View style={styles.statGrid}>
-            <StatTile value={String(s.totalAnalyses)} label="Análises" />
+          <View style={[styles.statGrid, { gap: rs(8) }]}>
+            <StatTile value={String(s.totalAnalyses)} label="Análises" cols={cols} />
             <StatTile
               value={s.totalAddressesProcessed.toLocaleString('pt-BR')}
               label="Endereços"
               tone="ok"
+              cols={cols}
             />
             <StatTile
               value={`${Math.round((s.avgNuanceRate / Math.max(s.totalAddressesProcessed, 1)) * 100 || 0)}%`}
               label="Nuances"
               tone="accent"
+              cols={cols}
             />
             <StatTile
               value={`${Math.round((s.avgSimilarity || 0) * 100)}%`}
               label="Similaridade"
               tone="ok"
+              cols={cols}
             />
-            <StatTile value={String(s.analysesThisMonth)} label="Este mês" />
+            <StatTile value={String(s.analysesThisMonth)} label="Este mês" cols={cols} />
           </View>
         ) : (
           <Card style={{ alignItems: 'center', paddingVertical: 28 }}>
@@ -256,19 +261,28 @@ function HeroBanner({
   );
 }
 
-function StatTile({ value, label, tone = 'muted' }: { value: string; label: string; tone?: 'muted' | 'ok' | 'accent' }) {
+function StatTile({ value, label, tone = 'muted', cols = 2 }: { value: string; label: string; tone?: 'muted' | 'ok' | 'accent'; cols?: number }) {
   const c = useColors();
+  const { rs } = useResponsive();
   const color = tone === 'ok' ? c.ok : tone === 'accent' ? c.accent : c.text;
   const stripColor = tone === 'ok' ? c.ok : tone === 'accent' ? c.accent : c.borderStrong;
+  const basis = cols === 4 ? '23%' : cols === 3 ? '31%' : '47%';
   return (
     <View
       style={[
         statStyles.tile,
-        { backgroundColor: c.surface, borderColor: c.borderStrong },
+        {
+          backgroundColor: c.surface,
+          borderColor: c.borderStrong,
+          flexBasis: basis,
+          paddingHorizontal: rs(12),
+          paddingTop: rs(12),
+          paddingBottom: rs(14),
+        },
       ]}
     >
-      <Text style={[statStyles.value, { color }]}>{value}</Text>
-      <Text style={[statStyles.label, { color: c.textFaint }]}>{label}</Text>
+      <Text style={[statStyles.value, { color, fontSize: rs(22) }]} numberOfLines={1} adjustsFontSizeToFit>{value}</Text>
+      <Text style={[statStyles.label, { color: c.textFaint, fontSize: rs(9) }]} numberOfLines={1}>{label}</Text>
       <View style={[statStyles.strip, { backgroundColor: stripColor }]} />
     </View>
   );
@@ -497,20 +511,15 @@ const styles = StyleSheet.create({
 
 const statStyles = StyleSheet.create({
   tile: {
-    flexBasis: '47%',
     flexGrow: 1,
-    paddingHorizontal: 12,
-    paddingTop: 12,
-    paddingBottom: 14,
     borderWidth: 1,
     borderRadius: 14,
     overflow: 'hidden',
     position: 'relative',
   },
-  value: { fontFamily: 'Poppins_700Bold', fontSize: 22, letterSpacing: -0.5 },
+  value: { fontFamily: 'Poppins_700Bold', letterSpacing: -0.5 },
   label: {
     fontFamily: 'Poppins_600SemiBold',
-    fontSize: 9,
     letterSpacing: 0.6,
     textTransform: 'uppercase',
     marginTop: 2,

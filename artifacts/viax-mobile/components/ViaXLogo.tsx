@@ -1,10 +1,6 @@
-import { View, Text, Image, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
+import Svg, { Path, Circle, Rect } from 'react-native-svg';
 import { useTheme } from '@/lib/theme';
-
-const LIGHT_LOGO = require('../assets/brand/viax-logo-light.png');
-const DARK_LOGO = require('../assets/brand/viax-logo-dark.png');
-const SHOWCASE_LOGO = require('../assets/brand/viax-logo-showcase.png');
-const BANNER = require('../assets/brand/viax-github-banner.png');
 
 type Size = 'sm' | 'md' | 'lg' | 'xl';
 
@@ -15,37 +11,69 @@ const SIZES: Record<Size, { icon: number; name: number; tag: number; gap: number
   xl: { icon: 48, name: 32, tag: 13, gap: 16 },
 };
 
-interface LogoMarkProps {
+interface LogoIconProps {
+  size?: number;
+  color?: string;
+  accentColor?: string;
+}
+
+export function LogoIcon({ size = 28, color = '#1a1917', accentColor = '#d4521a' }: LogoIconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 28 28">
+      <Path
+        d="M7 7C7 7 7 16 14 18C20 20 21 21 21 21"
+        stroke={color}
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+      />
+      <Circle cx={7} cy={7} r={2.5} fill={color} />
+      <Circle cx={21} cy={21} r={4.5} fill={accentColor} />
+      <Circle cx={21} cy={21} r={1.8} fill="#ffffff" />
+    </Svg>
+  );
+}
+
+interface AppIconProps {
   size?: number;
   dark?: boolean;
 }
 
-/**
- * Pure-image rendering of the brand mark — uses the same PNGs that ship with the
- * web build so the icon matches pixel-for-pixel. We crop to a square box around
- * the icon area (the showcase PNG has the mark in the centre).
- */
-export function LogoMark({ size = 36, dark }: LogoMarkProps) {
+export function AppIcon({ size = 40, dark }: AppIconProps) {
+  const { dark: themeDark } = useTheme();
+  const isDark = dark ?? themeDark;
+  const bg = isDark ? '#121110' : '#ffffff';
+  const fg = isDark ? '#f0ede8' : '#1a1917';
   return (
-    <Image
-      source={SHOWCASE_LOGO}
-      style={{ width: size, height: size, resizeMode: 'contain' }}
-    />
+    <Svg width={size} height={size} viewBox="0 0 40 40">
+      <Rect width={40} height={40} rx={9} fill={bg} />
+      <Path
+        d="M10 10C10 10 10 20 17 22C23 24 24 25 24 25"
+        stroke={fg}
+        strokeWidth={2.2}
+        strokeLinecap="round"
+        fill="none"
+      />
+      <Circle cx={10} cy={10} r={3} fill={fg} />
+      <Circle cx={30} cy={30} r={5.5} fill="#d4521a" />
+      <Circle cx={30} cy={30} r={2.2} fill="#ffffff" />
+    </Svg>
   );
+}
+
+export function LogoMark({ size = 28, dark }: LogoIconProps & { dark?: boolean }) {
+  const { dark: themeDark } = useTheme();
+  const isDark = dark ?? themeDark;
+  return <LogoIcon size={size} color={isDark ? '#f0ede8' : '#1a1917'} accentColor="#d4521a" />;
 }
 
 interface ViaXLogoProps {
   size?: Size;
   showTagline?: boolean;
-  /** Force a specific theme — defaults to current theme */
   dark?: boolean;
 }
 
-/**
- * Horizontal wordmark (icon + "ViaX:Trace" + tagline). Mirrors the web
- * `<ViaXLogo />` typographic treatment but composes the icon next to the text
- * so we can render at any size without raster blur.
- */
 export function ViaXLogo({ size = 'md', showTagline = true, dark: darkProp }: ViaXLogoProps) {
   const { dark: themeDark } = useTheme();
   const dark = darkProp ?? themeDark;
@@ -55,8 +83,8 @@ export function ViaXLogo({ size = 'md', showTagline = true, dark: darkProp }: Vi
 
   return (
     <View style={[styles.row, { gap: s.gap }]}>
-      <LogoMark size={s.icon} dark={dark} />
-      <View>
+      <LogoIcon size={s.icon} color={textColor} accentColor="#d4521a" />
+      <View style={{ flexShrink: 1 }}>
         <Text
           style={{
             fontFamily: 'Poppins_700Bold',
@@ -86,26 +114,12 @@ export function ViaXLogo({ size = 'md', showTagline = true, dark: darkProp }: Vi
   );
 }
 
-/** Full GitHub banner — same asset shipped with the web Docs page. */
-export function GitHubBanner() {
-  return (
-    <Image
-      source={BANNER}
-      style={{ width: '100%', aspectRatio: 1200 / 600, borderRadius: 14 }}
-      resizeMode="cover"
-    />
-  );
-}
-
-/** Standalone light/dark logo PNG, useful for splash, headers, etc. */
 export function FlatLogo({ width = 200, dark }: { width?: number; dark?: boolean }) {
-  const { dark: themeDark } = useTheme();
-  const isDark = dark ?? themeDark;
+  const iconSize = Math.round(width * 0.14);
   return (
-    <Image
-      source={isDark ? DARK_LOGO : LIGHT_LOGO}
-      style={{ width, aspectRatio: 4, resizeMode: 'contain' }}
-    />
+    <View style={{ width, alignItems: 'flex-start' }}>
+      <ViaXLogo size="lg" dark={dark} showTagline />
+    </View>
   );
 }
 

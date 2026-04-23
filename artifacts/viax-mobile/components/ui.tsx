@@ -14,10 +14,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { useColors } from '@/hooks/useColors';
 import { Radius } from '@/constants/colors';
 import { useTheme } from '@/lib/theme';
+import { useResponsive } from '@/lib/responsive';
 
 /** Card with the same warm-paper surface and 14px radius used on the web. */
 export function Card({ style, children, ...rest }: ViewProps) {
   const c = useColors();
+  const { rs } = useResponsive();
   return (
     <View
       {...rest}
@@ -27,7 +29,7 @@ export function Card({ style, children, ...rest }: ViewProps) {
           borderColor: c.borderStrong,
           borderWidth: 1,
           borderRadius: Radius.lg,
-          padding: 16,
+          padding: rs(16),
           shadowColor: '#000',
           shadowOpacity: 0.08,
           shadowRadius: 24,
@@ -42,28 +44,27 @@ export function Card({ style, children, ...rest }: ViewProps) {
   );
 }
 
-/** Card header strip — used on Login/Register/Setup to mirror the web's
- * "title + subtitle + bottom border" pattern. */
 export function CardHeader({ title, subtitle, style }: { title: string; subtitle?: string; style?: ViewStyle }) {
   const c = useColors();
+  const { rs } = useResponsive();
   return (
     <View
       style={[
         {
-          paddingHorizontal: 18,
-          paddingTop: 18,
-          paddingBottom: 14,
+          paddingHorizontal: rs(18),
+          paddingTop: rs(18),
+          paddingBottom: rs(14),
           borderBottomWidth: 1,
           borderBottomColor: c.border,
         },
         style,
       ]}
     >
-      <Text style={{ fontFamily: 'Poppins_700Bold', fontSize: 18, letterSpacing: -0.4, color: c.text }}>
+      <Text style={{ fontFamily: 'Poppins_700Bold', fontSize: rs(18), letterSpacing: -0.4, color: c.text }}>
         {title}
       </Text>
       {subtitle && (
-        <Text style={{ fontFamily: 'Poppins_400Regular', fontSize: 13, color: c.textFaint, marginTop: 4 }}>
+        <Text style={{ fontFamily: 'Poppins_400Regular', fontSize: rs(13), color: c.textFaint, marginTop: 4 }}>
           {subtitle}
         </Text>
       )}
@@ -71,15 +72,16 @@ export function CardHeader({ title, subtitle, style }: { title: string; subtitle
   );
 }
 
-/** Card body wrapper — uniform padding to match web cards. */
 export function CardBody({ children, style }: { children: React.ReactNode; style?: ViewStyle }) {
-  return <View style={[{ paddingHorizontal: 18, paddingVertical: 18, gap: 14 }, style]}>{children}</View>;
+  const { rs } = useResponsive();
+  return <View style={[{ paddingHorizontal: rs(18), paddingVertical: rs(18), gap: rs(14) }, style]}>{children}</View>;
 }
 
 export function H1({ children }: { children: React.ReactNode }) {
   const c = useColors();
+  const { rs } = useResponsive();
   return (
-    <Text style={{ fontFamily: 'Poppins_700Bold', fontSize: 22, color: c.text, letterSpacing: -0.6 }}>
+    <Text style={{ fontFamily: 'Poppins_700Bold', fontSize: rs(22), color: c.text, letterSpacing: -0.6 }}>
       {children}
     </Text>
   );
@@ -87,8 +89,9 @@ export function H1({ children }: { children: React.ReactNode }) {
 
 export function H2({ children }: { children: React.ReactNode }) {
   const c = useColors();
+  const { rs } = useResponsive();
   return (
-    <Text style={{ fontFamily: 'Poppins_600SemiBold', fontSize: 16, color: c.text, letterSpacing: -0.2 }}>
+    <Text style={{ fontFamily: 'Poppins_600SemiBold', fontSize: rs(16), color: c.text, letterSpacing: -0.2 }}>
       {children}
     </Text>
   );
@@ -96,21 +99,22 @@ export function H2({ children }: { children: React.ReactNode }) {
 
 export function Muted({ children, style }: { children: React.ReactNode; style?: any }) {
   const c = useColors();
+  const { rs } = useResponsive();
   return (
-    <Text style={[{ fontFamily: 'Poppins_400Regular', fontSize: 13, color: c.textFaint, lineHeight: 19 }, style]}>
+    <Text style={[{ fontFamily: 'Poppins_400Regular', fontSize: rs(13), color: c.textFaint, lineHeight: rs(19) }, style]}>
       {children}
     </Text>
   );
 }
 
-/** Web-style uppercase label: 0.72rem, 600, letter-spaced 0.08em. */
 export function Label({ children }: { children: React.ReactNode }) {
   const c = useColors();
+  const { rs } = useResponsive();
   return (
     <Text
       style={{
         fontFamily: 'Poppins_600SemiBold',
-        fontSize: 11,
+        fontSize: rs(11),
         color: c.textFaint,
         letterSpacing: 1.1,
         textTransform: 'uppercase',
@@ -127,9 +131,9 @@ interface InputBoxProps extends TextInputProps {
   rightSlot?: React.ReactNode;
 }
 
-/** Input matching web: surface-2 bg, border-strong, 8px radius, accent focus ring. */
 export function Input({ hasError, rightSlot, style, ...props }: InputBoxProps) {
   const c = useColors();
+  const { rs } = useResponsive();
   const [focused, setFocused] = useState(false);
   const borderColor = hasError ? c.accent : focused ? c.accent : c.borderStrong;
   return (
@@ -152,11 +156,11 @@ export function Input({ hasError, rightSlot, style, ...props }: InputBoxProps) {
             borderColor,
             borderWidth: 1,
             borderRadius: 8,
-            paddingHorizontal: 14,
-            paddingVertical: 12,
-            paddingRight: rightSlot ? 44 : 14,
+            paddingHorizontal: rs(14),
+            paddingVertical: rs(12),
+            paddingRight: rightSlot ? rs(44) : rs(14),
             fontFamily: 'Poppins_400Regular',
-            fontSize: 14,
+            fontSize: rs(14),
           },
           style,
         ]}
@@ -170,7 +174,6 @@ export function Input({ hasError, rightSlot, style, ...props }: InputBoxProps) {
   );
 }
 
-/** Password input with show/hide eye button (mirrors web Login). */
 export function PasswordInput(props: TextInputProps) {
   const c = useColors();
   const [show, setShow] = useState(false);
@@ -189,9 +192,9 @@ export function PasswordInput(props: TextInputProps) {
   );
 }
 
-/** Strength meter bar identical to the web's PasswordStrength component. */
 export function PasswordStrength({ password }: { password: string }) {
   const c = useColors();
+  const { rs } = useResponsive();
   if (!password) return null;
   const checks = [
     { ok: password.length >= 8, label: '8+ caracteres' },
@@ -218,7 +221,7 @@ export function PasswordStrength({ password }: { password: string }) {
         ))}
       </View>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
-        <Text style={{ fontFamily: 'Poppins_500Medium', fontSize: 10, color: score >= 3 ? '#22c55e' : c.textFaint }}>
+        <Text style={{ fontFamily: 'Poppins_500Medium', fontSize: rs(10), color: score >= 3 ? '#22c55e' : c.textFaint }}>
           {levels[score]}
         </Text>
         <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
@@ -227,7 +230,7 @@ export function PasswordStrength({ password }: { password: string }) {
               key={chk.label}
               style={{
                 fontFamily: chk.ok ? 'Poppins_600SemiBold' : 'Poppins_400Regular',
-                fontSize: 9.5,
+                fontSize: rs(9.5),
                 color: chk.ok ? '#22c55e' : c.textFaint,
               }}
             >
@@ -249,9 +252,9 @@ type ButtonProps = {
   iconRight?: keyof typeof Ionicons.glyphMap;
 };
 
-/** Pill button matching web: 99px radius, accent bg, drop shadow, optional right-arrow icon. */
 export function Button({ children, onPress, variant = 'primary', loading, disabled, iconRight }: ButtonProps) {
   const c = useColors();
+  const { rs } = useResponsive();
   const isPrimary = variant === 'primary';
   const isDark = variant === 'dark';
   const bg = isPrimary ? c.accent : isDark ? c.text : 'transparent';
@@ -266,8 +269,8 @@ export function Button({ children, onPress, variant = 'primary', loading, disabl
           borderColor: isPrimary || isDark ? bg : c.borderStrong,
           borderWidth: 1,
           borderRadius: Radius.pill,
-          paddingVertical: 13,
-          paddingHorizontal: 22,
+          paddingVertical: rs(13),
+          paddingHorizontal: rs(22),
           alignItems: 'center',
           justifyContent: 'center',
           flexDirection: 'row',
@@ -285,8 +288,8 @@ export function Button({ children, onPress, variant = 'primary', loading, disabl
         <ActivityIndicator color={fg} />
       ) : (
         <>
-          <Text style={{ color: fg, fontFamily: 'Poppins_600SemiBold', fontSize: 14 }}>{children}</Text>
-          {iconRight && <Ionicons name={iconRight} size={16} color={fg} />}
+          <Text style={{ color: fg, fontFamily: 'Poppins_600SemiBold', fontSize: rs(14) }}>{children}</Text>
+          {iconRight && <Ionicons name={iconRight} size={rs(16)} color={fg} />}
         </>
       )}
     </Pressable>
@@ -295,19 +298,20 @@ export function Button({ children, onPress, variant = 'primary', loading, disabl
 
 export function Pill({ children, tone = 'muted' }: { children: React.ReactNode; tone?: 'muted' | 'ok' | 'accent' }) {
   const c = useColors();
+  const { rs } = useResponsive();
   const bg = tone === 'ok' ? 'rgba(46,168,99,0.15)' : tone === 'accent' ? c.accentDim : c.surface2;
   const fg = tone === 'ok' ? c.ok : tone === 'accent' ? c.accent : c.textMuted;
   return (
     <View style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: Radius.pill, backgroundColor: bg, alignSelf: 'flex-start' }}>
-      <Text style={{ color: fg, fontFamily: 'Poppins_500Medium', fontSize: 11 }}>{children}</Text>
+      <Text style={{ color: fg, fontFamily: 'Poppins_500Medium', fontSize: rs(11) }}>{children}</Text>
     </View>
   );
 }
 
-/** Floating top-right theme toggle — mirrors the web Login/Register pill. */
 export function ThemeToggle() {
   const { dark, toggle } = useTheme();
   const c = useColors();
+  const { rs } = useResponsive();
   return (
     <Pressable
       onPress={toggle}
@@ -324,20 +328,20 @@ export function ThemeToggle() {
         opacity: pressed ? 0.7 : 1,
       })}
     >
-      <Ionicons name={dark ? 'sunny-outline' : 'moon-outline'} size={13} color={c.textMuted} />
-      <Text style={{ fontFamily: 'Poppins_500Medium', fontSize: 11, color: c.textMuted }}>
+      <Ionicons name={dark ? 'sunny-outline' : 'moon-outline'} size={rs(13)} color={c.textMuted} />
+      <Text style={{ fontFamily: 'Poppins_500Medium', fontSize: rs(11), color: c.textMuted }}>
         {dark ? 'Claro' : 'Escuro'}
       </Text>
     </Pressable>
   );
 }
 
-/** Inline error text used below form fields — matches web's accent error color. */
 export function FieldError({ children }: { children: React.ReactNode }) {
   const c = useColors();
+  const { rs } = useResponsive();
   if (!children) return null;
   return (
-    <Text style={{ color: c.accent, fontFamily: 'Poppins_500Medium', fontSize: 11, marginTop: 4 }}>
+    <Text style={{ color: c.accent, fontFamily: 'Poppins_500Medium', fontSize: rs(11), marginTop: 4 }}>
       {children}
     </Text>
   );
