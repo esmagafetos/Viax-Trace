@@ -4,7 +4,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import * as DocumentPicker from 'expo-document-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { useColors } from '@/hooks/useColors';
-import { Button, Card, H1, H2, Muted, Pill } from '@/components/ui';
+import { Button, Card, CardHeader, CardBody, H1, Muted, Pill } from '@/components/ui';
+import { AppHeader } from '@/components/AppHeader';
 import { getApiUrl } from '@/lib/api';
 
 type Progress = {
@@ -37,19 +38,25 @@ export default function ProcessScreen() {
 
   const upload = async () => {
     if (!file) return;
+    const apiUrl = getApiUrl();
+    if (!apiUrl) {
+      Alert.alert('Servidor', 'Configure o servidor em Ajustes antes de processar.');
+      return;
+    }
     setProgress({ status: 'uploading', percent: 0, message: 'Enviando arquivo...' });
 
     try {
       const form = new FormData();
-      form.append('file', {
+      form.append('arquivo', {
         uri: file.uri,
         name: file.name,
         type: file.mimeType ?? 'application/octet-stream',
       } as any);
 
-      const res = await fetch(`${getApiUrl()}/api/process/upload`, {
+      const res = await fetch(`${apiUrl}/api/process/upload`, {
         method: 'POST',
         body: form,
+        credentials: 'include',
       });
 
       if (!res.ok || !res.body) {
@@ -100,49 +107,82 @@ export default function ProcessScreen() {
 
   return (
     <SafeAreaView style={[styles.root, { backgroundColor: c.bg }]} edges={['top']}>
+      <AppHeader />
       <ScrollView contentContainerStyle={styles.scroll}>
-        <H1>Processar rota</H1>
-        <Muted>Envie uma planilha XLSX ou CSV (até 500 endereços, 10MB).</Muted>
+        <View>
+          <H1>Processar rota</H1>
+          <Muted>Envie uma planilha XLSX ou CSV (até 500 endereços, 10MB).</Muted>
+        </View>
 
-        <Card style={{ gap: 12 }}>
-          <H2>Arquivo</H2>
-          {file ? (
-            <View style={{ gap: 4 }}>
-              <Text style={{ color: c.text, fontFamily: 'Poppins_500Medium', fontSize: 14 }} numberOfLines={1}>
-                {file.name}
-              </Text>
-              <Muted>{file.size ? `${(file.size / 1024).toFixed(1)} KB` : ''}</Muted>
-            </View>
-          ) : (
-            <View style={[styles.dropzone, { borderColor: c.border }]}>
-              <Ionicons name="cloud-upload-outline" size={32} color={c.textMuted} />
-              <Muted>Nenhum arquivo selecionado</Muted>
-            </View>
-          )}
-          <Button onPress={pickFile} variant="ghost">
-            {file ? 'Trocar arquivo' : 'Selecionar planilha'}
-          </Button>
-          <Button onPress={upload} disabled={!file || isWorking} loading={isWorking}>
-            Iniciar análise
-          </Button>
+        <Card style={{ padding: 0 }}>
+          <CardHeader title="Arquivo" subtitle="Selecione a planilha que será analisada." />
+          <CardBody>
+            {file ? (
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 12,
+                  backgroundColor: c.surface2,
+                  borderColor: c.border,
+                  borderWidth: 1,
+                  borderRadius: 10,
+                  padding: 12,
+                }}
+              >
+                <Ionicons name="document-text-outline" size={22} color={c.accent} />
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text
+                    numberOfLines={1}
+                    style={{ color: c.text, fontFamily: 'Poppins_500Medium', fontSize: 13 }}
+                  >
+                    {file.name}
+                  </Text>
+                  <Text style={{ color: c.textFaint, fontFamily: 'Poppins_400Regular', fontSize: 11 }}>
+                    {file.size ? `${(file.size / 1024).toFixed(1)} KB` : ''}
+                  </Text>
+                </View>
+              </View>
+            ) : (
+              <View style={[styles.dropzone, { borderColor: c.border, backgroundColor: c.surface2 }]}>
+                <Ionicons name="cloud-upload-outline" size={32} color={c.textMuted} />
+                <Muted>Nenhum arquivo selecionado</Muted>
+              </View>
+            )}
+            <Button onPress={pickFile} variant="ghost">
+              {file ? 'Trocar arquivo' : 'Selecionar planilha'}
+            </Button>
+            <Button onPress={upload} disabled={!file || isWorking} loading={isWorking} iconRight="arrow-forward">
+              Iniciar análise
+            </Button>
+          </CardBody>
         </Card>
 
         {progress.status !== 'idle' && (
-          <Card style={{ gap: 10 }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-              <H2>Progresso</H2>
-              {progress.status === 'done' && <Pill tone="ok">Concluído</Pill>}
-              {progress.status === 'error' && <Pill tone="accent">Erro</Pill>}
-            </View>
-            <View style={[styles.bar, { backgroundColor: c.surface2 }]}>
-              <View
-                style={[
-                  styles.barFill,
-                  { width: `${progress.percent}%`, backgroundColor: progress.status === 'error' ? '#dc2626' : c.accent },
-                ]}
-              />
-            </View>
-            <Muted>{progress.message}</Muted>
+          <Card style={{ padding: 0 }}>
+            <CardHeader title="Progresso" />
+            <CardBody>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Text style={{ color: c.text, fontFamily: 'Poppins_600SemiBold', fontSize: 13 }}>
+                  {progress.percent}%
+                </Text>
+                {progress.status === 'done' && <Pill tone="ok">Concluído</Pill>}
+                {progress.status === 'error' && <Pill tone="accent">Erro</Pill>}
+                {isWorking && <Pill tone="accent">Em andamento</Pill>}
+              </View>
+              <View style={[styles.bar, { backgroundColor: c.surface2 }]}>
+                <View
+                  style={[
+                    styles.barFill,
+                    {
+                      width: `${progress.percent}%`,
+                      backgroundColor: progress.status === 'error' ? '#dc2626' : c.accent,
+                    },
+                  ]}
+                />
+              </View>
+              <Muted>{progress.message}</Muted>
+            </CardBody>
           </Card>
         )}
       </ScrollView>
@@ -152,12 +192,12 @@ export default function ProcessScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  scroll: { padding: 18, gap: 16 },
+  scroll: { padding: 16, gap: 14, paddingBottom: 32 },
   dropzone: {
     borderWidth: 2,
     borderStyle: 'dashed',
     borderRadius: 14,
-    paddingVertical: 28,
+    paddingVertical: 32,
     alignItems: 'center',
     gap: 8,
   },

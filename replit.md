@@ -51,6 +51,7 @@ pnpm workspace monorepo with React+Vite frontend and Express API backend.
    - Build: EAS Build profiles `development`, `preview` (APK debuggable) and `production` (APK release with `autoIncrement` of `versionCode`)
    - Release: GitHub Actions workflow `.github/workflows/mobile-release.yml` runs typecheck then builds APK on EAS and publishes a GitHub Release with the APK asset (uses `EXPO_TOKEN` secret). Supports `workflow_dispatch` with profile choice.
    - Android permissions: `INTERNET`, `ACCESS_NETWORK_STATE`, `READ_EXTERNAL_STORAGE`; `usesCleartextTraffic: true` so it can talk to local Termux servers over `http://` LAN IPs.
+   - **Authenticated screens (Wave 2)** mirror the web 1:1 — shared `components/AppHeader.tsx` (logo + theme toggle + avatar) above every tab; Dashboard with HeroBanner gradient, 5-stat tile grid, FinancialPanel (receita/despesas/lucro + meta progress + 20-day MiniBarChart), recent analyses list; Process with Card+CardHeader pattern, dropzone, SSE-driven progress bar; History with paginated list + delete confirmation; Settings as full 6-tab (Perfil / Financeiro / Instâncias / Parser / Tolerância / Sobre) using `lib/format.ts` helpers (`formatBRL`, `formatPct`, `formatMs`, `formatDate`).
 
 ## Stack
 

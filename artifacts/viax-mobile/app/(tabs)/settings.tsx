@@ -1,17 +1,70 @@
-import { ScrollView, View, StyleSheet, Pressable, Text, Linking } from 'react-native';
+import { useEffect, useState } from 'react';
+import {
+  ScrollView,
+  View,
+  StyleSheet,
+  Text,
+  Pressable,
+  Linking,
+  Alert,
+  TextInput,
+  Image,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
+import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
-import { Card, H1, H2, Muted } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
-import { getApiUrl } from '@/lib/api';
-import Constants from 'expo-constants';
+import { apiRequest, getApiUrl } from '@/lib/api';
+import { AppHeader } from '@/components/AppHeader';
+import { H1, Muted, Label, Input, Button, FieldError } from '@/components/ui';
+import { formatBRL } from '@/lib/format';
+
+type Tab = 'perfil' | 'financeiro' | 'instancias' | 'parser' | 'tolerancia' | 'sobre';
+
+type SettingsData = {
+  parserMode: 'builtin' | 'ai';
+  aiProvider: string | null;
+  aiApiKey: string | null;
+  toleranceMeters: number;
+  instanceMode: 'builtin' | 'geocodebr' | 'googlemaps';
+  googleMapsApiKey: string | null;
+  valorPorRota: number | null;
+  cicloPagamentoDias: number;
+  metaMensalRotas: number | null;
+  despesasFixasMensais: number | null;
+};
+
+const TABS: { id: Tab; label: string }[] = [
+  { id: 'perfil', label: 'Perfil' },
+  { id: 'financeiro', label: 'Financeiro' },
+  { id: 'instancias', label: 'Instâncias' },
+  { id: 'parser', label: 'Parser' },
+  { id: 'tolerancia', label: 'Tolerância' },
+  { id: 'sobre', label: 'Sobre' },
+];
+
+const CICLO_OPTS = [
+  { value: 7, label: 'Semanal (7 dias)' },
+  { value: 14, label: 'Quinzenal (14 dias)' },
+  { value: 30, label: 'Mensal (30 dias)' },
+];
+
+const TOLERANCE_PRESETS = [100, 300, 500, 1000, 2000, 5000];
 
 export default function SettingsScreen() {
   const c = useColors();
-  const { user, logout } = useAuth();
+  const { user, refresh, logout } = useAuth();
   const router = useRouter();
+  const queryClient = useQueryClient();
+  const [active, setActive] = useState<Tab>('perfil');
+
+  const { data: settings, isLoading } = useQuery<SettingsData>({
+    queryKey: ['/api/users/settings'],
+    queryFn: () => apiRequest<SettingsData>('/api/users/settings'),
+  });
 
   const onLogout = async () => {
     await logout();
@@ -20,56 +73,62 @@ export default function SettingsScreen() {
 
   return (
     <SafeAreaView style={[styles.root, { backgroundColor: c.bg }]} edges={['top']}>
+      <AppHeader />
       <ScrollView contentContainerStyle={styles.scroll}>
-        <H1>Ajustes</H1>
+        <View>
+          <H1>Configurações</H1>
+          <Muted>Perfil, financeiro, instâncias, parser e tolerância.</Muted>
+        </View>
 
-        <Card style={{ gap: 6 }}>
-          <H2>Perfil</H2>
-          <Muted>{user?.name ?? user?.email}</Muted>
-          {user?.name && user?.email && <Muted>{user.email}</Muted>}
-        </Card>
+        {/* Tab strip */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ gap: 4, paddingBottom: 1 }}
+          style={[styles.tabBar, { borderBottomColor: c.borderStrong }]}
+        >
+          {TABS.map((t) => {
+            const isActive = active === t.id;
+            return (
+              <Pressable
+                key={t.id}
+                onPress={() => setActive(t.id)}
+                style={({ pressed }) => [
+                  styles.tabBtn,
+                  {
+                    borderBottomColor: isActive ? c.accent : 'transparent',
+                    opacity: pressed ? 0.7 : 1,
+                  },
+                ]}
+              >
+                <Text
+                  style={{
+                    color: isActive ? c.accent : c.textMuted,
+                    fontFamily: isActive ? 'Poppins_600SemiBold' : 'Poppins_400Regular',
+                    fontSize: 13,
+                  }}
+                >
+                  {t.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
 
-        <Pressable onPress={() => router.push('/setup')}>
-          <Card style={{ gap: 6 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                <Ionicons name="server-outline" size={18} color={c.accent} />
-                <View>
-                  <Text style={{ color: c.text, fontFamily: 'Poppins_600SemiBold', fontSize: 14 }}>API Server</Text>
-                  <Text style={{ color: c.textMuted, fontFamily: 'Poppins_400Regular', fontSize: 11 }} numberOfLines={1}>
-                    {getApiUrl() || 'Não configurado'}
-                  </Text>
-                </View>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color={c.textMuted} />
-            </View>
-          </Card>
-        </Pressable>
-
-        <Pressable onPress={() => router.push('/setup')}>
-          <Card style={{ gap: 6 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                <Ionicons name="settings-outline" size={18} color={c.accent} />
-                <View>
-                  <Text style={{ color: c.text, fontFamily: 'Poppins_600SemiBold', fontSize: 14 }}>
-                    Parser, motor e tolerância
-                  </Text>
-                  <Muted>Configurar geocodificação</Muted>
-                </View>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color={c.textMuted} />
-            </View>
-          </Card>
-        </Pressable>
-
-        <Card style={{ gap: 0 }}>
-          <Row icon="information-circle-outline" label="Versão" value={Constants.expoConfig?.version ?? '—'} />
-          <Divider />
-          <Pressable onPress={() => Linking.openURL('https://github.com')}>
-            <Row icon="logo-github" label="Repositório" value="GitHub" />
-          </Pressable>
-        </Card>
+        {active === 'perfil' && <PerfilTab user={user} onUpdated={refresh} />}
+        {active === 'financeiro' && (
+          <FinanceiroTab settings={settings} loading={isLoading} queryClient={queryClient} />
+        )}
+        {active === 'instancias' && (
+          <InstanciasTab settings={settings} loading={isLoading} queryClient={queryClient} />
+        )}
+        {active === 'parser' && (
+          <ParserTab settings={settings} loading={isLoading} queryClient={queryClient} />
+        )}
+        {active === 'tolerancia' && (
+          <ToleranciaTab settings={settings} loading={isLoading} queryClient={queryClient} />
+        )}
+        {active === 'sobre' && <SobreTab />}
 
         <Pressable
           onPress={onLogout}
@@ -86,36 +145,901 @@ export default function SettingsScreen() {
   );
 }
 
-function Row({
-  icon,
-  label,
-  value,
+/* ─────────────── helpers ─────────────── */
+
+function PanelCard({
+  title,
+  children,
 }: {
-  icon: keyof typeof import('@expo/vector-icons').Ionicons.glyphMap;
-  label: string;
-  value: string;
+  title: string;
+  children: React.ReactNode;
 }) {
   const c = useColors();
   return (
-    <View style={styles.row}>
-      <Ionicons name={icon} size={18} color={c.textMuted} />
-      <Text style={{ color: c.text, fontFamily: 'Poppins_500Medium', fontSize: 14, flex: 1 }}>{label}</Text>
-      <Text style={{ color: c.textMuted, fontFamily: 'Poppins_400Regular', fontSize: 12 }} numberOfLines={1}>
-        {value}
-      </Text>
+    <View style={[panel.wrap, { backgroundColor: c.surface, borderColor: c.borderStrong }]}>
+      <View style={[panel.head, { borderBottomColor: c.border }]}>
+        <Text style={[panel.headLabel, { color: c.textMuted }]}>{title}</Text>
+      </View>
+      <View style={panel.body}>{children}</View>
     </View>
   );
 }
 
-function Divider() {
-  const c = useColors();
-  return <View style={{ height: 1, backgroundColor: c.border, marginVertical: 4 }} />;
+function useSaveSettings() {
+  const queryClient = useQueryClient();
+  return async (patch: Partial<SettingsData>) => {
+    try {
+      await apiRequest('/api/users/settings', {
+        method: 'PATCH',
+        body: JSON.stringify(patch),
+      });
+      await queryClient.invalidateQueries({ queryKey: ['/api/users/settings'] });
+      Alert.alert('Salvo', 'Configurações atualizadas.');
+    } catch (e: any) {
+      Alert.alert('Erro', e?.message ?? 'Falha ao salvar.');
+    }
+  };
 }
+
+/* ─────────────── tabs ─────────────── */
+
+function PerfilTab({ user, onUpdated }: { user: any; onUpdated: () => Promise<void> }) {
+  const c = useColors();
+  const [name, setName] = useState(user?.name ?? '');
+  const [birthDate, setBirthDate] = useState(user?.birthDate ?? '');
+  const [currentPwd, setCurrentPwd] = useState('');
+  const [newPwd, setNewPwd] = useState('');
+  const [confirmPwd, setConfirmPwd] = useState('');
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [savingPwd, setSavingPwd] = useState(false);
+
+  useEffect(() => {
+    setName(user?.name ?? '');
+    setBirthDate(user?.birthDate ?? '');
+  }, [user?.name, user?.birthDate]);
+
+  const initial = (name || user?.email || 'U').charAt(0).toUpperCase();
+
+  const saveProfile = async () => {
+    setSavingProfile(true);
+    try {
+      await apiRequest('/api/users/profile', {
+        method: 'PATCH',
+        body: JSON.stringify({ name, birthDate: birthDate || null }),
+      });
+      await onUpdated();
+      Alert.alert('Salvo', 'Perfil atualizado.');
+    } catch (e: any) {
+      Alert.alert('Erro', e?.message ?? 'Falha ao atualizar perfil.');
+    } finally {
+      setSavingProfile(false);
+    }
+  };
+
+  const savePassword = async () => {
+    if (newPwd !== confirmPwd) return Alert.alert('Erro', 'As senhas não coincidem.');
+    if (newPwd.length < 6) return Alert.alert('Erro', 'Senha deve ter no mínimo 6 caracteres.');
+    setSavingPwd(true);
+    try {
+      await apiRequest('/api/users/password', {
+        method: 'PATCH',
+        body: JSON.stringify({ currentPassword: currentPwd, newPassword: newPwd }),
+      });
+      setCurrentPwd('');
+      setNewPwd('');
+      setConfirmPwd('');
+      Alert.alert('Pronto', 'Senha alterada.');
+    } catch (e: any) {
+      Alert.alert('Erro', e?.message ?? 'Falha ao alterar senha.');
+    } finally {
+      setSavingPwd(false);
+    }
+  };
+
+  return (
+    <View style={{ gap: 12 }}>
+      <PanelCard title="Foto e informações">
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+          <View style={[avatarStyles.box, { backgroundColor: c.accentDim, borderColor: c.borderStrong }]}>
+            {user?.avatarUrl ? (
+              <Image source={{ uri: user.avatarUrl }} style={avatarStyles.img} />
+            ) : (
+              <Text style={{ color: c.accent, fontFamily: 'Poppins_700Bold', fontSize: 22 }}>
+                {initial}
+              </Text>
+            )}
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: c.text, fontFamily: 'Poppins_600SemiBold', fontSize: 13 }}>
+              Foto de perfil
+            </Text>
+            <Text style={{ color: c.textFaint, fontFamily: 'Poppins_400Regular', fontSize: 11, marginTop: 4, lineHeight: 16 }}>
+              Atualize sua foto pelo navegador (web) — em breve diretamente no app.
+            </Text>
+          </View>
+        </View>
+
+        <View style={{ height: 12 }} />
+        <Label>Nome</Label>
+        <Input value={name} onChangeText={setName} placeholder="Seu nome" />
+
+        <View style={{ height: 10 }} />
+        <Label>Data de nascimento</Label>
+        <Input
+          value={birthDate}
+          onChangeText={setBirthDate}
+          placeholder="AAAA-MM-DD"
+          autoCapitalize="none"
+        />
+
+        <View style={{ height: 10 }} />
+        <Label>Email</Label>
+        <Input value={user?.email ?? ''} editable={false} style={{ opacity: 0.6 }} />
+
+        <View style={{ height: 14 }} />
+        <Button onPress={saveProfile} loading={savingProfile}>
+          Salvar perfil
+        </Button>
+      </PanelCard>
+
+      <PanelCard title="Alterar senha">
+        <Label>Senha atual</Label>
+        <Input
+          value={currentPwd}
+          onChangeText={setCurrentPwd}
+          secureTextEntry
+          autoCapitalize="none"
+          placeholder="••••••••"
+        />
+        <View style={{ height: 10 }} />
+        <Label>Nova senha</Label>
+        <Input
+          value={newPwd}
+          onChangeText={setNewPwd}
+          secureTextEntry
+          autoCapitalize="none"
+          placeholder="••••••••"
+        />
+        <View style={{ height: 10 }} />
+        <Label>Confirmar nova senha</Label>
+        <Input
+          value={confirmPwd}
+          onChangeText={setConfirmPwd}
+          secureTextEntry
+          autoCapitalize="none"
+          placeholder="••••••••"
+        />
+        {confirmPwd && confirmPwd !== newPwd && <FieldError>As senhas não coincidem.</FieldError>}
+
+        <View style={{ height: 14 }} />
+        <Button onPress={savePassword} loading={savingPwd} variant="dark">
+          Alterar senha
+        </Button>
+      </PanelCard>
+    </View>
+  );
+}
+
+function FinanceiroTab({
+  settings,
+  loading,
+}: {
+  settings: SettingsData | undefined;
+  loading: boolean;
+  queryClient: ReturnType<typeof useQueryClient>;
+}) {
+  const c = useColors();
+  const save = useSaveSettings();
+  const [valorPorRota, setValorPorRota] = useState('');
+  const [ciclo, setCiclo] = useState(30);
+  const [meta, setMeta] = useState('');
+  const [despesas, setDespesas] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (settings) {
+      setValorPorRota(settings.valorPorRota != null ? String(settings.valorPorRota) : '');
+      setCiclo(settings.cicloPagamentoDias ?? 30);
+      setMeta(settings.metaMensalRotas != null ? String(settings.metaMensalRotas) : '');
+      setDespesas(settings.despesasFixasMensais != null ? String(settings.despesasFixasMensais) : '');
+    }
+  }, [settings]);
+
+  const onSave = async () => {
+    setSaving(true);
+    await save({
+      valorPorRota: valorPorRota ? Number(valorPorRota) : null,
+      cicloPagamentoDias: ciclo,
+      metaMensalRotas: meta ? Number(meta) : null,
+      despesasFixasMensais: despesas ? Number(despesas) : null,
+    });
+    setSaving(false);
+  };
+
+  if (loading) return <PanelCard title="Controle de renda"><Muted>Carregando…</Muted></PanelCard>;
+
+  const previa =
+    valorPorRota && meta
+      ? formatBRL((Number(meta) * Number(valorPorRota) * ciclo) / 30)
+      : null;
+
+  return (
+    <PanelCard title="Controle de renda">
+      <Muted>
+        Configure sua remuneração por rota e despesas. As informações alimentam o gráfico financeiro do dashboard.
+      </Muted>
+
+      <View style={{ height: 14 }} />
+      <Label>Valor por rota (R$)</Label>
+      <Input
+        value={valorPorRota}
+        onChangeText={setValorPorRota}
+        placeholder="ex: 12.50"
+        keyboardType="decimal-pad"
+      />
+
+      <View style={{ height: 12 }} />
+      <Label>Ciclo de pagamento</Label>
+      <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
+        {CICLO_OPTS.map((opt) => {
+          const isActive = ciclo === opt.value;
+          return (
+            <Pressable
+              key={opt.value}
+              onPress={() => setCiclo(opt.value)}
+              style={({ pressed }) => [
+                chipStyles.chip,
+                {
+                  backgroundColor: isActive ? c.accentDim : c.surface2,
+                  borderColor: isActive ? c.accent : c.borderStrong,
+                  opacity: pressed ? 0.8 : 1,
+                },
+              ]}
+            >
+              <Text
+                style={{
+                  color: isActive ? c.accent : c.textMuted,
+                  fontFamily: 'Poppins_500Medium',
+                  fontSize: 12,
+                }}
+              >
+                {opt.label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      <View style={{ height: 14 }} />
+      <View style={{ backgroundColor: c.surface2, borderWidth: 1, borderColor: c.border, borderRadius: 10, padding: 12, gap: 10 }}>
+        <Text style={{ color: c.textMuted, fontFamily: 'Poppins_700Bold', fontSize: 10, letterSpacing: 0.6, textTransform: 'uppercase' }}>
+          Despesas e metas
+        </Text>
+        <View>
+          <Label>Meta mensal de rotas</Label>
+          <Input
+            value={meta}
+            onChangeText={setMeta}
+            placeholder="ex: 200"
+            keyboardType="number-pad"
+          />
+        </View>
+        <View>
+          <Label>Despesas fixas mensais (R$)</Label>
+          <Input
+            value={despesas}
+            onChangeText={setDespesas}
+            placeholder="ex: 450.00"
+            keyboardType="decimal-pad"
+          />
+        </View>
+      </View>
+
+      {previa && (
+        <View style={{ marginTop: 12, padding: 12, borderRadius: 10, backgroundColor: c.accentDim, borderWidth: 1, borderColor: 'rgba(212,82,26,0.25)' }}>
+          <Text style={{ color: c.accent, fontFamily: 'Poppins_600SemiBold', fontSize: 11, marginBottom: 4 }}>
+            Prévia por ciclo
+          </Text>
+          <Text style={{ color: c.textMuted, fontFamily: 'Poppins_400Regular', fontSize: 12, lineHeight: 18 }}>
+            Receita estimada: <Text style={{ fontFamily: 'Poppins_700Bold' }}>{previa}</Text>
+          </Text>
+        </View>
+      )}
+
+      <View style={{ height: 14 }} />
+      <Button onPress={onSave} loading={saving}>
+        Salvar financeiro
+      </Button>
+    </PanelCard>
+  );
+}
+
+function InstanciasTab({
+  settings,
+  loading,
+}: {
+  settings: SettingsData | undefined;
+  loading: boolean;
+  queryClient: ReturnType<typeof useQueryClient>;
+}) {
+  const c = useColors();
+  const save = useSaveSettings();
+  const [mode, setMode] = useState<SettingsData['instanceMode']>('builtin');
+  const [mapsKey, setMapsKey] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (settings) {
+      setMode(settings.instanceMode ?? 'builtin');
+      setMapsKey(settings.googleMapsApiKey ?? '');
+    }
+  }, [settings]);
+
+  const onSave = async () => {
+    setSaving(true);
+    await save({ instanceMode: mode, googleMapsApiKey: mapsKey || null });
+    setSaving(false);
+  };
+
+  if (loading) return <PanelCard title="Instância de geocodificação"><Muted>Carregando…</Muted></PanelCard>;
+
+  const opts = [
+    {
+      value: 'builtin' as const,
+      label: 'Padrão Gratuito',
+      badge: 'Grátis',
+      badgeColor: c.ok,
+      badgeBg: 'rgba(46,168,99,0.15)',
+      desc: 'Photon + Overpass + Nominatim (OSM) + BrasilAPI. Zero custo, sem chave.',
+      icon: 'globe-outline' as const,
+    },
+    {
+      value: 'geocodebr' as const,
+      label: 'GeocodeR BR',
+      badge: 'Local / CNEFE',
+      badgeColor: '#7c3aed',
+      badgeBg: 'rgba(124,58,237,0.12)',
+      desc: 'Microserviço R via CNEFE/IBGE. Precisão máxima para BR, roda local.',
+      icon: 'home-outline' as const,
+    },
+    {
+      value: 'googlemaps' as const,
+      label: 'Google Maps',
+      badge: 'Pay-per-use',
+      badgeColor: '#1565c0',
+      badgeBg: 'rgba(21,101,192,0.12)',
+      desc: 'Google Maps Geocoding. Alta precisão global. Requer chave paga.',
+      icon: 'location-outline' as const,
+    },
+  ];
+
+  const mapsKeyError =
+    mapsKey && !mapsKey.startsWith('AIza')
+      ? 'A chave deve começar com "AIza".'
+      : mapsKey && (mapsKey.length < 35 || mapsKey.length > 45)
+        ? 'Comprimento inválido.'
+        : null;
+
+  return (
+    <PanelCard title="Instância de geocodificação">
+      <Muted>Escolha o serviço usado para validar endereços.</Muted>
+
+      <View style={{ height: 12 }} />
+      <View style={{ gap: 8 }}>
+        {opts.map((opt) => {
+          const isActive = mode === opt.value;
+          return (
+            <Pressable
+              key={opt.value}
+              onPress={() => setMode(opt.value)}
+              style={({ pressed }) => [
+                {
+                  borderWidth: 2,
+                  borderColor: isActive ? c.accent : c.borderStrong,
+                  backgroundColor: isActive ? c.accentDim : c.surface2,
+                  borderRadius: 12,
+                  padding: 12,
+                  opacity: pressed ? 0.85 : 1,
+                  flexDirection: 'row',
+                  gap: 10,
+                  alignItems: 'flex-start',
+                },
+              ]}
+            >
+              <Ionicons
+                name={opt.icon}
+                size={20}
+                color={isActive ? c.accent : c.textMuted}
+                style={{ marginTop: 2 }}
+              />
+              <View style={{ flex: 1 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4, flexWrap: 'wrap' }}>
+                  <Text
+                    style={{
+                      color: isActive ? c.accent : c.text,
+                      fontFamily: 'Poppins_700Bold',
+                      fontSize: 13,
+                    }}
+                  >
+                    {opt.label}
+                  </Text>
+                  <View
+                    style={{
+                      paddingHorizontal: 6,
+                      paddingVertical: 1.5,
+                      borderRadius: 99,
+                      backgroundColor: opt.badgeBg,
+                    }}
+                  >
+                    <Text style={{ color: opt.badgeColor, fontFamily: 'Poppins_700Bold', fontSize: 9, letterSpacing: 0.4 }}>
+                      {opt.badge}
+                    </Text>
+                  </View>
+                </View>
+                <Text style={{ color: c.textFaint, fontFamily: 'Poppins_400Regular', fontSize: 11, lineHeight: 16 }}>
+                  {opt.desc}
+                </Text>
+              </View>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      {mode === 'googlemaps' && (
+        <View
+          style={{
+            marginTop: 12,
+            padding: 12,
+            borderRadius: 10,
+            backgroundColor: 'rgba(21,101,192,0.06)',
+            borderWidth: 1,
+            borderColor: 'rgba(21,101,192,0.25)',
+          }}
+        >
+          <Label>Chave de API do Google Maps</Label>
+          <Input
+            value={mapsKey}
+            onChangeText={setMapsKey}
+            secureTextEntry
+            autoCapitalize="none"
+            placeholder="AIzaSy..."
+            hasError={!!mapsKeyError}
+          />
+          {mapsKeyError && <FieldError>{mapsKeyError}</FieldError>}
+          <Text style={{ color: c.textFaint, fontFamily: 'Poppins_400Regular', fontSize: 10, marginTop: 6, lineHeight: 14 }}>
+            Habilite a Geocoding API no Google Cloud Console.
+          </Text>
+        </View>
+      )}
+
+      {mode === 'geocodebr' && (
+        <View
+          style={{
+            marginTop: 12,
+            padding: 12,
+            borderRadius: 10,
+            backgroundColor: 'rgba(124,58,237,0.06)',
+            borderWidth: 1,
+            borderColor: 'rgba(124,58,237,0.25)',
+          }}
+        >
+          <Text style={{ color: '#7c3aed', fontFamily: 'Poppins_700Bold', fontSize: 11, marginBottom: 6 }}>
+            Como ativar
+          </Text>
+          <Text style={{ color: c.textFaint, fontFamily: 'Poppins_400Regular', fontSize: 11, lineHeight: 17 }}>
+            O microserviço precisa rodar localmente na porta 8002. Defina{' '}
+            <Text style={{ fontFamily: 'Poppins_600SemiBold' }}>
+              GEOCODEBR_URL=http://localhost:8002
+            </Text>{' '}
+            no servidor.
+          </Text>
+        </View>
+      )}
+
+      <View style={{ height: 14 }} />
+      <Button onPress={onSave} loading={saving}>
+        Salvar instância
+      </Button>
+    </PanelCard>
+  );
+}
+
+function ParserTab({
+  settings,
+  loading,
+}: {
+  settings: SettingsData | undefined;
+  loading: boolean;
+  queryClient: ReturnType<typeof useQueryClient>;
+}) {
+  const c = useColors();
+  const save = useSaveSettings();
+  const [mode, setMode] = useState<'builtin' | 'ai'>('builtin');
+  const [aiProvider, setAiProvider] = useState('');
+  const [aiKey, setAiKey] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (settings) {
+      setMode(settings.parserMode ?? 'builtin');
+      setAiProvider(settings.aiProvider ?? '');
+      setAiKey(settings.aiApiKey ?? '');
+    }
+  }, [settings]);
+
+  const onSave = async () => {
+    setSaving(true);
+    await save({ parserMode: mode, aiProvider: aiProvider || null, aiApiKey: aiKey || null });
+    setSaving(false);
+  };
+
+  if (loading) return <PanelCard title="Configuração do parser"><Muted>Carregando…</Muted></PanelCard>;
+
+  const providers = [
+    { value: 'openai', label: 'OpenAI (GPT-4o mini)' },
+    { value: 'anthropic', label: 'Anthropic (Claude Haiku)' },
+    { value: 'google', label: 'Google (Gemini 1.5 Flash)' },
+  ];
+
+  return (
+    <PanelCard title="Configuração do parser">
+      <Label>Modo de processamento</Label>
+      <View style={{ gap: 8 }}>
+        {[
+          { value: 'builtin' as const, label: 'Parser embutido', desc: 'Algoritmo próprio, offline, zero custo.' },
+          { value: 'ai' as const, label: 'Inteligência Artificial', desc: 'Maior precisão usando IA externa.' },
+        ].map((opt) => {
+          const isActive = mode === opt.value;
+          return (
+            <Pressable
+              key={opt.value}
+              onPress={() => setMode(opt.value)}
+              style={({ pressed }) => [
+                {
+                  borderWidth: 1,
+                  borderColor: isActive ? c.accent : c.borderStrong,
+                  backgroundColor: isActive ? c.accentDim : c.surface2,
+                  borderRadius: 10,
+                  padding: 12,
+                  opacity: pressed ? 0.85 : 1,
+                },
+              ]}
+            >
+              <Text
+                style={{
+                  color: isActive ? c.accent : c.text,
+                  fontFamily: 'Poppins_600SemiBold',
+                  fontSize: 13,
+                  marginBottom: 3,
+                }}
+              >
+                {opt.label}
+              </Text>
+              <Text style={{ color: c.textFaint, fontFamily: 'Poppins_400Regular', fontSize: 11 }}>
+                {opt.desc}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      {mode === 'ai' && (
+        <View
+          style={{
+            marginTop: 12,
+            padding: 12,
+            borderRadius: 10,
+            backgroundColor: c.surface2,
+            borderWidth: 1,
+            borderColor: c.borderStrong,
+            gap: 10,
+          }}
+        >
+          <View>
+            <Label>Provedor de IA</Label>
+            <View style={{ gap: 6 }}>
+              {providers.map((p) => {
+                const isActive = aiProvider === p.value;
+                return (
+                  <Pressable
+                    key={p.value}
+                    onPress={() => setAiProvider(p.value)}
+                    style={({ pressed }) => [
+                      {
+                        borderWidth: 1,
+                        borderColor: isActive ? c.accent : c.borderStrong,
+                        backgroundColor: isActive ? c.accentDim : c.bg,
+                        borderRadius: 8,
+                        paddingHorizontal: 12,
+                        paddingVertical: 10,
+                        opacity: pressed ? 0.85 : 1,
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={{
+                        color: isActive ? c.accent : c.text,
+                        fontFamily: 'Poppins_500Medium',
+                        fontSize: 12,
+                      }}
+                    >
+                      {p.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+          <View>
+            <Label>Chave de API</Label>
+            <Input
+              value={aiKey}
+              onChangeText={setAiKey}
+              secureTextEntry
+              autoCapitalize="none"
+              placeholder="sk-... ou AIza..."
+            />
+          </View>
+        </View>
+      )}
+
+      <View style={{ height: 14 }} />
+      <Button onPress={onSave} loading={saving}>
+        Salvar parser
+      </Button>
+    </PanelCard>
+  );
+}
+
+function ToleranciaTab({
+  settings,
+  loading,
+}: {
+  settings: SettingsData | undefined;
+  loading: boolean;
+  queryClient: ReturnType<typeof useQueryClient>;
+}) {
+  const c = useColors();
+  const save = useSaveSettings();
+  const [tol, setTol] = useState(300);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (settings) setTol(settings.toleranceMeters ?? 300);
+  }, [settings]);
+
+  const onSave = async () => {
+    setSaving(true);
+    await save({ toleranceMeters: tol });
+    setSaving(false);
+  };
+
+  if (loading) return <PanelCard title="Tolerância de coordenadas"><Muted>Carregando…</Muted></PanelCard>;
+
+  const label =
+    tol <= 200 ? 'Rigoroso' : tol <= 800 ? 'Moderado' : tol <= 2000 ? 'Flexível' : 'Muito flexível';
+  const desc =
+    tol <= 200
+      ? 'Aceita apenas endereços muito próximos da coordenada. Mais nuances detectadas.'
+      : tol <= 800
+        ? 'Configuração balanceada para uso geral em áreas urbanas.'
+        : tol <= 2000
+          ? 'Aceita divergências maiores. Útil em áreas rurais ou GPS impreciso.'
+          : 'Muito permissivo. Pode reduzir a qualidade da validação.';
+
+  return (
+    <PanelCard title="Tolerância de coordenadas">
+      <Muted>
+        Distância máxima (metros) entre o GPS do arquivo e o endereço oficial para ser considerado correto.
+      </Muted>
+
+      <View style={{ height: 14 }} />
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Label>Distância de tolerância</Label>
+        <Text style={{ color: c.accent, fontFamily: 'Poppins_700Bold', fontSize: 18 }}>
+          {tol}m
+        </Text>
+      </View>
+
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
+        {TOLERANCE_PRESETS.map((p) => {
+          const isActive = tol === p;
+          return (
+            <Pressable
+              key={p}
+              onPress={() => setTol(p)}
+              style={({ pressed }) => [
+                chipStyles.chip,
+                {
+                  backgroundColor: isActive ? c.accentDim : c.surface2,
+                  borderColor: isActive ? c.accent : c.borderStrong,
+                  opacity: pressed ? 0.8 : 1,
+                },
+              ]}
+            >
+              <Text
+                style={{
+                  color: isActive ? c.accent : c.textMuted,
+                  fontFamily: 'Poppins_500Medium',
+                  fontSize: 12,
+                }}
+              >
+                {p}m
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      <View style={{ marginTop: 14, padding: 12, borderRadius: 10, backgroundColor: c.surface2, borderWidth: 1, borderColor: c.border }}>
+        <Text style={{ color: c.text, fontFamily: 'Poppins_600SemiBold', fontSize: 12, marginBottom: 4 }}>
+          {label}
+        </Text>
+        <Text style={{ color: c.textFaint, fontFamily: 'Poppins_400Regular', fontSize: 11, lineHeight: 16 }}>
+          {desc}
+        </Text>
+      </View>
+
+      <View style={{ height: 14 }} />
+      <Button onPress={onSave} loading={saving}>
+        Salvar tolerância
+      </Button>
+    </PanelCard>
+  );
+}
+
+function SobreTab() {
+  const c = useColors();
+  const apiUrl = getApiUrl();
+  const version = Constants.expoConfig?.version ?? '—';
+
+  const links = [
+    {
+      href: 'https://github.com/esmagafetos/Viax-Scout',
+      label: 'GitHub — esmagafetos/Viax-Scout',
+      sub: 'Código-fonte, issues e releases',
+      badge: 'Open Source',
+      badgeColor: '#16a34a',
+      badgeBg: 'rgba(22,163,74,0.12)',
+      icon: 'logo-github' as const,
+    },
+    {
+      href: 'https://github.com/esmagafetos/Viax-Scout/blob/main/README.md',
+      label: 'Documentação',
+      sub: 'Guia de instalação e uso',
+      badge: 'Docs',
+      badgeColor: '#1d4ed8',
+      badgeBg: 'rgba(29,78,216,0.12)',
+      icon: 'document-text-outline' as const,
+    },
+    {
+      href: 'https://github.com/esmagafetos/Viax-Scout/issues',
+      label: 'Issues & Suporte',
+      sub: 'Reporte bugs ou tire dúvidas',
+      badge: 'Issues',
+      badgeColor: '#b45309',
+      badgeBg: 'rgba(180,83,9,0.12)',
+      icon: 'alert-circle-outline' as const,
+    },
+    {
+      href: 'https://github.com/esmagafetos/Viax-Scout/releases',
+      label: 'Releases & Changelog',
+      sub: 'Histórico de versões',
+      badge: 'v8.0',
+      badgeColor: '#d4521a',
+      badgeBg: 'rgba(212,82,26,0.12)',
+      icon: 'pricetag-outline' as const,
+    },
+  ];
+
+  return (
+    <View style={{ gap: 12 }}>
+      <View
+        style={{
+          borderRadius: 14,
+          padding: 18,
+          backgroundColor: c.surface,
+          borderWidth: 1,
+          borderColor: c.borderStrong,
+        }}
+      >
+        <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8 }}>
+          <Text style={{ color: c.text, fontFamily: 'Poppins_700Bold', fontSize: 22, letterSpacing: -0.5 }}>
+            ViaX<Text style={{ color: c.textFaint }}>:</Text>Trace
+          </Text>
+          <View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5, backgroundColor: c.accentDim }}>
+            <Text style={{ color: c.accent, fontFamily: 'Poppins_700Bold', fontSize: 9, letterSpacing: 0.5 }}>
+              v8.0
+            </Text>
+          </View>
+        </View>
+        <Text style={{ color: c.textMuted, fontFamily: 'Poppins_400Regular', fontSize: 12, marginTop: 6, lineHeight: 18 }}>
+          Auditoria de rotas logísticas que valida endereços contra coordenadas GPS reais via geocodificação reversa.
+        </Text>
+      </View>
+
+      <PanelCard title="Repositório & Documentação">
+        <View style={{ gap: 8 }}>
+          {links.map((l) => (
+            <Pressable
+              key={l.href}
+              onPress={() => Linking.openURL(l.href)}
+              style={({ pressed }) => [
+                {
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 10,
+                  padding: 11,
+                  borderRadius: 10,
+                  backgroundColor: c.surface2,
+                  borderWidth: 1,
+                  borderColor: c.border,
+                  opacity: pressed ? 0.85 : 1,
+                },
+              ]}
+            >
+              <Ionicons name={l.icon} size={16} color={c.textMuted} />
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: c.text, fontFamily: 'Poppins_600SemiBold', fontSize: 12 }}>{l.label}</Text>
+                <Text style={{ color: c.textFaint, fontFamily: 'Poppins_400Regular', fontSize: 11, marginTop: 2 }}>
+                  {l.sub}
+                </Text>
+              </View>
+              <View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 99, backgroundColor: l.badgeBg }}>
+                <Text style={{ color: l.badgeColor, fontFamily: 'Poppins_700Bold', fontSize: 9, letterSpacing: 0.4 }}>
+                  {l.badge}
+                </Text>
+              </View>
+              <Ionicons name="open-outline" size={14} color={c.textFaint} />
+            </Pressable>
+          ))}
+        </View>
+      </PanelCard>
+
+      <PanelCard title="Servidor configurado">
+        <Text style={{ color: c.textMuted, fontFamily: 'Poppins_500Medium', fontSize: 12 }} numberOfLines={1}>
+          {apiUrl || 'Não configurado'}
+        </Text>
+      </PanelCard>
+
+      <PanelCard title="Versão & Licença">
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 14 }}>
+          <View style={{ minWidth: 120 }}>
+            <Text style={{ color: c.textFaint, fontFamily: 'Poppins_700Bold', fontSize: 9, letterSpacing: 0.6, textTransform: 'uppercase' }}>
+              App
+            </Text>
+            <Text style={{ color: c.text, fontFamily: 'Poppins_600SemiBold', fontSize: 13, marginTop: 2 }}>
+              v{version}
+            </Text>
+          </View>
+          <View style={{ minWidth: 120 }}>
+            <Text style={{ color: c.textFaint, fontFamily: 'Poppins_700Bold', fontSize: 9, letterSpacing: 0.6, textTransform: 'uppercase' }}>
+              Licença
+            </Text>
+            <Text style={{ color: c.text, fontFamily: 'Poppins_600SemiBold', fontSize: 13, marginTop: 2 }}>
+              MIT License
+            </Text>
+          </View>
+        </View>
+      </PanelCard>
+    </View>
+  );
+}
+
+/* ─────────────── styles ─────────────── */
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  scroll: { padding: 18, gap: 12 },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10 },
+  scroll: { padding: 16, gap: 14, paddingBottom: 32 },
+  tabBar: {
+    borderBottomWidth: 1,
+  },
+  tabBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderBottomWidth: 2,
+    marginBottom: -1,
+  },
   logout: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -124,6 +1048,44 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 99,
     paddingVertical: 13,
-    marginTop: 8,
+    marginTop: 4,
+  },
+});
+
+const panel = StyleSheet.create({
+  wrap: { borderRadius: 14, borderWidth: 1, overflow: 'hidden' },
+  head: {
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    borderBottomWidth: 1,
+  },
+  headLabel: {
+    fontFamily: 'Poppins_700Bold',
+    fontSize: 10,
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+  },
+  body: { padding: 14 },
+});
+
+const avatarStyles = StyleSheet.create({
+  box: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    overflow: 'hidden',
+  },
+  img: { width: '100%', height: '100%' },
+});
+
+const chipStyles = StyleSheet.create({
+  chip: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 99,
+    borderWidth: 1,
   },
 });
