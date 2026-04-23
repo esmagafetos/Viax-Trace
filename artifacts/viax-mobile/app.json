@@ -2,7 +2,7 @@
   "expo": {
     "name": "ViaX:Trace",
     "slug": "viax-trace",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "viaxtrace",
@@ -15,7 +15,7 @@
     },
     "android": {
       "package": "com.viax.trace",
-      "versionCode": 1,
+      "versionCode": 2,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#1a0e08"
