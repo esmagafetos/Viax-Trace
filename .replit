@@ -18,39 +18,7 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "API Server"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "Start application"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
 args = "Mobile Dev Server"
-
-[[workflows.workflow]]
-name = "API Server"
-author = "agent"
-
-[workflows.workflow.metadata]
-outputType = "console"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "PORT=8080 pnpm --filter @workspace/api-server run dev"
-waitForPort = 8080
-
-[[workflows.workflow]]
-name = "Start application"
-author = "agent"
-
-[workflows.workflow.metadata]
-outputType = "webview"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "PORT=5173 BASE_PATH=/ pnpm --filter @workspace/viax-scout run dev"
-waitForPort = 5173
 
 [[workflows.workflow]]
 name = "Mobile Dev Server"
@@ -61,7 +29,7 @@ outputType = "console"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "cd artifacts/viax-mobile && EXPO_NO_TELEMETRY=1 RCT_METRO_PORT=8000 pnpm exec expo start --tunnel --port 8000 --non-interactive"
+args = "cd artifacts/viax-mobile && EXPO_NO_TELEMETRY=1 RCT_METRO_PORT=8000 pnpm exec expo start --tunnel --port 8000"
 waitForPort = 8000
 
 [agent]

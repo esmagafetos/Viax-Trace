@@ -15,7 +15,7 @@
 
 **Valide planilhas XLSX/CSV contra coordenadas GPS reais em tempo real**
 
-[Funcionalidades](#-funcionalidades) · [Arquitetura](#-arquitetura) · [Instalação](#-instalação) · [Configuração](#️-configuração) · [Screenshots](#-screenshots) · [Contribuindo](#-contribuindo)
+[Funcionalidades](#-funcionalidades) · [Arquitetura](#-arquitetura) · [Instalação](#-instalação) · [App Android](#-app-nativo-android) · [Configuração](#️-configuração) · [Screenshots](#-screenshots) · [Contribuindo](#-contribuindo)
 
 </div>
 
@@ -247,6 +247,59 @@ pnpm --filter @workspace/api-server run build
 
 ---
 
+## App Nativo Android
+
+Além do frontend web, o ViaX:Trace conta com um **aplicativo Android nativo** (`artifacts/viax-mobile`) construído em React Native + Expo. Ele oferece a mesma experiência do web (login, dashboard, processamento de planilhas, histórico, configurações) e adiciona uma seção exclusiva **"Configurar servidor"** para apontar o app para uma API rodando localmente no próprio celular via **Termux**.
+
+### Por que existe
+O backend pode rodar dentro do Termux no mesmo aparelho (ou em outro celular/PC da rede). O app nativo permite ao usuário operar o sistema **inteiramente offline** ou em rede privada, sem depender de servidor remoto.
+
+### Como instalar o APK (usuário final)
+1. Acesse a página de [Releases](https://github.com/esmagafetos/Viax-Scout/releases) e baixe o `viax-trace-vX.Y.Z.apk` mais recente.
+2. No Android, habilite **"Instalar de fontes desconhecidas"** para o app de arquivos/navegador.
+3. Toque no APK baixado e confirme a instalação.
+4. Abra o app, faça login (mesma conta do web) e na primeira execução vá em **Setup → Configurar servidor** para colar a URL do seu servidor Termux (ex.: `http://127.0.0.1:8080` ou `http://192.168.0.10:8080`).
+
+### Como rodar em modo de desenvolvimento
+Pré-requisito: o app **Expo Go** instalado no seu Android (Play Store).
+
+```bash
+# A partir da raiz do monorepo
+pnpm --filter @workspace/viax-mobile run start
+# Ou já com tunnel (necessário se o celular estiver em outra rede)
+cd artifacts/viax-mobile && pnpm exec expo start --tunnel
+```
+
+Escaneie o QR code que aparece no terminal com o Expo Go. Hot reload funciona instantaneamente.
+
+### Build de produção (EAS)
+O CI publica automaticamente um APK de release a cada push em `main` via GitHub Actions:
+
+- Workflow: `.github/workflows/mobile-release.yml`
+- Profile: `production` (definido em `artifacts/viax-mobile/eas.json`)
+- Versionamento: `versionCode` é incrementado automaticamente pelo EAS (`appVersionSource: remote`)
+- Publica o APK em uma GitHub Release com notas de build
+
+Para disparar uma build manualmente:
+```bash
+cd artifacts/viax-mobile
+pnpm exec eas build --platform android --profile production
+```
+
+> Requer o segredo `EXPO_TOKEN` configurado no repositório (Settings → Secrets and variables → Actions).
+
+### Stack do app nativo
+| Camada | Tecnologia |
+|---|---|
+| Framework | Expo SDK 54 + React Native 0.81 |
+| Roteamento | expo-router 6 (typed routes) |
+| Storage seguro | expo-secure-store (URL do servidor) |
+| Data fetching | TanStack Query 5 |
+| Tipografia | Poppins (`@expo-google-fonts/poppins`) |
+| Build & deploy | EAS Build + GitHub Actions |
+
+---
+
 ## Configuração
 
 Crie um arquivo `.env` na raiz do projeto (ou copie `.env.example`):
@@ -349,6 +402,9 @@ pnpm --filter @workspace/db run push
 | **Geocod. global** | Photon + Overpass + Nominatim | — |
 | **GeocodeR BR** | geocodebr (IPEA) + Plumber + R | 4.4+ |
 | API codegen | Orval | — |
+| **App Android** | Expo SDK + React Native | 54 / 0.81 |
+| Roteamento mobile | expo-router | 6 |
+| Build mobile | EAS Build + GitHub Actions | — |
 
 ---
 
