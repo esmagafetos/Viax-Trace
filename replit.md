@@ -17,6 +17,7 @@ pnpm workspace monorepo with React+Vite frontend and Express API backend.
 - Geocoder: coordinate-first validation — reverse geocode spreadsheet GPS with **Photon (primary) → Overpass API (secondary, multi-mirror, radius 40m→90m) → Nominatim (last resort)**; forward geocoding also Photon-first. Google Maps available as premium option via `instanceMode: "googlemaps"`.
 - Process: SSE-based XLSX/CSV upload (fetch + ReadableStream), max 500 addresses, 10MB file limit
 - Avatar: stored as base64 data URL in DB, uploaded via multipart POST
+- **Mobile (Expo SDK 54, expo-router)**: paridade 1:1 com a web — Docs page completa, Toast global (`<ToastProvider>` em `_layout.tsx`), primitivos `Progress`/`Skeleton`/`Accordion`/`SectionCard`, tokens `okDim`/`destructive`/`Shadows`, export CSV real (expo-file-system/legacy + expo-sharing) em Process e Tool, avatar upload via `expo-image-picker` → multipart `/api/users/avatar`
 
 ## Branding
 

@@ -9,6 +9,11 @@ export const Colors = {
     accent: '#d4521a',
     accentDim: 'rgba(212,82,26,0.12)',
     ok: '#1a7a4a',
+    okDim: 'rgba(26,122,74,0.10)',
+    warn: '#b45309',
+    warnDim: 'rgba(180,83,9,0.10)',
+    destructive: '#dc2626',
+    destructiveDim: 'rgba(220,38,38,0.10)',
     border: 'rgba(26,25,23,0.1)',
     borderStrong: 'rgba(26,25,23,0.18)',
   },
@@ -22,6 +27,11 @@ export const Colors = {
     accent: '#e8703a',
     accentDim: 'rgba(232,112,58,0.13)',
     ok: '#2ea863',
+    okDim: 'rgba(46,168,99,0.13)',
+    warn: '#f59e0b',
+    warnDim: 'rgba(245,158,11,0.13)',
+    destructive: '#ef4444',
+    destructiveDim: 'rgba(239,68,68,0.13)',
     border: 'rgba(240,237,232,0.08)',
     borderStrong: 'rgba(240,237,232,0.14)',
   },
@@ -36,5 +46,30 @@ export const Radius = {
   xl: 20,
   pill: 99,
 };
+
+/** Dual-layer-ish shadow tokens that approximate the web's CSS box-shadows. */
+export const Shadows = {
+  sm: {
+    shadowColor: '#000',
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 1 },
+    elevation: 2,
+  },
+  md: {
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
+  },
+  lg: {
+    shadowColor: '#000',
+    shadowOpacity: 0.12,
+    shadowRadius: 32,
+    shadowOffset: { width: 0, height: 12 },
+    elevation: 8,
+  },
+} as const;
 
 export type Theme = typeof Colors.light;

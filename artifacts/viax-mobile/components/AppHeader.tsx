@@ -223,7 +223,7 @@ export function AppHeader() {
                   color={c.text}
                   onPress={() => {
                     closeMenu();
-                    router.push('/(tabs)/settings' as any);
+                    router.push('/docs' as any);
                   }}
                 />
 

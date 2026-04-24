@@ -18,6 +18,8 @@ import { AppHeader } from '@/components/AppHeader';
 import { useResponsive } from '@/lib/responsive';
 import { apiRequest, getApiUrl } from '@/lib/api';
 import { formatMs } from '@/lib/format';
+import { buildCsv, shareCsv } from '@/lib/csv';
+import { useToast } from '@/components/Toast';
 
 type ResultRow = {
   linha: number;
@@ -61,6 +63,7 @@ const TIPO_MAP: Record<string, { label: string; color: string }> = {
 
 export default function ProcessScreen() {
   const c = useColors();
+  const toast = useToast();
   const { rs } = useResponsive();
   const [file, setFile] = useState<DocumentPicker.DocumentPickerAsset | null>(null);
   const [steps, setSteps] = useState<string[]>([]);
@@ -198,12 +201,35 @@ export default function ProcessScreen() {
       activeFilter === 'all' ? true : activeFilter === 'nuance' ? r.is_nuance : !r.is_nuance,
     ) ?? [];
 
-  const exportCsv = () => {
+  const exportCsv = async () => {
     if (!result) return;
-    Alert.alert(
-      'Exportar CSV',
-      'A exportação de CSV no aplicativo móvel será habilitada em breve. Use a versão web para baixar o arquivo.',
-    );
+    try {
+      const header = [
+        '#',
+        'Endereço Original',
+        'Rua Extraída',
+        'Rua Oficial',
+        'Similaridade',
+        'Nuance',
+        'Motivo',
+        'POI',
+      ];
+      const rows = result.detalhes.map((r) => [
+        r.linha,
+        r.endereco_original,
+        r.nome_rua_extraido ?? '',
+        r.nome_rua_oficial ?? '',
+        r.similaridade !== null ? (r.similaridade * 100).toFixed(1) + '%' : 'N/A',
+        r.is_nuance ? 'Sim' : 'Não',
+        r.motivo,
+        r.poi_estruturado ?? '',
+      ]);
+      const csv = buildCsv(header, rows);
+      const baseName = (file?.name ?? 'resultado').replace(/\.(xlsx|csv)$/i, '');
+      await shareCsv(`viax-${baseName}.csv`, csv);
+    } catch (e: any) {
+      toast.showToast(e?.message ?? 'Falha ao exportar CSV.');
+    }
   };
 
   return (

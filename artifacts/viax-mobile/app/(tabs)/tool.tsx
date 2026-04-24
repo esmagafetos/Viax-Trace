@@ -15,6 +15,8 @@ import { useColors } from '@/hooks/useColors';
 import { AppHeader } from '@/components/AppHeader';
 import { useResponsive } from '@/lib/responsive';
 import { apiRequest, getApiUrl } from '@/lib/api';
+import { buildCsv, shareCsv } from '@/lib/csv';
+import { useToast } from '@/components/Toast';
 
 type CondoSummary = {
   id: string;
@@ -69,6 +71,7 @@ const CLASS_LABEL: Record<Classificacao, string> = {
 
 export default function ToolScreen() {
   const c = useColors();
+  const toast = useToast();
   const { rs } = useResponsive();
   const [condos, setCondos] = useState<CondoSummary[]>([]);
   const [selectedId, setSelectedId] = useState<string>('bougainville-iii');
@@ -194,12 +197,26 @@ export default function ToolScreen() {
       activeFilter === 'all' ? true : r.classificacao === activeFilter,
     ) ?? [];
 
-  const exportCsv = () => {
+  const exportCsv = async () => {
     if (!result) return;
-    Alert.alert(
-      'Exportar CSV',
-      'A exportação de CSV no aplicativo móvel será habilitada em breve. Use a versão web para baixar o arquivo.',
-    );
+    try {
+      const header = ['Ordem', 'Linha', 'Quadra', 'Lote', 'Classificação', 'Endereço', 'Instrução', 'Motivo'];
+      const rows = result.detalhes.map((r) => [
+        r.ordem ?? '',
+        r.linha,
+        r.quadra ?? '',
+        r.lote ?? '',
+        CLASS_LABEL[r.classificacao],
+        r.enderecoOriginal,
+        r.instrucao ?? '',
+        r.motivo,
+      ]);
+      const csv = buildCsv(header, rows);
+      const baseName = (file?.name ?? 'rota').replace(/\.(xlsx|csv)$/i, '');
+      await shareCsv(`viax-${result.condominio.id}-${baseName}.csv`, csv);
+    } catch (e: any) {
+      toast.showToast(e?.message ?? 'Falha ao exportar CSV.');
+    }
   };
 
   return (

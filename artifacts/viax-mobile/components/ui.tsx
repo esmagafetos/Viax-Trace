@@ -1,20 +1,29 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Animated,
+  Easing,
+  LayoutAnimation,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
   TextInput,
   TextInputProps,
+  UIManager,
   View,
   ViewProps,
   ViewStyle,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useColors } from '@/hooks/useColors';
-import { Radius } from '@/constants/colors';
+import { Radius, Shadows } from '@/constants/colors';
 import { useTheme } from '@/lib/theme';
 import { useResponsive } from '@/lib/responsive';
+
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 /** Card with the same warm-paper surface and 14px radius used on the web. */
 export function Card({ style, children, ...rest }: ViewProps) {
@@ -350,3 +359,203 @@ export function FieldError({ children }: { children: React.ReactNode }) {
 export const screen = StyleSheet.create({
   root: { flex: 1, padding: 18, gap: 16 },
 });
+
+/** Linear progress bar — 1:1 with the web's animated bars. */
+export function Progress({ value, tone = 'accent' }: { value: number; tone?: 'accent' | 'ok' | 'warn' }) {
+  const c = useColors();
+  const pct = Math.max(0, Math.min(1, value));
+  const fg = tone === 'ok' ? c.ok : tone === 'warn' ? c.warn : c.accent;
+  return (
+    <View
+      style={{
+        height: 6,
+        borderRadius: 99,
+        backgroundColor: c.surface2,
+        overflow: 'hidden',
+      }}
+    >
+      <View
+        style={{
+          width: `${pct * 100}%`,
+          height: '100%',
+          borderRadius: 99,
+          backgroundColor: fg,
+        }}
+      />
+    </View>
+  );
+}
+
+/** Looping skeleton placeholder. */
+export function Skeleton({ height = 16, width, radius = 6, style }: { height?: number; width?: number | string; radius?: number; style?: ViewStyle }) {
+  const c = useColors();
+  const opacity = useRef(new Animated.Value(0.4)).current;
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(opacity, { toValue: 0.85, duration: 700, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+        Animated.timing(opacity, { toValue: 0.4, duration: 700, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [opacity]);
+  return (
+    <Animated.View
+      style={[
+        {
+          height,
+          width: (width ?? '100%') as any,
+          borderRadius: radius,
+          backgroundColor: c.surface2,
+          opacity,
+        },
+        style,
+      ]}
+    />
+  );
+}
+
+/** Simple uncontrolled accordion item — used by the Docs FAQ. */
+export function AccordionItem({
+  title,
+  children,
+  defaultOpen = false,
+}: {
+  title: string;
+  children: React.ReactNode;
+  defaultOpen?: boolean;
+}) {
+  const c = useColors();
+  const { rs } = useResponsive();
+  const [open, setOpen] = useState(defaultOpen);
+  const rot = useRef(new Animated.Value(defaultOpen ? 1 : 0)).current;
+
+  const toggle = () => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    Animated.timing(rot, { toValue: open ? 0 : 1, duration: 180, useNativeDriver: true }).start();
+    setOpen((v) => !v);
+  };
+
+  const rotate = rot.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '45deg'] });
+
+  return (
+    <View style={{ borderBottomWidth: 1, borderBottomColor: c.border }}>
+      <Pressable
+        onPress={toggle}
+        style={{
+          paddingVertical: rs(14),
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 12,
+        }}
+      >
+        <Text
+          style={{
+            flex: 1,
+            color: c.text,
+            fontFamily: 'Poppins_600SemiBold',
+            fontSize: rs(13.5),
+            lineHeight: rs(19),
+          }}
+        >
+          {title}
+        </Text>
+        <Animated.View style={{ transform: [{ rotate }] }}>
+          <Ionicons name="add" size={18} color={c.textFaint} />
+        </Animated.View>
+      </Pressable>
+      {open && (
+        <View style={{ paddingBottom: rs(14) }}>
+          {typeof children === 'string' ? (
+            <Text
+              style={{
+                color: c.textMuted,
+                fontFamily: 'Poppins_400Regular',
+                fontSize: rs(12.5),
+                lineHeight: rs(20),
+              }}
+            >
+              {children}
+            </Text>
+          ) : (
+            children
+          )}
+        </View>
+      )}
+    </View>
+  );
+}
+
+/** Section card with title + chevron-style header — used in Docs and Settings. */
+export function SectionCard({
+  icon,
+  title,
+  children,
+  style,
+}: {
+  icon?: keyof typeof Ionicons.glyphMap;
+  title: string;
+  children: React.ReactNode;
+  style?: ViewStyle;
+}) {
+  const c = useColors();
+  const { rs } = useResponsive();
+  return (
+    <View
+      style={[
+        {
+          backgroundColor: c.surface,
+          borderColor: c.borderStrong,
+          borderWidth: 1,
+          borderRadius: Radius.lg,
+          overflow: 'hidden',
+          ...Shadows.sm,
+        },
+        style,
+      ]}
+    >
+      <View
+        style={{
+          paddingHorizontal: rs(16),
+          paddingVertical: rs(12),
+          borderBottomWidth: 1,
+          borderBottomColor: c.border,
+          backgroundColor: c.surface2,
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 10,
+        }}
+      >
+        {icon && (
+          <View
+            style={{
+              width: rs(32),
+              height: rs(32),
+              borderRadius: 8,
+              backgroundColor: c.accentDim,
+              borderColor: 'rgba(212,82,26,0.2)',
+              borderWidth: 1,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Ionicons name={icon} size={rs(16)} color={c.accent} />
+          </View>
+        )}
+        <Text
+          style={{
+            color: c.text,
+            fontFamily: 'Poppins_700Bold',
+            fontSize: rs(14),
+            letterSpacing: -0.2,
+          }}
+        >
+          {title}
+        </Text>
+      </View>
+      <View style={{ padding: rs(16) }}>{children}</View>
+    </View>
+  );
+}

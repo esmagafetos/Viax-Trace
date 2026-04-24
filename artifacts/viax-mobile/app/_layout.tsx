@@ -16,6 +16,7 @@ import { AuthProvider } from '@/lib/auth';
 import { initApiUrl } from '@/lib/api';
 import { ThemeProvider, useTheme } from '@/lib/theme';
 import { useColors } from '@/hooks/useColors';
+import { ToastProvider } from '@/components/Toast';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -41,6 +42,7 @@ function ThemedStack() {
         <Stack.Screen name="index" />
         <Stack.Screen name="register" />
         <Stack.Screen name="setup" />
+        <Stack.Screen name="docs" />
         <Stack.Screen name="(tabs)" />
       </Stack>
     </>
@@ -74,7 +76,9 @@ export default function RootLayout() {
         <ThemeProvider>
           <QueryClientProvider client={queryClient}>
             <AuthProvider>
-              <ThemedStack />
+              <ToastProvider>
+                <ThemedStack />
+              </ToastProvider>
             </AuthProvider>
           </QueryClientProvider>
         </ThemeProvider>

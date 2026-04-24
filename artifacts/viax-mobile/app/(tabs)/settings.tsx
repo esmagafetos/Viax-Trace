@@ -15,11 +15,13 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
+import * as ImagePicker from 'expo-image-picker';
 import { useColors } from '@/hooks/useColors';
 import { useAuth } from '@/lib/auth';
-import { apiRequest, getApiUrl } from '@/lib/api';
+import { apiRequest, getApiUrl, uploadAvatar } from '@/lib/api';
 import { AppHeader } from '@/components/AppHeader';
 import { H1, Muted, Label, Input, Button, FieldError } from '@/components/ui';
+import { useToast } from '@/components/Toast';
 import { formatBRL } from '@/lib/format';
 
 type Tab = 'perfil' | 'financeiro' | 'instancias' | 'parser' | 'tolerancia' | 'sobre';
@@ -185,6 +187,7 @@ function useSaveSettings() {
 
 function PerfilTab({ user, onUpdated }: { user: any; onUpdated: () => Promise<void> }) {
   const c = useColors();
+  const toast = useToast();
   const [name, setName] = useState(user?.name ?? '');
   const [birthDate, setBirthDate] = useState(user?.birthDate ?? '');
   const [currentPwd, setCurrentPwd] = useState('');
@@ -192,6 +195,35 @@ function PerfilTab({ user, onUpdated }: { user: any; onUpdated: () => Promise<vo
   const [confirmPwd, setConfirmPwd] = useState('');
   const [savingProfile, setSavingProfile] = useState(false);
   const [savingPwd, setSavingPwd] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+
+  const pickAvatar = async () => {
+    try {
+      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!perm.granted) {
+        toast.showToast('Permissão da galeria negada.');
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'] as unknown as ImagePicker.MediaType[],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.85,
+      });
+      if (result.canceled || !result.assets?.[0]) return;
+      const asset = result.assets[0];
+      setUploadingAvatar(true);
+      const mime = asset.mimeType ?? 'image/jpeg';
+      const ext = mime.split('/')[1] ?? 'jpg';
+      await uploadAvatar(asset.uri, mime, `avatar.${ext}`);
+      await onUpdated();
+      toast.showToast('Foto atualizada.', 'success');
+    } catch (e: any) {
+      toast.showToast(e?.message ?? 'Falha ao enviar foto.');
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
 
   useEffect(() => {
     setName(user?.name ?? '');
@@ -254,8 +286,35 @@ function PerfilTab({ user, onUpdated }: { user: any; onUpdated: () => Promise<vo
               Foto de perfil
             </Text>
             <Text style={{ color: c.textFaint, fontFamily: 'Poppins_400Regular', fontSize: 11, marginTop: 4, lineHeight: 16 }}>
-              Atualize sua foto pelo navegador (web) — em breve diretamente no app.
+              Toque em "Atualizar" para escolher uma imagem da galeria.
             </Text>
+            <View style={{ height: 8 }} />
+            <Pressable
+              onPress={pickAvatar}
+              disabled={uploadingAvatar}
+              style={({ pressed }) => ({
+                alignSelf: 'flex-start',
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 6,
+                paddingHorizontal: 12,
+                paddingVertical: 7,
+                borderRadius: 99,
+                backgroundColor: c.surface2,
+                borderWidth: 1,
+                borderColor: c.borderStrong,
+                opacity: uploadingAvatar ? 0.6 : pressed ? 0.85 : 1,
+              })}
+            >
+              <Ionicons
+                name={uploadingAvatar ? 'cloud-upload-outline' : 'image-outline'}
+                size={14}
+                color={c.text}
+              />
+              <Text style={{ color: c.text, fontFamily: 'Poppins_600SemiBold', fontSize: 12 }}>
+                {uploadingAvatar ? 'Enviando…' : 'Atualizar foto'}
+              </Text>
+            </Pressable>
           </View>
         </View>
 

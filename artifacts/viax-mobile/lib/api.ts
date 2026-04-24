@@ -116,6 +116,48 @@ export async function clearSession(): Promise<void> {
   await setSession(null);
 }
 
+/** Uploads an avatar image via multipart/form-data to /api/users/avatar. */
+export async function uploadAvatar(localUri: string, mimeType: string, fileName: string): Promise<{ avatarUrl: string }> {
+  const base = getApiUrl();
+  if (!base) throw new Error('Servidor não configurado.');
+  const cookie = await getSession();
+
+  const form = new FormData();
+  // React Native FormData accepts { uri, name, type } as a "file"
+  form.append('avatar', {
+    uri: localUri,
+    name: fileName,
+    type: mimeType,
+  } as unknown as Blob);
+
+  const res = await fetch(`${base}/api/users/avatar`, {
+    method: 'POST',
+    headers: {
+      ...(cookie ? { Cookie: cookie } : {}),
+      Accept: 'application/json',
+      // NB: do NOT set Content-Type — RN auto-sets the multipart boundary
+    },
+    body: form as any,
+  });
+
+  const setCookie = res.headers.get('set-cookie');
+  if (setCookie) {
+    const sid = setCookie.split(';')[0];
+    await setSession(sid);
+  }
+
+  const text = await res.text();
+  const data = text ? safeJson(text) : null;
+  if (!res.ok) {
+    const msg =
+      (data && typeof data === 'object' && 'message' in data && (data as any).message) ||
+      (data && typeof data === 'object' && 'error' in data && (data as any).error) ||
+      `HTTP ${res.status}`;
+    throw new Error(String(msg));
+  }
+  return data as { avatarUrl: string };
+}
+
 function safeJson(text: string): unknown {
   try {
     return JSON.parse(text);
