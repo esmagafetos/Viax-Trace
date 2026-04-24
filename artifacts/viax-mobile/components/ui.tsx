@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   Animated,
   Easing,
   LayoutAnimation,
+  Modal as RNModal,
   Platform,
   Pressable,
   StyleSheet,
@@ -16,6 +16,7 @@ import {
   ViewStyle,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { useColors } from '@/hooks/useColors';
 import { Radius, Shadows } from '@/constants/colors';
 import { useTheme } from '@/lib/theme';
@@ -171,6 +172,16 @@ export function Input({ hasError, rightSlot, style, ...props }: InputBoxProps) {
             fontFamily: 'Poppins_400Regular',
             fontSize: rs(14),
           },
+          // Outer "ring" glow on focus — mirrors web `box-shadow: 0 0 0 3px var(--accent-dim)`
+          focused
+            ? ({
+                shadowColor: c.accent,
+                shadowOpacity: 0.35,
+                shadowRadius: 6,
+                shadowOffset: { width: 0, height: 0 },
+                elevation: 3,
+              } as ViewStyle)
+            : null,
           style,
         ]}
       />
@@ -294,7 +305,16 @@ export function Button({ children, onPress, variant = 'primary', loading, disabl
       ]}
     >
       {loading ? (
-        <ActivityIndicator color={fg} />
+        <>
+          <SpinnerRing
+            size={rs(15)}
+            color={fg}
+            trackColor={isPrimary || isDark ? 'rgba(255,255,255,0.3)' : c.borderStrong}
+          />
+          <Text style={{ color: fg, fontFamily: 'Poppins_600SemiBold', fontSize: rs(14) }}>
+            {typeof children === 'string' && children.toLowerCase().startsWith('entrar') ? 'Entrando…' : 'Aguarde…'}
+          </Text>
+        </>
       ) : (
         <>
           <Text style={{ color: fg, fontFamily: 'Poppins_600SemiBold', fontSize: rs(14) }}>{children}</Text>
@@ -302,6 +322,42 @@ export function Button({ children, onPress, variant = 'primary', loading, disabl
         </>
       )}
     </Pressable>
+  );
+}
+
+/** Rotating ring used in loading states — equivalent to the web `animate-spin-ring`. */
+export function SpinnerRing({
+  size = 15,
+  color = '#fff',
+  trackColor = 'rgba(255,255,255,0.3)',
+  borderWidth = 2,
+}: {
+  size?: number;
+  color?: string;
+  trackColor?: string;
+  borderWidth?: number;
+}) {
+  const spin = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.timing(spin, { toValue: 1, duration: 800, easing: Easing.linear, useNativeDriver: true }),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [spin]);
+  const rotate = spin.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
+  return (
+    <Animated.View
+      style={{
+        width: size,
+        height: size,
+        borderRadius: size / 2,
+        borderWidth,
+        borderColor: trackColor,
+        borderTopColor: color,
+        transform: [{ rotate }],
+      }}
+    />
   );
 }
 
@@ -485,6 +541,285 @@ export function AccordionItem({
         </View>
       )}
     </View>
+  );
+}
+
+/** Continuous touch-driven slider — mirrors the web `<input type="range">` for tolerance. */
+export function Slider({
+  min,
+  max,
+  step = 1,
+  value,
+  onChange,
+}: {
+  min: number;
+  max: number;
+  step?: number;
+  value: number;
+  onChange: (v: number) => void;
+}) {
+  const c = useColors();
+  const [width, setWidth] = useState(0);
+  const ratio = max === min ? 0 : Math.max(0, Math.min(1, (value - min) / (max - min)));
+  const KNOB = 22;
+
+  const updateFromX = (x: number) => {
+    if (width <= 0) return;
+    const r = Math.max(0, Math.min(1, x / width));
+    const raw = min + r * (max - min);
+    const stepped = Math.round(raw / step) * step;
+    const clamped = Math.max(min, Math.min(max, stepped));
+    if (clamped !== value) onChange(clamped);
+  };
+
+  return (
+    <View
+      onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
+      onStartShouldSetResponder={() => true}
+      onMoveShouldSetResponder={() => true}
+      onResponderGrant={(e) => updateFromX(e.nativeEvent.locationX)}
+      onResponderMove={(e) => updateFromX(e.nativeEvent.locationX)}
+      style={{ height: 32, justifyContent: 'center', paddingHorizontal: KNOB / 2 }}
+    >
+      <View style={{ height: 4, borderRadius: 99, backgroundColor: c.surface2 }}>
+        <View
+          style={{
+            width: `${ratio * 100}%`,
+            height: '100%',
+            borderRadius: 99,
+            backgroundColor: c.accent,
+          }}
+        />
+      </View>
+      <View
+        pointerEvents="none"
+        style={{
+          position: 'absolute',
+          left: ratio * Math.max(0, width - KNOB),
+          top: (32 - KNOB) / 2,
+          width: KNOB,
+          height: KNOB,
+          borderRadius: KNOB / 2,
+          backgroundColor: c.accent,
+          borderWidth: 2,
+          borderColor: '#fff',
+          ...Shadows.sm,
+        }}
+      />
+    </View>
+  );
+}
+
+/** Native date picker wrapped in a button-styled control — matches web `<input type="date">`. */
+export function DateInput({
+  value,
+  onChange,
+  placeholder = 'AAAA-MM-DD',
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+}) {
+  const c = useColors();
+  const { rs } = useResponsive();
+  const [show, setShow] = useState(false);
+
+  const parsed = (() => {
+    if (!value) return null;
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
+    if (!m) return null;
+    return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  })();
+
+  const display = parsed
+    ? parsed.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    : '';
+
+  return (
+    <>
+      <Pressable
+        onPress={() => setShow(true)}
+        style={({ pressed }) => ({
+          backgroundColor: c.surface2,
+          borderColor: c.borderStrong,
+          borderWidth: 1,
+          borderRadius: 8,
+          paddingHorizontal: rs(14),
+          paddingVertical: rs(12),
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          opacity: pressed ? 0.85 : 1,
+        })}
+      >
+        <Text
+          style={{
+            color: display ? c.text : c.textFaint,
+            fontFamily: 'Poppins_400Regular',
+            fontSize: rs(14),
+          }}
+        >
+          {display || placeholder}
+        </Text>
+        <Ionicons name="calendar-outline" size={rs(16)} color={c.textFaint} />
+      </Pressable>
+      {show && (
+        <DateTimePicker
+          value={parsed ?? new Date(2000, 0, 1)}
+          mode="date"
+          display={Platform.OS === 'ios' ? 'inline' : 'default'}
+          maximumDate={new Date()}
+          onChange={(event, selected) => {
+            if (Platform.OS === 'android') setShow(false);
+            if (event.type === 'set' && selected) {
+              const yyyy = selected.getFullYear();
+              const mm = String(selected.getMonth() + 1).padStart(2, '0');
+              const dd = String(selected.getDate()).padStart(2, '0');
+              onChange(`${yyyy}-${mm}-${dd}`);
+              if (Platform.OS === 'ios') setShow(false);
+            } else if (event.type === 'dismissed') {
+              setShow(false);
+            }
+          }}
+        />
+      )}
+    </>
+  );
+}
+
+/** Centered modal with translucent backdrop and slide-up animation. */
+export function Modal({
+  visible,
+  onClose,
+  children,
+  dismissOnBackdrop = true,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  children: React.ReactNode;
+  dismissOnBackdrop?: boolean;
+}) {
+  const c = useColors();
+  return (
+    <RNModal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable
+        onPress={dismissOnBackdrop ? onClose : undefined}
+        style={{
+          flex: 1,
+          backgroundColor: 'rgba(0,0,0,0.55)',
+          justifyContent: 'center',
+          alignItems: 'center',
+          padding: 20,
+        }}
+      >
+        <Pressable onPress={(e) => e.stopPropagation()}>
+          <View
+            style={{
+              backgroundColor: c.surface,
+              borderColor: c.borderStrong,
+              borderWidth: 1,
+              borderRadius: Radius.lg,
+              padding: 20,
+              minWidth: 280,
+              maxWidth: 380,
+              ...Shadows.lg,
+            }}
+          >
+            {children}
+          </View>
+        </Pressable>
+      </Pressable>
+    </RNModal>
+  );
+}
+
+/** Confirmation dialog — destructive style by default for delete actions. */
+export function ConfirmModal({
+  visible,
+  title,
+  message,
+  confirmLabel = 'Confirmar',
+  cancelLabel = 'Cancelar',
+  destructive = false,
+  onConfirm,
+  onCancel,
+  loading = false,
+}: {
+  visible: boolean;
+  title: string;
+  message: string;
+  confirmLabel?: string;
+  cancelLabel?: string;
+  destructive?: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+  loading?: boolean;
+}) {
+  const c = useColors();
+  const { rs } = useResponsive();
+  return (
+    <Modal visible={visible} onClose={onCancel} dismissOnBackdrop={!loading}>
+      <Text
+        style={{
+          color: c.text,
+          fontFamily: 'Poppins_700Bold',
+          fontSize: rs(16),
+          letterSpacing: -0.3,
+          marginBottom: 6,
+        }}
+      >
+        {title}
+      </Text>
+      <Text
+        style={{
+          color: c.textMuted,
+          fontFamily: 'Poppins_400Regular',
+          fontSize: rs(13),
+          lineHeight: rs(20),
+          marginBottom: 16,
+        }}
+      >
+        {message}
+      </Text>
+      <View style={{ flexDirection: 'row', gap: 10, justifyContent: 'flex-end' }}>
+        <Pressable
+          onPress={onCancel}
+          disabled={loading}
+          style={({ pressed }) => ({
+            paddingVertical: 10,
+            paddingHorizontal: 18,
+            borderRadius: Radius.pill,
+            borderWidth: 1,
+            borderColor: c.borderStrong,
+            backgroundColor: 'transparent',
+            opacity: pressed ? 0.7 : 1,
+          })}
+        >
+          <Text style={{ color: c.text, fontFamily: 'Poppins_600SemiBold', fontSize: rs(13) }}>
+            {cancelLabel}
+          </Text>
+        </Pressable>
+        <Pressable
+          onPress={onConfirm}
+          disabled={loading}
+          style={({ pressed }) => ({
+            paddingVertical: 10,
+            paddingHorizontal: 18,
+            borderRadius: Radius.pill,
+            backgroundColor: destructive ? c.destructive : c.accent,
+            opacity: loading ? 0.6 : pressed ? 0.85 : 1,
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 8,
+          })}
+        >
+          {loading && <SpinnerRing size={rs(13)} color="#fff" />}
+          <Text style={{ color: '#fff', fontFamily: 'Poppins_600SemiBold', fontSize: rs(13) }}>
+            {confirmLabel}
+          </Text>
+        </Pressable>
+      </View>
+    </Modal>
   );
 }
 

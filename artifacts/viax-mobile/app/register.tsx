@@ -17,6 +17,7 @@ import {
   Card,
   CardBody,
   CardHeader,
+  DateInput,
   FieldError,
   Input,
   Label,
@@ -155,14 +156,7 @@ export default function RegisterScreen() {
                 <Label>
                   Data de nascimento <Text style={{ fontWeight: '400', opacity: 0.6 }}>(opcional)</Text>
                 </Label>
-                <Input
-                  value={birthDate}
-                  onChangeText={setBirthDate}
-                  placeholder="AAAA-MM-DD"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  keyboardType="numbers-and-punctuation"
-                />
+                <DateInput value={birthDate} onChange={setBirthDate} />
               </View>
 
               {serverError && <FieldError>{serverError}</FieldError>}

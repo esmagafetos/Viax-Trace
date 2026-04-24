@@ -6,7 +6,6 @@ import {
   Pressable,
   StyleSheet,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as DocumentPicker from 'expo-document-picker';
@@ -109,7 +108,7 @@ export default function ToolScreen() {
     const asset = res.assets[0];
     const ext = asset.name.split('.').pop()?.toLowerCase();
     if (!['xlsx', 'csv'].includes(ext ?? '')) {
-      Alert.alert('Formato inválido', 'Use .xlsx ou .csv');
+      toast.showToast('Formato inválido. Use .xlsx ou .csv');
       return;
     }
     setFile(asset);
@@ -120,12 +119,12 @@ export default function ToolScreen() {
   const handleProcess = async () => {
     if (!file || !selected) return;
     if (selected.status !== 'ativo') {
-      Alert.alert('Indisponível', 'Este condomínio ainda está em desenvolvimento.');
+      toast.showToast('Este condomínio ainda está em desenvolvimento.');
       return;
     }
     const apiUrl = getApiUrl();
     if (!apiUrl) {
-      Alert.alert('Servidor', 'Configure o servidor em Configurações antes de processar.');
+      toast.showToast('Configure o servidor em Configurações antes de processar.');
       return;
     }
     setIsProcessing(true);
@@ -149,7 +148,7 @@ export default function ToolScreen() {
       });
 
       if (!response.ok || !response.body) {
-        Alert.alert('Erro', `Falha no processamento (HTTP ${response.status}).`);
+        toast.showToast(`Falha no processamento (HTTP ${response.status}).`);
         return;
       }
 
@@ -178,7 +177,7 @@ export default function ToolScreen() {
               setResult(parsed.result);
               addStep('✓ Sequência logística pronta!');
             } else if (eventType === 'error' && parsed.error) {
-              Alert.alert('Erro', parsed.error);
+              toast.showToast(parsed.error);
             }
           } catch {
             // ignore
@@ -186,7 +185,7 @@ export default function ToolScreen() {
         }
       }
     } catch (err: any) {
-      Alert.alert('Erro de conexão', err?.message ?? String(err));
+      toast.showToast(`Erro de conexão: ${err?.message ?? String(err)}`);
     } finally {
       setIsProcessing(false);
     }

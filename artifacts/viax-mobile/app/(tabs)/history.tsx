@@ -1,12 +1,13 @@
 import { useState } from 'react';
-import { ScrollView, View, StyleSheet, Text, RefreshControl, Pressable, Alert } from 'react-native';
+import { ScrollView, View, StyleSheet, Text, RefreshControl, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import { useColors } from '@/hooks/useColors';
 import { apiRequest } from '@/lib/api';
 import { AppHeader } from '@/components/AppHeader';
-import { H1, Muted } from '@/components/ui';
+import { H1, Muted, ConfirmModal } from '@/components/ui';
+import { useToast } from '@/components/Toast';
 import { formatDate, formatMs } from '@/lib/format';
 
 type Analysis = {
@@ -26,10 +27,12 @@ type Listing = { items: Analysis[]; total: number; page: number; limit: number }
 
 export default function HistoryScreen() {
   const c = useColors();
+  const toast = useToast();
   const [page, setPage] = useState(1);
   const limit = 10;
   const queryClient = useQueryClient();
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [confirmId, setConfirmId] = useState<number | null>(null);
 
   const { data, isLoading, refetch, isRefetching } = useQuery<Listing>({
     queryKey: ['/api/analyses', page, limit],
@@ -41,25 +44,22 @@ export default function HistoryScreen() {
   const total = data?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / limit));
 
-  const onDelete = (id: number) => {
-    Alert.alert('Excluir análise', 'Esta ação não pode ser desfeita.', [
-      { text: 'Cancelar', style: 'cancel' },
-      {
-        text: 'Excluir',
-        style: 'destructive',
-        onPress: async () => {
-          setDeletingId(id);
-          try {
-            await apiRequest(`/api/analyses/${id}`, { method: 'DELETE' });
-            await queryClient.invalidateQueries({ queryKey: ['/api/analyses'] });
-          } catch (e: any) {
-            Alert.alert('Erro', e?.message ?? 'Falha ao excluir.');
-          } finally {
-            setDeletingId(null);
-          }
-        },
-      },
-    ]);
+  const requestDelete = (id: number) => setConfirmId(id);
+
+  const performDelete = async () => {
+    if (confirmId == null) return;
+    const id = confirmId;
+    setDeletingId(id);
+    try {
+      await apiRequest(`/api/analyses/${id}`, { method: 'DELETE' });
+      await queryClient.invalidateQueries({ queryKey: ['/api/analyses'] });
+      toast.showToast('Análise excluída.', 'success');
+    } catch (e: any) {
+      toast.showToast(e?.message ?? 'Falha ao excluir.');
+    } finally {
+      setDeletingId(null);
+      setConfirmId(null);
+    }
   };
 
   return (
@@ -136,7 +136,7 @@ export default function HistoryScreen() {
                   </View>
                 </View>
                 <Pressable
-                  onPress={() => onDelete(a.id)}
+                  onPress={() => requestDelete(a.id)}
                   disabled={deletingId === a.id}
                   hitSlop={8}
                   style={({ pressed }) => ({
@@ -191,6 +191,19 @@ export default function HistoryScreen() {
           )}
         </View>
       </ScrollView>
+      <ConfirmModal
+        visible={confirmId !== null}
+        title="Excluir análise"
+        message="Esta ação não pode ser desfeita. Os dados desta análise serão removidos permanentemente."
+        confirmLabel="Excluir"
+        cancelLabel="Cancelar"
+        destructive
+        loading={deletingId !== null}
+        onConfirm={performDelete}
+        onCancel={() => {
+          if (deletingId === null) setConfirmId(null);
+        }}
+      />
     </SafeAreaView>
   );
 }

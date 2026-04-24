@@ -7,7 +7,6 @@ import {
   Platform,
   Pressable,
   Text,
-  Alert,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -19,6 +18,7 @@ import {
   Card,
   CardBody,
   CardHeader,
+  ConfirmModal,
   FieldError,
   H1,
   H2,
@@ -29,6 +29,7 @@ import {
   Pill,
   ThemeToggle,
 } from '@/components/ui';
+import { useToast } from '@/components/Toast';
 import { Radius } from '@/constants/colors';
 import { apiRequest, getApiUrl, hasApiUrl, setApiUrl, testApiUrl } from '@/lib/api';
 
@@ -92,12 +93,14 @@ export default function SetupScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
+  const toast = useToast();
 
   // Server config
   const [serverUrl, setServerUrl] = useState(getApiUrl());
   const [savingServer, setSavingServer] = useState(false);
   const [serverStatus, setServerStatus] = useState<'idle' | 'ok' | 'fail'>('idle');
   const [serverMsg, setServerMsg] = useState<string>('');
+  const [confirmSaveAnyway, setConfirmSaveAnyway] = useState(false);
 
   // App settings (only when authenticated)
   const [parserMode, setParserMode] = useState<'builtin' | 'ai'>('builtin');
@@ -130,7 +133,7 @@ export default function SetupScreen() {
 
   const onSaveServer = async () => {
     if (!serverUrl.trim()) {
-      Alert.alert('URL inválida', 'Insira a URL do servidor.');
+      toast.showToast('Insira a URL do servidor.');
       return;
     }
     setSavingServer(true);
@@ -139,20 +142,7 @@ export default function SetupScreen() {
       setSavingServer(false);
       setServerStatus('fail');
       setServerMsg(r.message ?? `HTTP ${r.status ?? '???'}`);
-      Alert.alert(
-        'Falha de conexão',
-        'Não conseguimos acessar o servidor. Salvar mesmo assim?',
-        [
-          { text: 'Cancelar', style: 'cancel' },
-          {
-            text: 'Salvar mesmo assim',
-            onPress: async () => {
-              const v = await setApiUrl(serverUrl);
-              setServerUrl(v);
-            },
-          },
-        ],
-      );
+      setConfirmSaveAnyway(true);
       return;
     }
     const v = await setApiUrl(serverUrl);
@@ -160,16 +150,24 @@ export default function SetupScreen() {
     setServerStatus('ok');
     setServerMsg('Servidor salvo com sucesso.');
     setSavingServer(false);
+    toast.showToast('Servidor salvo com sucesso.', 'success');
   };
 
-  const showCmd = (cmd: string) => Alert.alert('Comando', cmd, [{ text: 'OK' }]);
+  const onConfirmSaveAnyway = async () => {
+    const v = await setApiUrl(serverUrl);
+    setServerUrl(v);
+    setConfirmSaveAnyway(false);
+    toast.showToast('Servidor salvo (sem validação).', 'success');
+  };
+
+  const showCmd = (cmd: string) => toast.showToast(cmd);
 
   const onSaveSettings = async () => {
     if (instanceMode === 'googlemaps') {
       setKeyTouched(true);
       const err = validateGoogleMapsKey(googleMapsApiKey);
       if (err) {
-        Alert.alert('Chave inválida', err);
+        toast.showToast(err);
         return;
       }
     }
@@ -186,7 +184,7 @@ export default function SetupScreen() {
       });
       router.replace('/(tabs)/dashboard');
     } catch (e: any) {
-      Alert.alert('Erro', e?.message ?? 'Não foi possível salvar.');
+      toast.showToast(e?.message ?? 'Não foi possível salvar.');
     } finally {
       setSavingSettings(false);
     }
@@ -500,6 +498,15 @@ export default function SetupScreen() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+      <ConfirmModal
+        visible={confirmSaveAnyway}
+        title="Falha de conexão"
+        message="Não conseguimos acessar o servidor. Salvar mesmo assim?"
+        confirmLabel="Salvar mesmo assim"
+        cancelLabel="Cancelar"
+        onConfirm={onConfirmSaveAnyway}
+        onCancel={() => setConfirmSaveAnyway(false)}
+      />
     </SafeAreaView>
   );
 }

@@ -6,7 +6,6 @@ import {
   Text,
   Pressable,
   Linking,
-  Alert,
   TextInput,
   Image,
 } from 'react-native';
@@ -20,7 +19,7 @@ import { useColors } from '@/hooks/useColors';
 import { useAuth } from '@/lib/auth';
 import { apiRequest, getApiUrl, uploadAvatar } from '@/lib/api';
 import { AppHeader } from '@/components/AppHeader';
-import { H1, Muted, Label, Input, Button, FieldError } from '@/components/ui';
+import { H1, Muted, Label, Input, Button, FieldError, Slider, DateInput } from '@/components/ui';
 import { useToast } from '@/components/Toast';
 import { formatBRL } from '@/lib/format';
 
@@ -169,6 +168,7 @@ function PanelCard({
 
 function useSaveSettings() {
   const queryClient = useQueryClient();
+  const toast = useToast();
   return async (patch: Partial<SettingsData>) => {
     try {
       await apiRequest('/api/users/settings', {
@@ -176,9 +176,9 @@ function useSaveSettings() {
         body: JSON.stringify(patch),
       });
       await queryClient.invalidateQueries({ queryKey: ['/api/users/settings'] });
-      Alert.alert('Salvo', 'Configurações atualizadas.');
+      toast.showToast('Configurações atualizadas.', 'success');
     } catch (e: any) {
-      Alert.alert('Erro', e?.message ?? 'Falha ao salvar.');
+      toast.showToast(e?.message ?? 'Falha ao salvar.');
     }
   };
 }
@@ -240,17 +240,23 @@ function PerfilTab({ user, onUpdated }: { user: any; onUpdated: () => Promise<vo
         body: JSON.stringify({ name, birthDate: birthDate || null }),
       });
       await onUpdated();
-      Alert.alert('Salvo', 'Perfil atualizado.');
+      toast.showToast('Perfil atualizado.', 'success');
     } catch (e: any) {
-      Alert.alert('Erro', e?.message ?? 'Falha ao atualizar perfil.');
+      toast.showToast(e?.message ?? 'Falha ao atualizar perfil.');
     } finally {
       setSavingProfile(false);
     }
   };
 
   const savePassword = async () => {
-    if (newPwd !== confirmPwd) return Alert.alert('Erro', 'As senhas não coincidem.');
-    if (newPwd.length < 6) return Alert.alert('Erro', 'Senha deve ter no mínimo 6 caracteres.');
+    if (newPwd !== confirmPwd) {
+      toast.showToast('As senhas não coincidem.');
+      return;
+    }
+    if (newPwd.length < 6) {
+      toast.showToast('A senha deve ter no mínimo 6 caracteres.');
+      return;
+    }
     setSavingPwd(true);
     try {
       await apiRequest('/api/users/password', {
@@ -260,9 +266,9 @@ function PerfilTab({ user, onUpdated }: { user: any; onUpdated: () => Promise<vo
       setCurrentPwd('');
       setNewPwd('');
       setConfirmPwd('');
-      Alert.alert('Pronto', 'Senha alterada.');
+      toast.showToast('Senha alterada com sucesso.', 'success');
     } catch (e: any) {
-      Alert.alert('Erro', e?.message ?? 'Falha ao alterar senha.');
+      toast.showToast(e?.message ?? 'Falha ao alterar senha.');
     } finally {
       setSavingPwd(false);
     }
@@ -900,7 +906,19 @@ function ToleranciaTab({
         </Text>
       </View>
 
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
+      <View style={{ marginTop: 4 }}>
+        <Slider min={100} max={5000} step={100} value={tol} onChange={setTol} />
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
+          <Text style={{ color: c.textFaint, fontFamily: 'Poppins_400Regular', fontSize: 10 }}>
+            100m
+          </Text>
+          <Text style={{ color: c.textFaint, fontFamily: 'Poppins_400Regular', fontSize: 10 }}>
+            5000m
+          </Text>
+        </View>
+      </View>
+
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
         {TOLERANCE_PRESETS.map((p) => {
           const isActive = tol === p;
           return (

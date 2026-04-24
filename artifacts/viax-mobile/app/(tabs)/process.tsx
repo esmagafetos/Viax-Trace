@@ -6,7 +6,6 @@ import {
   Text,
   Pressable,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
@@ -118,7 +117,7 @@ export default function ProcessScreen() {
     const asset = res.assets[0];
     const ext = asset.name.split('.').pop()?.toLowerCase();
     if (!['xlsx', 'csv'].includes(ext ?? '')) {
-      Alert.alert('Formato inválido', 'Use .xlsx ou .csv');
+      toast.showToast('Formato inválido. Use .xlsx ou .csv');
       return;
     }
     setFile(asset);
@@ -130,7 +129,7 @@ export default function ProcessScreen() {
     if (!file) return;
     const apiUrl = getApiUrl();
     if (!apiUrl) {
-      Alert.alert('Servidor', 'Configure o servidor em Configurações antes de processar.');
+      toast.showToast('Configure o servidor em Configurações antes de processar.');
       return;
     }
     setIsProcessing(true);
@@ -153,7 +152,7 @@ export default function ProcessScreen() {
       });
 
       if (!response.ok || !response.body) {
-        Alert.alert('Erro', `Falha no processamento (HTTP ${response.status}).`);
+        toast.showToast(`Falha no processamento (HTTP ${response.status}).`);
         return;
       }
 
@@ -182,7 +181,7 @@ export default function ProcessScreen() {
               setResult(parsed.result);
               addStep('✓ Análise concluída!');
             } else if (eventType === 'error' && parsed.error) {
-              Alert.alert('Erro', parsed.error);
+              toast.showToast(parsed.error);
             }
           } catch {
             // ignore
@@ -190,7 +189,7 @@ export default function ProcessScreen() {
         }
       }
     } catch (err: any) {
-      Alert.alert('Erro de conexão', err?.message ?? String(err));
+      toast.showToast(`Erro de conexão: ${err?.message ?? String(err)}`);
     } finally {
       setIsProcessing(false);
     }
