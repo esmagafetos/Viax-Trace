@@ -12,6 +12,7 @@ import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client
 import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SplashScreen from 'expo-splash-screen';
+import * as Updates from 'expo-updates';
 import {
   useFonts,
   Poppins_400Regular,
@@ -26,7 +27,7 @@ import { useColors } from '@/hooks/useColors';
 import { ToastProvider } from '@/components/Toast';
 import { OfflineBanner } from '@/components/OfflineBanner';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
-import { initSentry } from '@/lib/sentry';
+import { initSentry, reportError } from '@/lib/sentry';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -110,6 +111,41 @@ export default function RootLayout() {
       SplashScreen.hideAsync().catch(() => {});
     }
   }, [fontsLoaded, fontError, apiReady]);
+
+  /**
+   * EAS Update — fire-and-forget background check on cold start.
+   *
+   * The native side is configured with `checkAutomatically: ON_LOAD` and
+   * `fallbackToCacheTimeout: 0`, so the app boots instantly from the
+   * cached bundle while the update is fetched in the background. This
+   * extra explicit check exists for two reasons:
+   *   1. It applies the just-downloaded update in *this* session via
+   *      `reloadAsync()` if one becomes available within ~3s of mount,
+   *      shaving one cold-start cycle off the rollout window.
+   *   2. It catches errors that the native auto-check swallows silently
+   *      and reports them to Sentry, so we know if rollout is broken.
+   *
+   * Disabled when `Updates.isEnabled` is false (dev client, Expo Go, or
+   * `updates.enabled: false` in app.json).
+   */
+  useEffect(() => {
+    if (!Updates.isEnabled) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const result = await Updates.checkForUpdateAsync();
+        if (cancelled || !result.isAvailable) return;
+        const fetched = await Updates.fetchUpdateAsync();
+        if (cancelled || !fetched.isNew) return;
+        // Defer one tick so we don't yank the carpet before any other
+        // mount-effects finish their first frame.
+        setTimeout(() => Updates.reloadAsync().catch(() => {}), 250);
+      } catch (e) {
+        reportError(e, { source: 'eas-update-check' });
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   if ((!fontsLoaded && !fontError) || !apiReady) return null;
 

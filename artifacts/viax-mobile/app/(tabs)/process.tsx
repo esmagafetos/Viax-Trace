@@ -12,6 +12,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
 import * as Haptics from 'expo-haptics';
+import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import Svg, { Circle, Text as SvgText } from 'react-native-svg';
 import { useColors } from '@/hooks/useColors';
 import { AppHeader } from '@/components/AppHeader';
@@ -71,6 +72,18 @@ export default function ProcessScreen() {
   const [result, setResult] = useState<ProcessResult | null>(null);
   const [activeFilter, setActiveFilter] = useState<Filter>('all');
   const stepsScrollRef = useRef<ScrollView>(null);
+
+  // Hold a wake lock *only* while the SSE stream is in flight. Long routes
+  // take several minutes — if the user puts the phone down and the screen
+  // sleeps, some Android OEMs throttle JS execution and the stream stalls
+  // halfway through. Released on completion, error, or unmount.
+  useEffect(() => {
+    if (!isProcessing) return;
+    activateKeepAwakeAsync('viax-process').catch(() => {});
+    return () => {
+      try { deactivateKeepAwake('viax-process'); } catch { /* ignore */ }
+    };
+  }, [isProcessing]);
 
   const { data: settings } = useQuery<SettingsBrief>({
     queryKey: ['/api/users/settings'],
@@ -309,6 +322,9 @@ export default function ProcessScreen() {
 
           <Pressable
             onPress={pickFile}
+            accessibilityRole="button"
+            accessibilityLabel={file ? `Arquivo selecionado: ${file.name}. Toque para trocar` : 'Selecionar planilha XLSX ou CSV'}
+            accessibilityHint="Aceita arquivos com até 10 MB e a coluna Destination Address"
             style={({ pressed }) => [
               styles.dropzone,
               {
@@ -378,6 +394,10 @@ export default function ProcessScreen() {
             <Pressable
               onPress={handleProcess}
               disabled={!canProcess}
+              accessibilityRole="button"
+              accessibilityLabel={isProcessing ? 'Processando rota' : 'Iniciar processamento'}
+              accessibilityHint={file ? undefined : 'Selecione um arquivo antes'}
+              accessibilityState={{ disabled: !canProcess, busy: isProcessing }}
               style={({ pressed }) => [
                 styles.startBtn,
                 {
@@ -573,6 +593,9 @@ export default function ProcessScreen() {
                     <Pressable
                       key={f}
                       onPress={() => setActiveFilter(f)}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Filtrar: ${label}, ${count} resultados`}
+                      accessibilityState={{ selected: isActive }}
                       style={({ pressed }) => [
                         styles.filterChip,
                         {
@@ -597,6 +620,8 @@ export default function ProcessScreen() {
               </View>
               <Pressable
                 onPress={exportCsv}
+                accessibilityRole="button"
+                accessibilityLabel="Exportar resultados como CSV"
                 style={({ pressed }) => [
                   styles.filterChip,
                   {

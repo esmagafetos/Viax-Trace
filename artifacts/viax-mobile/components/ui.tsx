@@ -205,7 +205,12 @@ export function PasswordInput(props: TextInputProps) {
       autoCapitalize="none"
       autoCorrect={false}
       rightSlot={
-        <Pressable onPress={() => setShow((v) => !v)} hitSlop={8}>
+        <Pressable
+          onPress={() => setShow((v) => !v)}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel={show ? 'Ocultar senha' : 'Mostrar senha'}
+        >
           <Ionicons name={show ? 'eye-off-outline' : 'eye-outline'} size={18} color={c.textFaint} />
         </Pressable>
       }
@@ -271,19 +276,38 @@ type ButtonProps = {
   loading?: boolean;
   disabled?: boolean;
   iconRight?: keyof typeof Ionicons.glyphMap;
+  /** Optional override; defaults to the children string (when string). */
+  accessibilityLabel?: string;
+  accessibilityHint?: string;
 };
 
-export function Button({ children, onPress, variant = 'primary', loading, disabled, iconRight }: ButtonProps) {
+export function Button({
+  children,
+  onPress,
+  variant = 'primary',
+  loading,
+  disabled,
+  iconRight,
+  accessibilityLabel,
+  accessibilityHint,
+}: ButtonProps) {
   const c = useColors();
   const { rs } = useResponsive();
   const isPrimary = variant === 'primary';
   const isDark = variant === 'dark';
   const bg = isPrimary ? c.accent : isDark ? c.text : 'transparent';
   const fg = isPrimary ? '#fff' : isDark ? c.bg : c.text;
+  // Auto-derive label from string children so screen readers always have
+  // *something* meaningful even if callers forget to pass an explicit one.
+  const a11yLabel = accessibilityLabel ?? (typeof children === 'string' ? children : undefined);
   return (
     <Pressable
       onPress={onPress}
       disabled={disabled || loading}
+      accessibilityRole="button"
+      accessibilityLabel={a11yLabel}
+      accessibilityHint={accessibilityHint}
+      accessibilityState={{ disabled: !!(disabled || loading), busy: !!loading }}
       style={({ pressed }) => [
         {
           backgroundColor: bg,
@@ -385,6 +409,10 @@ export function ThemeToggle() {
   return (
     <Pressable
       onPress={onPress}
+      accessibilityRole="switch"
+      accessibilityLabel="Alternar tema"
+      accessibilityHint={dark ? 'Mudar para o tema claro' : 'Mudar para o tema escuro'}
+      accessibilityState={{ checked: dark }}
       style={({ pressed }) => ({
         flexDirection: 'row',
         alignItems: 'center',

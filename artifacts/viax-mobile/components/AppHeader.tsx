@@ -67,6 +67,8 @@ export function AppHeader() {
           onPress={() => router.push('/(tabs)/dashboard')}
           style={{ flexShrink: 1 }}
           hitSlop={6}
+          accessibilityRole="link"
+          accessibilityLabel="Ir para o Dashboard"
         >
           <ViaXLogo size="sm" showTagline />
         </Pressable>
@@ -74,6 +76,10 @@ export function AppHeader() {
         <View style={styles.actions}>
           <Pressable
             onPress={toggle}
+            accessibilityRole="switch"
+            accessibilityLabel="Alternar tema"
+            accessibilityHint={dark ? 'Mudar para o tema claro' : 'Mudar para o tema escuro'}
+            accessibilityState={{ checked: dark }}
             style={({ pressed }) => [
               styles.iconBtn,
               {
@@ -94,6 +100,10 @@ export function AppHeader() {
           {user && (
             <Pressable
               onPress={() => setMenuOpen(true)}
+              accessibilityRole="button"
+              accessibilityLabel={`Menu do perfil de ${user.name ?? user.email ?? 'usuário'}`}
+              accessibilityHint="Abre opções de conta, configurações e logout"
+              accessibilityState={{ expanded: menuOpen }}
               style={({ pressed }) => [
                 styles.avatar,
                 {
@@ -134,6 +144,9 @@ export function AppHeader() {
             <Pressable
               key={link.href}
               onPress={() => router.push(link.href as any)}
+              accessibilityRole="tab"
+              accessibilityLabel={link.label}
+              accessibilityState={{ selected: active }}
               style={({ pressed }) => [
                 styles.pill,
                 {
@@ -281,6 +294,8 @@ function DropdownItem({
   return (
     <Pressable
       onPress={onPress}
+      accessibilityRole="menuitem"
+      accessibilityLabel={label}
       style={({ pressed }) => [
         styles.dropdownItem,
         { backgroundColor: pressed ? c.surface2 : 'transparent' },
