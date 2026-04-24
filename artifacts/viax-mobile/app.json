@@ -24,30 +24,20 @@
     },
     "android": {
       "package": "com.viax.trace",
-      "versionCode": 3,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#1a0e08"
       },
       "permissions": [
         "INTERNET",
-        "ACCESS_NETWORK_STATE",
-        "READ_EXTERNAL_STORAGE"
+        "ACCESS_NETWORK_STATE"
       ]
     },
     "plugins": [
       "expo-router",
       "expo-secure-store",
       "expo-font",
-      "@sentry/react-native/expo",
-      [
-        "expo-build-properties",
-        {
-          "android": {
-            "usesCleartextTraffic": true
-          }
-        }
-      ]
+      "@sentry/react-native/expo"
     ],
     "experiments": {
       "typedRoutes": true

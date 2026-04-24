@@ -6,3 +6,11 @@ ios/
 *.log
 .env*.local
 expo-env.d.ts
+
+# Credenciais sensíveis — NUNCA commitar
+google-play-service-account.json
+google-services.json
+*.keystore
+*.jks
+*.p8
+*.p12
