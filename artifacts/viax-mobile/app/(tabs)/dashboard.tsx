@@ -1,83 +1,52 @@
 import { useState } from 'react';
-import { ScrollView, View, StyleSheet, Text, RefreshControl, Pressable } from 'react-native';
+import {
+  ScrollView,
+  View,
+  StyleSheet,
+  Text,
+  RefreshControl,
+  Pressable,
+  useWindowDimensions,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Path, Circle as SvgCircle, Defs, RadialGradient, Stop } from 'react-native-svg';
+import { MotiView } from 'moti';
+import { Easing } from 'react-native-reanimated';
+import { VictoryBar, VictoryAxis, VictoryChart } from 'victory-native';
+
 import { useColors } from '@/hooks/useColors';
 import { useAuth } from '@/lib/auth';
-import { apiRequest } from '@/lib/api';
 import { AppHeader } from '@/components/AppHeader';
 import { ViaXLogo } from '@/components/ViaXLogo';
-import { Card } from '@/components/ui';
 import { formatBRL, formatDate, formatShortDate } from '@/lib/format';
 import { useResponsive } from '@/lib/responsive';
+import { useDashboardData, type DashboardFinancial } from '@/hooks/useDashboardData';
+import { Skeleton } from '@/components/states/Skeleton';
+import {
+  StatTilesLoading,
+  FinancialPanelLoading,
+  RecentListLoading,
+} from '@/components/states/LoadingState';
+import { EmptyState } from '@/components/states/EmptyState';
+import { ErrorState } from '@/components/states/ErrorState';
 
-type Summary = {
-  totalAnalyses: number;
-  totalAddressesProcessed: number;
-  avgNuanceRate: number;
-  avgSimilarity: number;
-  analysesThisMonth: number;
-};
-
-type RecentAnalysis = {
-  id: number;
-  fileName: string;
-  totalAddresses: number;
-  nuances: number;
-  status: string;
-  createdAt: string;
-};
-
-type Financial = {
-  valorPorRota: number | null;
-  cicloPagamentoDias: number;
-  inicioDoCliclo: string;
-  fimDoCiclo: string;
-  receitaEstimada: number;
-  despesasFixas: number;
-  lucroBruto: number;
-  rotasCicloAtual: number;
-  metaRotas: number | null;
-  percentualMeta: number | null;
-  graficoDiario: { data: string; rotas: number; receita: number }[];
-};
+/** Mirror of the web's `cubic-bezier(0, 0, 0.2, 1)` (ease-out). */
+const EASE_OUT = Easing.bezier(0, 0, 0.2, 1);
+/** Reusable entry transition factory — keeps every card on the same beat. */
+const enterTransition = (delay = 0) =>
+  ({ type: 'timing' as const, duration: 320, delay, easing: EASE_OUT });
 
 export default function DashboardScreen() {
   const c = useColors();
   const router = useRouter();
   const { user } = useAuth();
-  const { rs, cols, isCompact } = useResponsive();
+  const { rs } = useResponsive();
   const [heroDismissed, setHeroDismissed] = useState(false);
 
-  const summaryQ = useQuery<Summary>({
-    queryKey: ['/api/dashboard/summary'],
-    queryFn: () => apiRequest<Summary>('/api/dashboard/summary'),
-  });
-  const recentQ = useQuery<RecentAnalysis[]>({
-    queryKey: ['/api/dashboard/recent'],
-    queryFn: () => apiRequest<RecentAnalysis[]>('/api/dashboard/recent'),
-  });
-  const financialQ = useQuery<Financial>({
-    queryKey: ['/api/dashboard/financial'],
-    queryFn: () => apiRequest<Financial>('/api/dashboard/financial'),
-  });
-
-  const refreshing =
-    summaryQ.isRefetching || recentQ.isRefetching || financialQ.isRefetching;
-
-  const refetchAll = () => {
-    summaryQ.refetch();
-    recentQ.refetch();
-    financialQ.refetch();
-  };
-
-  const s = summaryQ.data;
-  const r = recentQ.data ?? [];
-  const f = financialQ.data;
+  const { summary, recent, financial, isRefetching, refetchAll } = useDashboardData();
   const firstName = user?.name?.split(' ')[0] ?? 'usuário';
 
   return (
@@ -85,55 +54,122 @@ export default function DashboardScreen() {
       <AppHeader />
       <ScrollView
         contentContainerStyle={[styles.scroll, { padding: rs(16), gap: rs(14), paddingBottom: rs(32) }]}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refetchAll} tintColor={c.accent} />}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefetching}
+            onRefresh={refetchAll}
+            tintColor={c.accent}
+            colors={[c.accent]}
+          />
+        }
       >
-        {/* Hero banner */}
-        {!heroDismissed && <HeroBanner userName={firstName} onDismiss={() => setHeroDismissed(true)} onAction={() => router.push('/(tabs)/process')} />}
+        {/* Hero banner — slides + fades in, mirrors web's hover-card register */}
+        {!heroDismissed && (
+          <MotiView
+            from={{ opacity: 0, translateY: -8 }}
+            animate={{ opacity: 1, translateY: 0 }}
+            transition={enterTransition(0)}
+          >
+            <HeroBanner
+              userName={firstName}
+              onDismiss={() => setHeroDismissed(true)}
+              onAction={() => router.push('/(tabs)/process')}
+            />
+          </MotiView>
+        )}
 
-        <View>
+        <MotiView
+          from={{ opacity: 0, translateY: 8 }}
+          animate={{ opacity: 1, translateY: 0 }}
+          transition={enterTransition(60)}
+        >
           <Text style={[styles.h1, { color: c.text, fontSize: rs(22) }]}>Dashboard</Text>
           <Text style={[styles.subtitle, { color: c.textFaint, fontSize: rs(12) }]}>
             Resumo das suas análises e controle financeiro de rotas.
           </Text>
-        </View>
+        </MotiView>
 
-        {/* Stat tiles — mobile-first grid: 2 cols (xs/sm), 3 cols (md), 4 cols (lg) */}
-        {s ? (
-          <View style={[styles.statGrid, { gap: rs(8) }]}>
-            <StatTile value={String(s.totalAnalyses)} label="Análises" cols={cols} />
-            <StatTile
-              value={s.totalAddressesProcessed.toLocaleString('pt-BR')}
-              label="Endereços"
-              tone="ok"
-              cols={cols}
+        {/* ── Stat tiles ─────────────────────────────────────────────── */}
+        {summary.isLoading && !summary.data ? (
+          <StatTilesLoading />
+        ) : summary.error ? (
+          <View style={[styles.panel, { backgroundColor: c.surface, borderColor: c.borderStrong }]}>
+            <ErrorState
+              error={summary.error}
+              onRetry={() => summary.refetch()}
+              compact
+              title="Não foi possível carregar as estatísticas"
             />
-            <StatTile
-              value={`${Math.round((s.avgNuanceRate / Math.max(s.totalAddressesProcessed, 1)) * 100 || 0)}%`}
-              label="Nuances"
-              tone="accent"
-              cols={cols}
-            />
-            <StatTile
-              value={`${Math.round((s.avgSimilarity || 0) * 100)}%`}
-              label="Similaridade"
-              tone="ok"
-              cols={cols}
-            />
-            <StatTile value={String(s.analysesThisMonth)} label="Este mês" cols={cols} />
           </View>
         ) : (
-          <Card style={{ alignItems: 'center', paddingVertical: 28 }}>
-            <Text style={{ color: c.textFaint, fontFamily: 'Poppins_400Regular' }}>
-              Carregando estatísticas…
-            </Text>
-          </Card>
+          summary.data && (
+            <View style={[styles.statGrid, { gap: rs(8) }]}>
+              {[
+                { value: String(summary.data.totalAnalyses), label: 'Análises', tone: 'muted' as const },
+                {
+                  value: summary.data.totalAddressesProcessed.toLocaleString('pt-BR'),
+                  label: 'Endereços',
+                  tone: 'ok' as const,
+                },
+                {
+                  value: `${Math.round(
+                    (summary.data.avgNuanceRate / Math.max(summary.data.totalAddressesProcessed, 1)) * 100 || 0
+                  )}%`,
+                  label: 'Nuances',
+                  tone: 'accent' as const,
+                },
+                {
+                  value: `${Math.round((summary.data.avgSimilarity || 0) * 100)}%`,
+                  label: 'Similaridade',
+                  tone: 'ok' as const,
+                },
+                { value: String(summary.data.analysesThisMonth), label: 'Este mês', tone: 'muted' as const },
+              ].map((tile, i) => (
+                <MotiView
+                  key={tile.label}
+                  from={{ opacity: 0, translateY: 10 }}
+                  animate={{ opacity: 1, translateY: 0 }}
+                  transition={enterTransition(120 + i * 50)}
+                  style={statTileWrap}
+                >
+                  <StatTile {...tile} />
+                </MotiView>
+              ))}
+            </View>
+          )
         )}
 
-        {/* Financial panel */}
-        {f && <FinancialPanel f={f} onConfigure={() => router.push('/(tabs)/settings')} />}
+        {/* ── Financial panel ───────────────────────────────────────── */}
+        {financial.isLoading && !financial.data ? (
+          <FinancialPanelLoading />
+        ) : financial.error ? (
+          <View style={[styles.panel, { backgroundColor: c.surface, borderColor: c.borderStrong }]}>
+            <ErrorState
+              error={financial.error}
+              onRetry={() => financial.refetch()}
+              compact
+              title="Painel financeiro indisponível"
+            />
+          </View>
+        ) : (
+          financial.data && (
+            <MotiView
+              from={{ opacity: 0, translateY: 10 }}
+              animate={{ opacity: 1, translateY: 0 }}
+              transition={enterTransition(380)}
+            >
+              <FinancialPanel f={financial.data} onConfigure={() => router.push('/(tabs)/settings')} />
+            </MotiView>
+          )
+        )}
 
         {/* Quick actions */}
-        <View style={styles.quickActions}>
+        <MotiView
+          from={{ opacity: 0, translateY: 6 }}
+          animate={{ opacity: 1, translateY: 0 }}
+          transition={enterTransition(440)}
+          style={styles.quickActions}
+        >
           <Pressable
             onPress={() => router.push('/(tabs)/process')}
             style={({ pressed }) => [
@@ -153,10 +189,15 @@ export default function DashboardScreen() {
           >
             <Text style={[styles.ghostBtnText, { color: c.textMuted }]}>Ver histórico</Text>
           </Pressable>
-        </View>
+        </MotiView>
 
-        {/* Recent analyses */}
-        <View style={[styles.panel, { backgroundColor: c.surface, borderColor: c.borderStrong }]}>
+        {/* ── Análises recentes ─────────────────────────────────────── */}
+        <MotiView
+          from={{ opacity: 0, translateY: 10 }}
+          animate={{ opacity: 1, translateY: 0 }}
+          transition={enterTransition(500)}
+          style={[styles.panel, { backgroundColor: c.surface, borderColor: c.borderStrong }]}
+        >
           <View style={[styles.panelHead, { borderBottomColor: c.border }]}>
             <Text style={[styles.panelHeadLabel, { color: c.textMuted }]}>Análises recentes</Text>
             <Pressable onPress={() => router.push('/(tabs)/history')} hitSlop={6}>
@@ -166,31 +207,32 @@ export default function DashboardScreen() {
             </Pressable>
           </View>
 
-          {recentQ.isLoading ? (
-            <View style={styles.panelEmpty}>
-              <Text style={{ color: c.textFaint, fontFamily: 'Poppins_400Regular', fontSize: 13 }}>
-                Carregando…
-              </Text>
-            </View>
-          ) : r.length === 0 ? (
-            <View style={styles.panelEmpty}>
-              <Ionicons name="folder-open-outline" size={28} color={c.textFaint} />
-              <Text style={{ color: c.textFaint, fontFamily: 'Poppins_400Regular', fontSize: 13, marginTop: 8 }}>
-                Nenhuma análise ainda.
-              </Text>
-              <Pressable onPress={() => router.push('/(tabs)/process')} hitSlop={6} style={{ marginTop: 4 }}>
-                <Text style={{ color: c.accent, fontFamily: 'Poppins_600SemiBold', fontSize: 13 }}>
-                  Processar primeira rota
-                </Text>
-              </Pressable>
-            </View>
+          {recent.isLoading && !recent.data ? (
+            <RecentListLoading />
+          ) : recent.error ? (
+            <ErrorState
+              error={recent.error}
+              onRetry={() => recent.refetch()}
+              compact
+              title="Não foi possível carregar as análises"
+            />
+          ) : !recent.data || recent.data.length === 0 ? (
+            <EmptyState
+              icon="folder-open-outline"
+              title="Nenhuma análise ainda"
+              subtitle="Processe sua primeira rota para vê-la listada aqui."
+              cta={{ label: 'Processar primeira rota', onPress: () => router.push('/(tabs)/process') }}
+            />
           ) : (
-            r.map((a, i) => (
-              <View
+            recent.data.map((a, i) => (
+              <MotiView
                 key={a.id}
+                from={{ opacity: 0, translateX: -6 }}
+                animate={{ opacity: 1, translateX: 0 }}
+                transition={enterTransition(560 + i * 35)}
                 style={[
                   styles.recentRow,
-                  { borderBottomColor: c.border, borderBottomWidth: i === r.length - 1 ? 0 : 1 },
+                  { borderBottomColor: c.border, borderBottomWidth: i === recent.data!.length - 1 ? 0 : 1 },
                 ]}
               >
                 <View style={{ flex: 1, minWidth: 0 }}>
@@ -205,23 +247,24 @@ export default function DashboardScreen() {
                   </Text>
                 </View>
                 <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
-                  <Badge
-                    tone={a.nuances > 0 ? 'accent' : 'ok'}
-                    label={`${a.nuances}`}
-                  />
+                  <Badge tone={a.nuances > 0 ? 'accent' : 'ok'} label={`${a.nuances}`} />
                   <Badge
                     tone={a.status === 'done' ? 'ok' : 'accent'}
                     label={a.status === 'done' ? 'OK' : a.status}
                   />
                 </View>
-              </View>
+              </MotiView>
             ))
           )}
-        </View>
+        </MotiView>
       </ScrollView>
     </SafeAreaView>
   );
 }
+
+/* ──────────────────────────────────────────────────────────────────────── */
+/*  HeroBanner                                                              */
+/* ──────────────────────────────────────────────────────────────────────── */
 
 function HeroBanner({
   userName,
@@ -242,7 +285,6 @@ function HeroBanner({
         style={StyleSheet.absoluteFill}
       />
 
-      {/* Decorative radial blobs */}
       <Svg style={StyleSheet.absoluteFill} pointerEvents="none">
         <Defs>
           <RadialGradient id="blob1" cx="50%" cy="50%" r="50%">
@@ -258,27 +300,14 @@ function HeroBanner({
         <SvgCircle cx="15%" cy="115%" r="95" fill="url(#blob2)" />
       </Svg>
 
-      {/* Decorative dashed route paths */}
       <Svg
         viewBox="0 0 600 120"
         preserveAspectRatio="xMidYMid slice"
         style={[StyleSheet.absoluteFill, { opacity: 0.06 }]}
         pointerEvents="none"
       >
-        <Path
-          d="M0 60 C100 20 200 100 300 60 C400 20 500 80 600 40"
-          stroke="white"
-          strokeWidth={2}
-          strokeDasharray="8 10"
-          fill="none"
-        />
-        <Path
-          d="M0 90 C150 50 250 110 400 70 C500 40 550 90 600 70"
-          stroke="white"
-          strokeWidth={1.5}
-          strokeDasharray="5 8"
-          fill="none"
-        />
+        <Path d="M0 60 C100 20 200 100 300 60 C400 20 500 80 600 40" stroke="white" strokeWidth={2} strokeDasharray="8 10" fill="none" />
+        <Path d="M0 90 C150 50 250 110 400 70 C500 40 550 90 600 70" stroke="white" strokeWidth={1.5} strokeDasharray="5 8" fill="none" />
         <SvgCircle cx={0} cy={60} r={6} fill="white" />
         <SvgCircle cx={300} cy={60} r={8} fill="white" fillOpacity={0.6} />
         <SvgCircle cx={600} cy={40} r={5} fill="white" />
@@ -322,12 +351,23 @@ function HeroBanner({
   );
 }
 
-function StatTile({ value, label, tone = 'muted', cols = 2 }: { value: string; label: string; tone?: 'muted' | 'ok' | 'accent'; cols?: number }) {
+/* ──────────────────────────────────────────────────────────────────────── */
+/*  StatTile                                                                */
+/* ──────────────────────────────────────────────────────────────────────── */
+
+function StatTile({
+  value,
+  label,
+  tone = 'muted',
+}: {
+  value: string;
+  label: string;
+  tone?: 'muted' | 'ok' | 'accent';
+}) {
   const c = useColors();
   const { rs } = useResponsive();
   const color = tone === 'ok' ? c.ok : tone === 'accent' ? c.accent : c.text;
   const stripColor = tone === 'ok' ? c.ok : tone === 'accent' ? c.accent : c.borderStrong;
-  const basis = cols === 4 ? '23%' : cols === 3 ? '31%' : '47%';
   return (
     <View
       style={[
@@ -335,21 +375,28 @@ function StatTile({ value, label, tone = 'muted', cols = 2 }: { value: string; l
         {
           backgroundColor: c.surface,
           borderColor: c.borderStrong,
-          flexBasis: basis,
           paddingHorizontal: rs(12),
           paddingTop: rs(12),
           paddingBottom: rs(14),
         },
       ]}
     >
-      <Text style={[statStyles.value, { color, fontSize: rs(22) }]} numberOfLines={1} adjustsFontSizeToFit>{value}</Text>
-      <Text style={[statStyles.label, { color: c.textFaint, fontSize: rs(9) }]} numberOfLines={1}>{label}</Text>
+      <Text style={[statStyles.value, { color, fontSize: rs(22) }]} numberOfLines={1} adjustsFontSizeToFit>
+        {value}
+      </Text>
+      <Text style={[statStyles.label, { color: c.textFaint, fontSize: rs(9) }]} numberOfLines={1}>
+        {label}
+      </Text>
       <View style={[statStyles.strip, { backgroundColor: stripColor }]} />
     </View>
   );
 }
 
-function FinancialPanel({ f, onConfigure }: { f: Financial; onConfigure: () => void }) {
+/* ──────────────────────────────────────────────────────────────────────── */
+/*  FinancialPanel                                                          */
+/* ──────────────────────────────────────────────────────────────────────── */
+
+function FinancialPanel({ f, onConfigure }: { f: DashboardFinancial; onConfigure: () => void }) {
   const c = useColors();
   const semConfigurar = f.valorPorRota == null;
   const cicloLabel =
@@ -429,7 +476,7 @@ function FinancialPanel({ f, onConfigure }: { f: Financial; onConfigure: () => v
           <Text style={{ color: c.text, fontFamily: 'Poppins_700Bold', fontSize: 28, letterSpacing: -1 }}>
             {f.rotasCicloAtual}
           </Text>
-          {f.valorPorRota && (
+          {f.valorPorRota != null && (
             <Text style={{ color: c.textFaint, fontFamily: 'Poppins_400Regular', fontSize: 11, marginTop: 2 }}>
               × {formatBRL(f.valorPorRota)}/rota
             </Text>
@@ -460,56 +507,103 @@ function FinancialPanel({ f, onConfigure }: { f: Financial; onConfigure: () => v
           )}
         </View>
 
-        <MiniBarChart data={f.graficoDiario ?? []} accent={c.accent} ok={c.ok} muted={c.borderStrong} faint={c.textFaint} />
+        <ActivityChart data={f.graficoDiario ?? []} />
       </View>
     </View>
   );
 }
 
-function MiniBarChart({
-  data,
-  accent,
-  ok,
-  muted,
-  faint,
-}: {
-  data: { data: string; rotas: number }[];
-  accent: string;
-  ok: string;
-  muted: string;
-  faint: string;
-}) {
+/* ──────────────────────────────────────────────────────────────────────── */
+/*  ActivityChart (victory-native)                                          */
+/* ──────────────────────────────────────────────────────────────────────── */
+
+/**
+ * Bar chart of "rotas por dia" mirroring the web's mini chart styling:
+ *  - today        → accent
+ *  - day with > 0 → ok (green)
+ *  - empty day    → border, low opacity
+ * Built with `victory-native` so animations and scaling are handled by the
+ * library while the visual register stays identical to the web.
+ */
+function ActivityChart({ data }: { data: { data: string; rotas: number; receita: number }[] }) {
+  const c = useColors();
+  const { width: screenW } = useWindowDimensions();
   const visible = data.slice(-20);
-  const max = Math.max(...visible.map((d) => d.rotas), 1);
   const today = new Date().toISOString().substring(0, 10);
+
   if (visible.length === 0) return null;
+
+  // Width budget = screen − scroll padding (16) − panel padding (14) on both sides.
+  const chartWidth = Math.max(180, screenW - 16 * 2 - 14 * 2);
+  const chartHeight = 90;
+
   return (
     <View>
-      <Text style={{ color: faint, fontFamily: 'Poppins_600SemiBold', fontSize: 10, letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 6 }}>
+      <Text
+        style={{
+          color: c.textFaint,
+          fontFamily: 'Poppins_600SemiBold',
+          fontSize: 10,
+          letterSpacing: 0.5,
+          textTransform: 'uppercase',
+          marginBottom: 4,
+        }}
+      >
         Atividade do ciclo
       </Text>
-      <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 3, height: 60 }}>
-        {visible.map((d, i) => {
-          const h = Math.max(2, Math.round((d.rotas / max) * 56));
-          const isToday = d.data === today;
-          return (
-            <View
-              key={i}
-              style={{
-                flex: 1,
-                height: h,
-                backgroundColor: isToday ? accent : d.rotas > 0 ? ok : muted,
-                borderTopLeftRadius: 2,
-                borderTopRightRadius: 2,
-                opacity: d.rotas > 0 ? 1 : 0.35,
-              }}
-            />
-          );
-        })}
+
+      <VictoryChart
+        width={chartWidth}
+        height={chartHeight}
+        padding={{ top: 6, bottom: 14, left: 6, right: 6 }}
+        domainPadding={{ x: 6 }}
+      >
+        <VictoryAxis
+          style={{
+            axis: { stroke: 'transparent' },
+            ticks: { stroke: 'transparent' },
+            tickLabels: { fill: 'transparent' },
+            grid: { stroke: 'transparent' },
+          }}
+        />
+        <VictoryAxis
+          dependentAxis
+          style={{
+            axis: { stroke: 'transparent' },
+            ticks: { stroke: 'transparent' },
+            tickLabels: { fill: 'transparent' },
+            grid: { stroke: 'transparent' },
+          }}
+        />
+        <VictoryBar
+          data={visible}
+          x="data"
+          y="rotas"
+          cornerRadius={{ top: 2 }}
+          style={{
+            data: {
+              fill: ({ datum }: any) =>
+                datum.data === today ? c.accent : datum.rotas > 0 ? c.ok : c.borderStrong,
+              fillOpacity: ({ datum }: any) => (datum.rotas > 0 ? 1 : 0.35),
+            },
+          }}
+          animate={{ duration: 400, easing: 'cubicOut', onLoad: { duration: 320 } }}
+        />
+      </VictoryChart>
+
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+        <Text style={{ color: c.textFaint, fontFamily: 'Poppins_400Regular', fontSize: 10 }}>
+          {formatShortDate(visible[0]?.data)}
+        </Text>
+        <Text style={{ color: c.textFaint, fontFamily: 'Poppins_400Regular', fontSize: 10 }}>hoje</Text>
       </View>
     </View>
   );
 }
+
+/* ──────────────────────────────────────────────────────────────────────── */
+/*  Misc                                                                    */
+/* ──────────────────────────────────────────────────────────────────────── */
 
 function Badge({ tone, label }: { tone: 'ok' | 'accent' | 'muted'; label: string }) {
   const c = useColors();
@@ -521,6 +615,8 @@ function Badge({ tone, label }: { tone: 'ok' | 'accent' | 'muted'; label: string
     </View>
   );
 }
+
+const statTileWrap = { flexBasis: '47%', flexGrow: 1 } as const;
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
@@ -543,7 +639,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.8,
     textTransform: 'uppercase',
   },
-  panelEmpty: { padding: 28, alignItems: 'center' },
   recentRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -642,31 +737,30 @@ const heroStyles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   subtitle: {
-    color: 'rgba(240,237,232,0.5)',
+    color: 'rgba(240,237,232,0.55)',
     fontFamily: 'Poppins_400Regular',
-    fontSize: 11,
+    fontSize: 11.5,
     lineHeight: 16,
   },
   actions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginLeft: 'auto',
+    gap: 6,
   },
   cta: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#d4521a',
     paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingVertical: 9,
     borderRadius: 99,
+    backgroundColor: '#d4521a',
     shadowColor: '#d4521a',
-    shadowOpacity: 0.5,
-    shadowRadius: 12,
+    shadowOpacity: 0.45,
+    shadowRadius: 10,
     shadowOffset: { width: 0, height: 2 },
-    elevation: 4,
+    elevation: 3,
   },
-  ctaText: { color: '#fff', fontFamily: 'Poppins_600SemiBold', fontSize: 12.5 },
+  ctaText: { color: '#fff', fontFamily: 'Poppins_600SemiBold', fontSize: 12 },
   close: { padding: 4 },
 });
