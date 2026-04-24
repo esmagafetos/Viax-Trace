@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { useColorScheme } from 'react-native';
+import { colorScheme as nwColorScheme } from 'nativewind';
 import * as SecureStore from 'expo-secure-store';
 
 type Mode = 'light' | 'dark';
@@ -26,6 +27,12 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       })
       .finally(() => setHydrated(true));
   }, []);
+
+  // Keep NativeWind's color scheme in sync so `dark:` variants resolve
+  // against our explicit user selection (not just the OS preference).
+  useEffect(() => {
+    nwColorScheme.set(mode);
+  }, [mode]);
 
   const setMode = (m: Mode) => {
     setModeState(m);

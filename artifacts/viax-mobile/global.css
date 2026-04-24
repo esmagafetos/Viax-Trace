@@ -1,0 +1,36 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * ── Design tokens (mirror of artifacts/viax-scout/src/index.css) ──
+ * Values are stored as raw R G B triplets so Tailwind's `<alpha-value>`
+ * helper can compose them with arbitrary opacity (e.g. `bg-accent/30`).
+ */
+@layer base {
+  :root {
+    --color-bg: 244 243 239;          /* #f4f3ef */
+    --color-surface: 250 249 246;     /* #faf9f6 */
+    --color-surface-2: 238 236 234;   /* #eeecea */
+    --color-text: 26 25 23;           /* #1a1917 */
+    --color-text-muted: 107 104 96;   /* #6b6860 */
+    --color-text-faint: 160 158 154;  /* #a09e9a */
+    --color-accent: 212 82 26;        /* #d4521a */
+    --color-ok: 26 122 74;            /* #1a7a4a */
+    --color-warn: 180 83 9;           /* #b45309 */
+    --color-destructive: 220 38 38;   /* #dc2626 */
+  }
+
+  .dark {
+    --color-bg: 18 17 16;             /* #121110 */
+    --color-surface: 28 27 25;        /* #1c1b19 */
+    --color-surface-2: 36 35 32;      /* #242320 */
+    --color-text: 240 237 232;        /* #f0ede8 */
+    --color-text-muted: 138 135 127;  /* #8a877f */
+    --color-text-faint: 80 77 72;     /* #504d48 */
+    --color-accent: 232 112 58;       /* #e8703a */
+    --color-ok: 46 168 99;            /* #2ea863 */
+    --color-warn: 245 158 11;         /* #f59e0b */
+    --color-destructive: 239 68 68;   /* #ef4444 */
+  }
+}
