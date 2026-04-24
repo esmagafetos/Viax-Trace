@@ -207,7 +207,7 @@ export default function ProcessScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.root, { backgroundColor: c.bg }]} edges={['top']}>
+    <SafeAreaView style={[styles.root, { backgroundColor: c.bg }]} edges={['left', 'right']}>
       <AppHeader />
       <ScrollView
         contentContainerStyle={[styles.scroll, { padding: rs(16), paddingBottom: rs(32), gap: rs(14) }]}

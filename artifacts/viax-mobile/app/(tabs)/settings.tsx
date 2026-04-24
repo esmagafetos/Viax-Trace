@@ -72,7 +72,7 @@ export default function SettingsScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.root, { backgroundColor: c.bg }]} edges={['top']}>
+    <SafeAreaView style={[styles.root, { backgroundColor: c.bg }]} edges={['left', 'right']}>
       <AppHeader />
       <ScrollView contentContainerStyle={styles.scroll}>
         <View>

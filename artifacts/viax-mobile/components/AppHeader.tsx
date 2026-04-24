@@ -9,6 +9,7 @@ import {
   Modal,
   TouchableWithoutFeedback,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, usePathname } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
@@ -37,8 +38,10 @@ export function AppHeader() {
   const router = useRouter();
   const pathname = usePathname();
   const { rs } = useResponsive();
+  const insets = useSafeAreaInsets();
   const [menuOpen, setMenuOpen] = useState(false);
   const initial = (user?.name ?? user?.email ?? 'U').charAt(0).toUpperCase();
+  const dropdownTop = insets.top + 52 + 6;
 
   const isActive = (href: string) => {
     const segment = href.split('/').pop() ?? '';
@@ -54,6 +57,7 @@ export function AppHeader() {
         {
           backgroundColor: c.surface,
           borderBottomColor: c.border,
+          paddingTop: insets.top + 4,
         },
       ]}
     >
@@ -166,7 +170,7 @@ export function AppHeader() {
         onRequestClose={closeMenu}
       >
         <TouchableWithoutFeedback onPress={closeMenu}>
-          <View style={styles.modalOverlay}>
+          <View style={[styles.modalOverlay, { paddingTop: dropdownTop }]}>
             <TouchableWithoutFeedback>
               <View
                 style={[
@@ -339,7 +343,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.25)',
     justifyContent: 'flex-start',
     alignItems: 'flex-end',
-    paddingTop: 100,
     paddingRight: 12,
   },
   dropdown: {

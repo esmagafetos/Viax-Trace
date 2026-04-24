@@ -81,7 +81,7 @@ export default function DashboardScreen() {
   const firstName = user?.name?.split(' ')[0] ?? 'usuário';
 
   return (
-    <SafeAreaView style={[styles.root, { backgroundColor: c.bg }]} edges={['top']}>
+    <SafeAreaView style={[styles.root, { backgroundColor: c.bg }]} edges={['left', 'right']}>
       <AppHeader />
       <ScrollView
         contentContainerStyle={[styles.scroll, { padding: rs(16), gap: rs(14), paddingBottom: rs(32) }]}
