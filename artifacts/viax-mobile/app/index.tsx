@@ -15,16 +15,14 @@ import { useColors } from '@/hooks/useColors';
 import {
   Button,
   Card,
-  CardBody,
-  CardHeader,
   Input,
   Label,
   Muted,
   PasswordInput,
   ThemeToggle,
-  FieldError,
 } from '@/components/ui';
 import { ViaXLogo } from '@/components/ViaXLogo';
+import { useToast } from '@/components/Toast';
 import { hasApiUrl, getApiUrl } from '@/lib/api';
 
 export default function LoginScreen() {
@@ -32,13 +30,12 @@ export default function LoginScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { user, loading, login } = useAuth();
+  const toast = useToast();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [serverConfigured, setServerConfigured] = useState(hasApiUrl());
 
-  useEffect(() => setError(null), [email, password]);
   useEffect(() => setServerConfigured(hasApiUrl()), [user, loading]);
 
   if (loading) return null;
@@ -46,15 +43,19 @@ export default function LoginScreen() {
 
   const onSubmit = async () => {
     if (!hasApiUrl()) {
-      setError('Configure o servidor antes de entrar.');
+      toast.showToast('Configure o servidor antes de entrar.');
+      return;
+    }
+    if (!email.trim() || !password) {
+      toast.showToast('Preencha email e senha.');
       return;
     }
     setSubmitting(true);
-    setError(null);
     try {
       await login(email.trim(), password);
     } catch (e: any) {
-      setError(e?.message ?? 'Credenciais inválidas.');
+      // Mirror web Login.tsx — surface API errors via toast (not inline).
+      toast.showToast(e?.message ?? 'Credenciais inválidas.');
     } finally {
       setSubmitting(false);
     }
@@ -67,79 +68,146 @@ export default function LoginScreen() {
       </View>
 
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-        <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+        <ScrollView
+          contentContainerStyle={styles.scroll}
+          keyboardShouldPersistTaps="handled"
+        >
           <View style={styles.container}>
-          <View style={styles.logoWrap}>
-            <ViaXLogo size="md" showTagline />
-          </View>
+            {/* Logo above card — mirrors web */}
+            <View style={styles.logoWrap}>
+              <ViaXLogo size="md" showTagline />
+            </View>
 
-          {!serverConfigured && (
-            <Card style={{ gap: 10, borderColor: c.accent, marginBottom: 14 }}>
-              <Text style={{ color: c.accent, fontFamily: 'Poppins_600SemiBold', fontSize: 13 }}>
-                Servidor não configurado
-              </Text>
-              <Muted>
-                Antes de entrar, configure a URL do seu servidor ViaX:Trace (Termux ou outro host).
-              </Muted>
-              <Button onPress={() => router.push('/setup')}>Configurar servidor</Button>
-            </Card>
-          )}
+            {/* Server-not-configured banner — mobile-only addition (web has no Setup) */}
+            {!serverConfigured && (
+              <Card
+                style={{
+                  gap: 10,
+                  borderColor: c.accent,
+                  marginBottom: 14,
+                  borderWidth: 1,
+                }}
+              >
+                <Text
+                  style={{
+                    color: c.accent,
+                    fontFamily: 'Poppins_600SemiBold',
+                    fontSize: 13,
+                  }}
+                >
+                  Servidor não configurado
+                </Text>
+                <Muted>
+                  Antes de entrar, configure a URL do seu servidor ViaX:Trace (Termux ou outro host).
+                </Muted>
+                <Button onPress={() => router.push('/setup')}>Configurar servidor</Button>
+              </Card>
+            )}
 
-          <Card style={{ padding: 0, overflow: 'hidden' }}>
-            <CardHeader title="Acessar conta" subtitle="Entre com suas credenciais para continuar" />
-
-            <CardBody>
-              <View>
-                <Label>Email</Label>
-                <Input
-                  value={email}
-                  onChangeText={setEmail}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  placeholder="seu@email.com"
-                />
+            {/* Card — mirrors web Login card with exact paddings */}
+            <Card style={{ padding: 0, overflow: 'hidden' }}>
+              {/* Header — web: padding: 1.75rem 2rem 1.25rem (28/32/20) */}
+              <View
+                style={[
+                  styles.cardHeader,
+                  { borderBottomColor: c.border },
+                ]}
+              >
+                <Text
+                  style={{
+                    fontFamily: 'Poppins_700Bold',
+                    fontSize: 17.6,
+                    letterSpacing: -0.4,
+                    color: c.text,
+                    marginBottom: 3,
+                  }}
+                >
+                  Acessar conta
+                </Text>
+                <Text
+                  style={{
+                    fontFamily: 'Poppins_400Regular',
+                    fontSize: 13,
+                    color: c.textFaint,
+                  }}
+                >
+                  Entre com suas credenciais para continuar
+                </Text>
               </View>
 
-              <View>
-                <Label>Senha</Label>
-                <PasswordInput value={password} onChangeText={setPassword} placeholder="••••••••" />
-              </View>
+              {/* Body — web: padding: 1.5rem 2rem 2rem (24/32/32) */}
+              <View style={styles.cardBody}>
+                <View style={{ gap: 6 }}>
+                  <Label>Email</Label>
+                  <Input
+                    value={email}
+                    onChangeText={setEmail}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    autoComplete="email"
+                    textContentType="emailAddress"
+                    placeholder="seu@email.com"
+                    returnKeyType="next"
+                  />
+                </View>
 
-              {error && <FieldError>{error}</FieldError>}
+                <View style={{ gap: 6 }}>
+                  <Label>Senha</Label>
+                  <PasswordInput
+                    value={password}
+                    onChangeText={setPassword}
+                    autoComplete="current-password"
+                    textContentType="password"
+                    placeholder="••••••••"
+                    returnKeyType="go"
+                    onSubmitEditing={onSubmit}
+                  />
+                </View>
 
-              <Button onPress={onSubmit} loading={submitting} disabled={!serverConfigured} iconRight="arrow-forward">
-                Entrar
-              </Button>
+                <Button
+                  onPress={onSubmit}
+                  loading={submitting}
+                  disabled={!serverConfigured}
+                  iconRight="arrow-forward"
+                >
+                  Entrar
+                </Button>
 
-              <View style={styles.footerRow}>
-                <Muted>Ainda não tem conta?</Muted>
-                <Link href="/register" asChild>
-                  <Pressable hitSlop={6}>
-                    <Text style={{ color: c.accent, fontFamily: 'Poppins_600SemiBold', fontSize: 13 }}>
-                      {' '}Criar conta grátis
+                <View style={styles.footerRow}>
+                  <Muted>Ainda não tem conta?</Muted>
+                  <Link href="/register" asChild>
+                    <Pressable hitSlop={6}>
+                      <Text
+                        style={{
+                          color: c.accent,
+                          fontFamily: 'Poppins_600SemiBold',
+                          fontSize: 13,
+                        }}
+                      >
+                        {' '}Criar conta grátis
+                      </Text>
+                    </Pressable>
+                  </Link>
+                </View>
+
+                {serverConfigured && (
+                  <Pressable onPress={() => router.push('/setup')} hitSlop={4}>
+                    <Text
+                      style={{
+                        color: c.textFaint,
+                        fontFamily: 'Poppins_400Regular',
+                        fontSize: 11,
+                        textAlign: 'center',
+                        marginTop: 2,
+                      }}
+                    >
+                      Servidor: {getApiUrl()} (alterar)
                     </Text>
                   </Pressable>
-                </Link>
+                )}
               </View>
-
-              {serverConfigured && (
-                <Pressable onPress={() => router.push('/setup')} hitSlop={4}>
-                  <Text
-                    style={{
-                      color: c.textFaint,
-                      fontFamily: 'Poppins_400Regular',
-                      fontSize: 11,
-                      textAlign: 'center',
-                      marginTop: 4,
-                    }}
-                  >
-                    Servidor: {getApiUrl()} (alterar)
-                  </Text>
-                </Pressable>
-              )}
-            </CardBody>
-          </Card>
+            </Card>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -150,8 +218,34 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1 },
   toggleWrap: { position: 'absolute', right: 14, zIndex: 10 },
-  scroll: { paddingHorizontal: 22, paddingVertical: 28, justifyContent: 'center', flexGrow: 1, alignItems: 'center' },
+  scroll: {
+    paddingHorizontal: 22,
+    paddingVertical: 28,
+    justifyContent: 'center',
+    flexGrow: 1,
+    alignItems: 'center',
+  },
   container: { width: '100%', maxWidth: 440 },
   logoWrap: { alignItems: 'center', marginBottom: 18 },
-  footerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap' },
+  /** Web: 1.75rem 2rem 1.25rem (28px / 32px / 20px). */
+  cardHeader: {
+    paddingTop: 28,
+    paddingHorizontal: 32,
+    paddingBottom: 20,
+    borderBottomWidth: 1,
+  },
+  /** Web: 1.5rem 2rem 2rem (24px / 32px / 32px). */
+  cardBody: {
+    paddingTop: 24,
+    paddingHorizontal: 32,
+    paddingBottom: 32,
+    gap: 16,
+  },
+  footerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexWrap: 'wrap',
+    marginTop: 4,
+  },
 });

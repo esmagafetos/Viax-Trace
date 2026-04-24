@@ -1,10 +1,20 @@
 import * as SecureStore from 'expo-secure-store';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 declare const process: { env: Record<string, string | undefined> };
 
 const DEFAULT_API_URL = process.env.EXPO_PUBLIC_API_URL || '';
+
+/**
+ * ── Storage policy ────────────────────────────────────────────────────────
+ *  SecureStore  → credentials (session cookie, OAuth tokens). Encrypted.
+ *  AsyncStorage → non-sensitive user preferences (API URL, theme mode).
+ *                 Plain text but persistent and conventional for RN apps.
+ */
 const SESSION_KEY = 'viax_session_cookie';
 const API_URL_KEY = 'viax_api_url';
+/** Legacy key used before migrating from SecureStore → AsyncStorage. */
+const LEGACY_API_URL_KEY = 'viax_api_url';
 
 let cachedApiUrl: string = DEFAULT_API_URL;
 
@@ -15,9 +25,27 @@ function normalizeUrl(raw: string): string {
   return v.replace(/\/+$/, '');
 }
 
+/**
+ * One-shot migration: if a previous build saved the API URL via
+ * SecureStore, copy it into AsyncStorage and clear the secure copy
+ * (SecureStore is overkill for a non-sensitive base URL).
+ */
+async function migrateLegacyApiUrl(): Promise<string | null> {
+  try {
+    const legacy = await SecureStore.getItemAsync(LEGACY_API_URL_KEY);
+    if (!legacy) return null;
+    await AsyncStorage.setItem(API_URL_KEY, legacy);
+    await SecureStore.deleteItemAsync(LEGACY_API_URL_KEY);
+    return legacy;
+  } catch {
+    return null;
+  }
+}
+
 export async function initApiUrl(): Promise<void> {
   try {
-    const stored = await SecureStore.getItemAsync(API_URL_KEY);
+    let stored = await AsyncStorage.getItem(API_URL_KEY);
+    if (!stored) stored = await migrateLegacyApiUrl();
     if (stored) cachedApiUrl = stored;
   } catch {
     // ignore
@@ -36,8 +64,8 @@ export async function setApiUrl(value: string): Promise<string> {
   const normalized = normalizeUrl(value);
   cachedApiUrl = normalized;
   try {
-    if (normalized) await SecureStore.setItemAsync(API_URL_KEY, normalized);
-    else await SecureStore.deleteItemAsync(API_URL_KEY);
+    if (normalized) await AsyncStorage.setItem(API_URL_KEY, normalized);
+    else await AsyncStorage.removeItem(API_URL_KEY);
   } catch {
     // ignore
   }

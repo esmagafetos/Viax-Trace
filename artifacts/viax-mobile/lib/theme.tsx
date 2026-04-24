@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { useColorScheme } from 'react-native';
 import { colorScheme as nwColorScheme } from 'nativewind';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
 
 type Mode = 'light' | 'dark';
@@ -14,6 +15,21 @@ interface ThemeCtx {
 
 const Ctx = createContext<ThemeCtx | null>(null);
 const STORE_KEY = 'viax_theme_mode';
+/** Legacy key used before migrating from SecureStore → AsyncStorage. */
+const LEGACY_STORE_KEY = 'viax_theme_mode';
+
+/** One-shot migration of an old SecureStore-stored theme → AsyncStorage. */
+async function migrateLegacyTheme(): Promise<Mode | null> {
+  try {
+    const legacy = await SecureStore.getItemAsync(LEGACY_STORE_KEY);
+    if (legacy !== 'light' && legacy !== 'dark') return null;
+    await AsyncStorage.setItem(STORE_KEY, legacy);
+    await SecureStore.deleteItemAsync(LEGACY_STORE_KEY);
+    return legacy;
+  } catch {
+    return null;
+  }
+}
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const system = useColorScheme();
@@ -21,11 +37,15 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
-    SecureStore.getItemAsync(STORE_KEY)
-      .then((v) => {
+    (async () => {
+      try {
+        let v: string | null = await AsyncStorage.getItem(STORE_KEY);
+        if (!v) v = await migrateLegacyTheme();
         if (v === 'light' || v === 'dark') setModeState(v);
-      })
-      .finally(() => setHydrated(true));
+      } finally {
+        setHydrated(true);
+      }
+    })();
   }, []);
 
   // Keep NativeWind's color scheme in sync so `dark:` variants resolve
@@ -36,7 +56,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   const setMode = (m: Mode) => {
     setModeState(m);
-    SecureStore.setItemAsync(STORE_KEY, m).catch(() => {});
+    AsyncStorage.setItem(STORE_KEY, m).catch(() => {});
   };
 
   const toggle = () => setMode(mode === 'dark' ? 'light' : 'dark');
