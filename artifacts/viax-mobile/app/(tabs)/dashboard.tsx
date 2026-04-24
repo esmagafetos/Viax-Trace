@@ -4,6 +4,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import Svg, { Path, Circle as SvgCircle, Defs, RadialGradient, Stop } from 'react-native-svg';
 import { useColors } from '@/hooks/useColors';
 import { useAuth } from '@/lib/auth';
 import { apiRequest } from '@/lib/api';
@@ -232,25 +234,84 @@ function HeroBanner({
 }) {
   return (
     <View style={heroStyles.wrap}>
-      <View style={heroStyles.blob1} />
-      <View style={heroStyles.blob2} />
+      <LinearGradient
+        colors={['#1a0e08', '#2d1408', '#3d1c0c', '#1f0a18']}
+        locations={[0, 0.4, 0.7, 1]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={StyleSheet.absoluteFill}
+      />
+
+      {/* Decorative radial blobs */}
+      <Svg style={StyleSheet.absoluteFill} pointerEvents="none">
+        <Defs>
+          <RadialGradient id="blob1" cx="50%" cy="50%" r="50%">
+            <Stop offset="0%" stopColor="#d4521a" stopOpacity="0.32" />
+            <Stop offset="70%" stopColor="#d4521a" stopOpacity="0" />
+          </RadialGradient>
+          <RadialGradient id="blob2" cx="50%" cy="50%" r="50%">
+            <Stop offset="0%" stopColor="#d4521a" stopOpacity="0.16" />
+            <Stop offset="70%" stopColor="#d4521a" stopOpacity="0" />
+          </RadialGradient>
+        </Defs>
+        <SvgCircle cx="78%" cy="-10%" r="130" fill="url(#blob1)" />
+        <SvgCircle cx="15%" cy="115%" r="95" fill="url(#blob2)" />
+      </Svg>
+
+      {/* Decorative dashed route paths */}
+      <Svg
+        viewBox="0 0 600 120"
+        preserveAspectRatio="xMidYMid slice"
+        style={[StyleSheet.absoluteFill, { opacity: 0.06 }]}
+        pointerEvents="none"
+      >
+        <Path
+          d="M0 60 C100 20 200 100 300 60 C400 20 500 80 600 40"
+          stroke="white"
+          strokeWidth={2}
+          strokeDasharray="8 10"
+          fill="none"
+        />
+        <Path
+          d="M0 90 C150 50 250 110 400 70 C500 40 550 90 600 70"
+          stroke="white"
+          strokeWidth={1.5}
+          strokeDasharray="5 8"
+          fill="none"
+        />
+        <SvgCircle cx={0} cy={60} r={6} fill="white" />
+        <SvgCircle cx={300} cy={60} r={8} fill="white" fillOpacity={0.6} />
+        <SvgCircle cx={600} cy={40} r={5} fill="white" />
+      </Svg>
+
       <View style={heroStyles.inner}>
-        <View style={{ flex: 1, gap: 10 }}>
-          <ViaXLogo size="md" dark showTagline />
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-            <Text style={heroStyles.greeting}>Olá, {userName}!</Text>
-            <View style={heroStyles.versionPill}>
-              <Text style={heroStyles.versionPillText}>v8.0</Text>
-            </View>
+        <View style={heroStyles.left}>
+          <View style={{ flexShrink: 0 }}>
+            <ViaXLogo size="md" dark showTagline />
           </View>
-          <Text style={heroStyles.subtitle}>
-            Geocodificação multi-camada · Detecção de nuances · Suporte a Travessa e Passagem
-          </Text>
+          <View style={heroStyles.divider} />
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <View style={heroStyles.greetingRow}>
+              <Text style={heroStyles.greeting} numberOfLines={1}>
+                Olá, {userName}!
+              </Text>
+              <View style={heroStyles.versionPill}>
+                <Text style={heroStyles.versionPillText}>v8.0</Text>
+              </View>
+            </View>
+            <Text style={heroStyles.subtitle}>
+              Geocodificação multi-camada · Detecção de nuances · Suporte a Travessa e Passagem
+            </Text>
+          </View>
         </View>
-        <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
-          <Pressable onPress={onAction} style={({ pressed }) => [heroStyles.cta, { opacity: pressed ? 0.85 : 1 }]}>
+
+        <View style={heroStyles.actions}>
+          <Pressable
+            onPress={onAction}
+            style={({ pressed }) => [heroStyles.cta, { opacity: pressed ? 0.85 : 1 }]}
+          >
             <Ionicons name="cloud-upload-outline" size={14} color="#fff" />
-            <Text style={heroStyles.ctaText}>Nova análise</Text>
+            <Text style={heroStyles.ctaText}>Nova Análise</Text>
           </Pressable>
           <Pressable onPress={onDismiss} style={heroStyles.close} hitSlop={8}>
             <Ionicons name="close" size={16} color="rgba(240,237,232,0.4)" />
@@ -531,35 +592,41 @@ const heroStyles = StyleSheet.create({
   wrap: {
     borderRadius: 16,
     overflow: 'hidden',
-    backgroundColor: '#1a0e08',
     borderWidth: 1,
     borderColor: 'rgba(212,82,26,0.25)',
-  },
-  blob1: {
-    position: 'absolute',
-    width: 200,
-    height: 200,
-    borderRadius: 100,
-    backgroundColor: 'rgba(212,82,26,0.18)',
-    top: -60,
-    right: -30,
-  },
-  blob2: {
-    position: 'absolute',
-    width: 130,
-    height: 130,
-    borderRadius: 65,
-    backgroundColor: 'rgba(212,82,26,0.10)',
-    bottom: -40,
-    left: -10,
+    shadowColor: '#000',
+    shadowOpacity: 0.15,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 8 },
   },
   inner: {
-    padding: 16,
+    paddingHorizontal: 18,
+    paddingVertical: 18,
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 10,
+    alignItems: 'center',
+    gap: 12,
+    flexWrap: 'wrap',
   },
-  greeting: { color: '#f0ede8', fontFamily: 'Poppins_700Bold', fontSize: 14 },
+  left: {
+    flex: 1,
+    minWidth: '60%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  divider: {
+    width: 1,
+    height: 36,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+  },
+  greetingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexWrap: 'wrap',
+    marginBottom: 4,
+  },
+  greeting: { color: '#f0ede8', fontFamily: 'Poppins_700Bold', fontSize: 15 },
   versionPill: {
     paddingHorizontal: 8,
     paddingVertical: 2,
@@ -575,20 +642,31 @@ const heroStyles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   subtitle: {
-    color: 'rgba(240,237,232,0.55)',
+    color: 'rgba(240,237,232,0.5)',
     fontFamily: 'Poppins_400Regular',
     fontSize: 11,
     lineHeight: 16,
+  },
+  actions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginLeft: 'auto',
   },
   cta: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
     backgroundColor: '#d4521a',
-    paddingHorizontal: 12,
-    paddingVertical: 9,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
     borderRadius: 99,
+    shadowColor: '#d4521a',
+    shadowOpacity: 0.5,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 4,
   },
-  ctaText: { color: '#fff', fontFamily: 'Poppins_600SemiBold', fontSize: 12 },
+  ctaText: { color: '#fff', fontFamily: 'Poppins_600SemiBold', fontSize: 12.5 },
   close: { padding: 4 },
 });

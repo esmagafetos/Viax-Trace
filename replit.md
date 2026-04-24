@@ -39,8 +39,11 @@ pnpm workspace monorepo with React+Vite frontend and Express API backend.
    - Proxy: `/api/*` → `http://localhost:8080` (Vite proxy config)
    - Pages: Login, Register, Setup, Dashboard, Process, History, Settings
 3. **ViaX Mobile** (`artifacts/viax-mobile`) — Expo (React Native) Android app, brand-matched to web
-   - Stack: Expo SDK 54 + expo-router (file-based routing) + TanStack Query + Poppins fonts
-   - Screens: Login, Register, **Setup**, Tabs (Dashboard, Processar, Histórico, Ajustes)
+   - Stack: Expo SDK 54 + expo-router (file-based routing) + TanStack Query + Poppins fonts + `expo-linear-gradient` + `react-native-svg`
+   - Screens: Login, Register, **Setup**, Tabs (Dashboard, Processar, **Ferramenta**, Histórico, Settings)
+   - **AppHeader 1:1 com a web**: linha 1 = ViaX:Trace + theme toggle + avatar (com **dropdown modal** de perfil mostrando nome/email + Configurações + Documentação + Sair); linha 2 = horizontal pill nav (Dashboard / Processar / Ferramenta / Histórico) com ícones Ionicons + estado ativo accent. Bottom tab bar do expo-router está oculta (`tabBarStyle: { display: 'none' }`).
+   - **Hero do Dashboard espelha o web**: `expo-linear-gradient` (135deg, 4 stops `#1a0e08 → #2d1408 → #3d1c0c → #1f0a18`), 2 blobs com `react-native-svg` `RadialGradient`, paths tracejados decorativos no SVG, layout horizontal com logo+divisor+saudação à esquerda e botão "Nova Análise" + close à direita.
+   - **Aba Ferramenta** (`app/(tabs)/tool.tsx`) reescrita a partir de `viax-scout/src/pages/Tool.tsx` — seletor de condomínio em cards, dropzone com `expo-document-picker`, processamento SSE (`fetch + ReadableStream`), tiles de estatísticas com strip colorida, chips de filtro, lista de sequência logística colorida por classificação.
    - **Visual parity with web** — same warm amber palette (`#d4521a`), Poppins typography, 14px-radius cards with shadow, 99px pill buttons, uppercase letter-spaced labels, accent focus ring on inputs, eye toggle on PasswordInput, 4-segment PasswordStrength meter, floating top-right ThemeToggle pill
    - Theme: `lib/theme.tsx` ThemeProvider (light/dark) persisted in `expo-secure-store` (key `viax_theme_mode`); `useColors()` reads from it
    - Brand mark: **vector SVG** via `react-native-svg` (port 1:1 of web's `<LogoIcon />` — path + 3 circles), exposed by `components/ViaXLogo.tsx` as `LogoIcon`, `LogoMark`, `AppIcon`, `ViaXLogo`, `FlatLogo`. **No more raster screenshots** — the previous showcase PNGs (1920×1080) were removed in v1.2.0.
