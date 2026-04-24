@@ -51,6 +51,9 @@ pnpm workspace monorepo with React+Vite frontend and Express API backend.
    - **Logo** (`components/Logo.tsx`): vector SVG port of `<LogoIcon />` (path + 3 circles) using `react-native-svg`.
    - All API calls use the session cookie (web also uses sessions — no JWT). Logout clears cookie jar + cached user.
    - Safe-area handling via `react-native-safe-area-context` `useSafeAreaInsets()` on every screen header and tab bar bottom padding.
+   - **Native app icons** generated from SVG sources in `assets/source/{icon,adaptive-icon,splash}.svg` — rendered to `assets/{icon,adaptive-icon,splash,favicon}.png` via `rsvg-convert` (locally via `magick`). Cream `#faf9f6` background, dark→cream tracing curve, orange `#d4521a` destination pin with white core. Wired into `app.json` (`icon`, `splash`, `android.adaptiveIcon`, `web.favicon`).
+   - **EAS build config** (`artifacts/viax-mobile/eas.json`): three profiles (`development` / `preview` / `production`); production uses `appVersionSource=local` so version comes from `app.json` (`2.0.0`).
+   - **Release workflow** (`.github/workflows/mobile-release.yml`): default profile is now `production`; auto-installs `librsvg` and **regenerates icons from SVG** in CI before EAS build; produces tag `mobile-v<version>` (production) or `mobile-v<version>-preview-<ts>-<sha>` (preview); rich Markdown release notes with build metadata table, stack summary, v2.0.0 changelog, install instructions; APK attached as `viax-trace-v<version>-<sha>.apk`.
 
 ## Stack
 

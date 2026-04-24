@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1242" height="1242" viewBox="0 0 1242 1242">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#faf9f6"/>
+      <stop offset="100%" stop-color="#eeecea"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0%" stop-color="#d4521a" stop-opacity="0.10"/>
+      <stop offset="100%" stop-color="#d4521a" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="curve" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1a1917"/>
+      <stop offset="100%" stop-color="#3a352e"/>
+    </linearGradient>
+    <linearGradient id="pin" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#e8703a"/>
+      <stop offset="100%" stop-color="#c43d10"/>
+    </linearGradient>
+  </defs>
+  <rect width="1242" height="1242" fill="url(#bg)"/>
+  <circle cx="621" cy="621" r="500" fill="url(#glow)"/>
+  <g transform="translate(481, 481) scale(10)">
+    <path d="M7 7 C 7 7, 7 16, 14 18 C 20 20, 21 21, 21 21"
+          stroke="url(#curve)" stroke-width="2.6"
+          stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+    <circle cx="7" cy="7" r="3" fill="url(#curve)"/>
+    <circle cx="21" cy="21" r="5.2" fill="url(#pin)"/>
+    <circle cx="21" cy="21" r="2.1" fill="#ffffff"/>
+  </g>
+  <text x="621" y="970" font-family="Helvetica, Arial, sans-serif" font-size="62" font-weight="700"
+        text-anchor="middle" fill="#1a1917" letter-spacing="2">VIA<tspan fill="#d4521a">X</tspan>:TRACE</text>
+  <text x="621" y="1020" font-family="Helvetica, Arial, sans-serif" font-size="26" font-weight="400"
+        text-anchor="middle" fill="#6b6258" letter-spacing="6">AUDITORIA LOGÍSTICA</text>
+</svg>

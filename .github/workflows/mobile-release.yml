@@ -9,13 +9,18 @@ on:
   workflow_dispatch:
     inputs:
       profile:
-        description: 'EAS build profile (preview or production)'
+        description: 'EAS build profile'
         required: false
-        default: 'preview'
+        default: 'production'
         type: choice
         options:
           - preview
           - production
+      release_notes:
+        description: 'Notas adicionais para o release (opcional)'
+        required: false
+        default: ''
+        type: string
 
 concurrency:
   group: mobile-release-${{ github.ref }}
@@ -57,6 +62,21 @@ jobs:
         working-directory: ${{ github.workspace }}
         run: pnpm install --frozen-lockfile
 
+      - name: Install librsvg + ImageMagick (for icon rendering)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends librsvg2-bin imagemagick
+
+      - name: Regenerate app icons from SVG sources
+        run: |
+          set -eux
+          mkdir -p assets
+          rsvg-convert -w 1024 -h 1024 assets/source/icon.svg          -o assets/icon.png
+          rsvg-convert -w 1024 -h 1024 assets/source/adaptive-icon.svg -o assets/adaptive-icon.png
+          rsvg-convert -w 1242 -h 1242 assets/source/splash.svg        -o assets/splash.png
+          rsvg-convert -w 48   -h 48   assets/source/icon.svg          -o assets/favicon.png
+          ls -lh assets/*.png
+
       - name: Typecheck mobile
         run: pnpm --filter @workspace/viax-mobile run typecheck
 
@@ -66,15 +86,24 @@ jobs:
       - name: Resolve build metadata
         id: meta
         run: |
+          set -eu
           SHORT_SHA=$(git rev-parse --short HEAD)
           BUILD_TS=$(date -u +%Y%m%d-%H%M%S)
-          PROFILE="${{ github.event.inputs.profile || 'preview' }}"
+          BUILD_DATE=$(date -u +"%Y-%m-%d %H:%M UTC")
+          PROFILE="${{ github.event.inputs.profile || 'production' }}"
           VERSION=$(node -p "require('./package.json').version")
-          TAG="mobile-v${VERSION}-${BUILD_TS}-${SHORT_SHA}"
-          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
-          echo "short_sha=${SHORT_SHA}" >> "$GITHUB_OUTPUT"
-          echo "profile=${PROFILE}" >> "$GITHUB_OUTPUT"
-          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          if [ "$PROFILE" = "production" ]; then
+            TAG="mobile-v${VERSION}"
+          else
+            TAG="mobile-v${VERSION}-${PROFILE}-${BUILD_TS}-${SHORT_SHA}"
+          fi
+          {
+            echo "tag=${TAG}"
+            echo "short_sha=${SHORT_SHA}"
+            echo "profile=${PROFILE}"
+            echo "version=${VERSION}"
+            echo "build_date=${BUILD_DATE}"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Build APK on EAS
         env:
@@ -86,18 +115,19 @@ jobs:
             --profile "${{ steps.meta.outputs.profile }}" \
             --non-interactive \
             --json \
-            --wait 2>&1 | tee build-output.json
-          echo "---- last 5 lines of build-output.json ----"
-          tail -n 5 build-output.json
+            --wait > build-output.json
+          echo "---- build-output.json ----"
+          cat build-output.json
 
       - name: Download APK artifact
         run: |
+          set -eu
           APK_URL=$(node -e "
             const fs = require('fs');
             const raw = fs.readFileSync('build-output.json','utf8').trim();
             const start = raw.indexOf('[');
             const end = raw.lastIndexOf(']');
-            if (start === -1 || end === -1) { console.error('no JSON array in output'); process.exit(1); }
+            if (start === -1 || end === -1) { console.error('no JSON array in EAS output'); process.exit(1); }
             const builds = JSON.parse(raw.slice(start, end + 1));
             const url = builds[0] && builds[0].artifacts && builds[0].artifacts.buildUrl;
             if (!url) { console.error('no buildUrl in EAS response'); process.exit(1); }
@@ -105,33 +135,86 @@ jobs:
           ")
           echo "APK URL: $APK_URL"
           mkdir -p out
-          curl -fL "$APK_URL" -o "out/viax-trace-${{ steps.meta.outputs.version }}-${{ steps.meta.outputs.short_sha }}.apk"
+          curl -fL "$APK_URL" -o "out/viax-trace-v${{ steps.meta.outputs.version }}-${{ steps.meta.outputs.short_sha }}.apk"
           ls -lh out
+
+      - name: Compute APK size
+        id: apk
+        run: |
+          APK_FILE=$(ls out/*.apk | head -n1)
+          APK_SIZE=$(du -h "$APK_FILE" | cut -f1)
+          APK_NAME=$(basename "$APK_FILE")
+          {
+            echo "file=${APK_FILE}"
+            echo "name=${APK_NAME}"
+            echo "size=${APK_SIZE}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Compose release notes
+        id: notes
+        run: |
+          cat > release-notes.md <<EOF
+          # ViaX:Trace Mobile — v${{ steps.meta.outputs.version }}
+
+          APK Android assinado, gerado automaticamente via **EAS Build** no perfil
+          \`${{ steps.meta.outputs.profile }}\`.
+
+          ## Informações da build
+
+          | Campo            | Valor |
+          |------------------|-------|
+          | Versão           | \`${{ steps.meta.outputs.version }}\` |
+          | Perfil EAS       | \`${{ steps.meta.outputs.profile }}\` |
+          | Data da build    | ${{ steps.meta.outputs.build_date }} |
+          | Commit           | [\`${{ steps.meta.outputs.short_sha }}\`](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}) |
+          | Tamanho do APK   | ${{ steps.apk.outputs.size }} |
+          | Arquivo          | \`${{ steps.apk.outputs.name }}\` |
+          | Pacote Android   | \`com.viax.trace\` |
+          | SDK Expo         | 54 (New Architecture) |
+
+          ## Stack
+
+          Expo SDK 54 · React Native New Architecture · TypeScript estrito · NativeWind v4 ·
+          Reanimated v4 · expo-router v6 · TanStack Query v5 · react-native-sse ·
+          @shopify/react-native-skia · AsyncStorage · expo-haptics · NetInfo.
+
+          ## Novidades da v2.0.0
+
+          - Reescrita completa do app mobile do zero com a nova arquitetura.
+          - 5 abas inferiores: **Dashboard**, **Processar**, **Ferramenta**, **Histórico**, **Configurações**.
+          - Tela de **Setup** para configurar a URL do servidor (\`@viax/serverUrl\`) com teste de conexão via \`/api/healthz\`.
+          - Autenticação por **cookie de sessão** (sem JWT) com cookie jar persistido em AsyncStorage.
+          - **SSE com upload multipart** para Processar e Ferramenta com progresso em tempo real.
+          - Gráficos **Skia** (donut, barras, sparkline) no Dashboard.
+          - Tema light/dark espelhado da web (acento \`#d4521a\`, fonte Poppins).
+          - Exportação de CSV via \`expo-file-system\` + \`expo-sharing\`.
+          - Ícone nativo elegante derivado do logo SVG do projeto.
+
+          ## Como instalar
+
+          1. Baixe o APK abaixo no seu Android.
+          2. Em **Configurações → Segurança**, habilite **Instalar de fontes desconhecidas**
+             para o navegador usado no download.
+          3. Toque no APK baixado para instalar.
+          4. Ao abrir o app, configure a URL do seu servidor ViaX:Trace
+             (rodando localmente via Termux ou em outro host) na tela inicial.
+
+          ${{ github.event.inputs.release_notes && format('## Notas adicionais
+
+          {0}', github.event.inputs.release_notes) || '' }}
+          EOF
+          echo "Generated release notes:"
+          cat release-notes.md
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.meta.outputs.tag }}
-          name: ViaX:Trace Mobile ${{ steps.meta.outputs.tag }}
-          body: |
-            ## ViaX:Trace Mobile — Android APK
-
-            Build automatizado via EAS Build.
-
-            - **Versão**: `${{ steps.meta.outputs.version }}`
-            - **Commit**: `${{ github.sha }}`
-            - **Trigger**: ${{ github.event_name }}
-            - **Profile**: `${{ steps.meta.outputs.profile }}`
-
-            ### Instalação
-
-            1. Baixe o `.apk` abaixo no seu Android.
-            2. Em **Configurações → Segurança**, autorize a instalação de fontes desconhecidas.
-            3. Toque no APK baixado para instalar.
-            4. Ao abrir o app, configure a URL do seu servidor ViaX:Trace
-               (rodando localmente via Termux ou em outro host) na tela inicial.
+          name: ViaX:Trace Mobile v${{ steps.meta.outputs.version }}
+          body_path: artifacts/viax-mobile/release-notes.md
           files: artifacts/viax-mobile/out/*.apk
           draft: false
-          prerelease: false
+          prerelease: ${{ steps.meta.outputs.profile == 'preview' }}
+          fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
