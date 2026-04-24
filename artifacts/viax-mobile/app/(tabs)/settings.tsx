@@ -13,7 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { useColors } from '@/hooks/useColors';
 import { useAuth } from '@/lib/auth';
@@ -60,7 +60,14 @@ export default function SettingsScreen() {
   const { user, refresh, logout } = useAuth();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const [active, setActive] = useState<Tab>('perfil');
+  const params = useLocalSearchParams<{ tab?: string }>();
+  const initialTab = (TABS.find((t) => t.id === params.tab)?.id ?? 'perfil') as Tab;
+  const [active, setActive] = useState<Tab>(initialTab);
+
+  useEffect(() => {
+    const next = TABS.find((t) => t.id === params.tab)?.id as Tab | undefined;
+    if (next) setActive(next);
+  }, [params.tab]);
 
   const { data: settings, isLoading } = useQuery<SettingsData>({
     queryKey: ['/api/users/settings'],
@@ -330,12 +337,7 @@ function PerfilTab({ user, onUpdated }: { user: any; onUpdated: () => Promise<vo
 
         <View style={{ height: 10 }} />
         <Label>Data de nascimento</Label>
-        <Input
-          value={birthDate}
-          onChangeText={setBirthDate}
-          placeholder="AAAA-MM-DD"
-          autoCapitalize="none"
-        />
+        <DateInput value={birthDate} onChange={setBirthDate} />
 
         <View style={{ height: 10 }} />
         <Label>Email</Label>
@@ -671,8 +673,17 @@ function InstanciasTab({
             hasError={!!mapsKeyError}
           />
           {mapsKeyError && <FieldError>{mapsKeyError}</FieldError>}
-          <Text style={{ color: c.textFaint, fontFamily: 'Poppins_400Regular', fontSize: 10, marginTop: 6, lineHeight: 14 }}>
-            Habilite a Geocoding API no Google Cloud Console.
+          <Text style={{ color: c.textFaint, fontFamily: 'Poppins_400Regular', fontSize: 11, lineHeight: 16, marginTop: 8 }}>
+            A chave deve começar com{' '}
+            <Text style={{ fontFamily: 'Poppins_600SemiBold' }}>AIza</Text>{' '}
+            e ter entre 35 e 45 caracteres. Crie uma em{' '}
+            <Text
+              onPress={() => Linking.openURL('https://console.cloud.google.com/google/maps-apis/credentials')}
+              style={{ color: c.accent, fontFamily: 'Poppins_600SemiBold', textDecorationLine: 'underline' }}
+            >
+              console.cloud.google.com
+            </Text>
+            .
           </Text>
         </View>
       )}
@@ -688,16 +699,36 @@ function InstanciasTab({
             borderColor: 'rgba(124,58,237,0.25)',
           }}
         >
-          <Text style={{ color: '#7c3aed', fontFamily: 'Poppins_700Bold', fontSize: 11, marginBottom: 6 }}>
-            Como ativar
-          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+            <Ionicons name="information-circle-outline" size={14} color="#7c3aed" />
+            <Text style={{ color: '#7c3aed', fontFamily: 'Poppins_700Bold', fontSize: 11, letterSpacing: 0.3 }}>
+              Como ativar o GeocodeR BR
+            </Text>
+          </View>
           <Text style={{ color: c.textFaint, fontFamily: 'Poppins_400Regular', fontSize: 11, lineHeight: 17 }}>
-            O microserviço precisa rodar localmente na porta 8002. Defina{' '}
-            <Text style={{ fontFamily: 'Poppins_600SemiBold' }}>
+            O microserviço precisa estar rodando localmente na porta{' '}
+            <Text style={{ fontFamily: 'Poppins_700Bold' }}>8002</Text>. Configure a variável de ambiente{' '}
+            <Text style={{ fontFamily: 'Poppins_500Medium', color: c.text }}>
               GEOCODEBR_URL=http://localhost:8002
             </Text>{' '}
-            no servidor.
+            no servidor da API.
           </Text>
+          <Text style={{ color: c.text, fontFamily: 'Poppins_600SemiBold', fontSize: 11, marginTop: 10, marginBottom: 4 }}>
+            Via Docker:
+          </Text>
+          <View style={{ backgroundColor: c.surface2, borderWidth: 1, borderColor: c.border, borderRadius: 6, paddingHorizontal: 10, paddingVertical: 8 }}>
+            <Text selectable style={{ color: c.textMuted, fontFamily: 'Poppins_400Regular', fontSize: 10.5, lineHeight: 16 }}>
+              docker run -p 8002:8002 -v geocodebr-cache:/root/.cache viax-geocodebr
+            </Text>
+          </View>
+          <Text style={{ color: c.text, fontFamily: 'Poppins_600SemiBold', fontSize: 11, marginTop: 10, marginBottom: 4 }}>
+            Via Termux (Android):
+          </Text>
+          <View style={{ backgroundColor: c.surface2, borderWidth: 1, borderColor: c.border, borderRadius: 6, paddingHorizontal: 10, paddingVertical: 8 }}>
+            <Text selectable style={{ color: c.textMuted, fontFamily: 'Poppins_400Regular', fontSize: 10.5, lineHeight: 16 }}>
+              bash ~/viax-system/start-geocodebr.sh
+            </Text>
+          </View>
         </View>
       )}
 
@@ -1076,6 +1107,101 @@ function SobreTab() {
       <PanelCard title="Servidor configurado">
         <Text style={{ color: c.textMuted, fontFamily: 'Poppins_500Medium', fontSize: 12 }} numberOfLines={1}>
           {apiUrl || 'Não configurado'}
+        </Text>
+      </PanelCard>
+
+      <PanelCard title="Stack Tecnológico">
+        <View style={{ gap: 6 }}>
+          {[
+            { layer: 'Mobile', tech: 'Expo SDK 54 + React Native 0.81', detail: 'expo-router, TanStack Query, Poppins, react-native-svg' },
+            { layer: 'Frontend Web', tech: 'React 18 + Vite', detail: 'TypeScript, Tailwind CSS, Wouter' },
+            { layer: 'Backend', tech: 'Express 5', detail: 'TypeScript, REST API, pino logger' },
+            { layer: 'Banco de Dados', tech: 'PostgreSQL', detail: 'Drizzle ORM, migrações automáticas' },
+            { layer: 'Monorepo', tech: 'pnpm workspaces', detail: 'Libs compartilhadas, builds isolados' },
+            { layer: 'Geocod. Brasil (CEP)', tech: 'BrasilAPI v2', detail: 'Primário BR — IBGE/Correios, lat/lon' },
+            { layer: 'Geocod. Brasil (CEP)', tech: 'AwesomeAPI CEP', detail: 'Fallback BR — lat/lon gratuito' },
+            { layer: 'Geocod. Global', tech: 'Photon (Komoot)', detail: 'Sem rate limit, dados OSM' },
+            { layer: 'Geocod. Global', tech: 'Overpass + Nominatim', detail: 'Fallback — geometria OSM precisa' },
+            { layer: 'Premium opcional', tech: 'Google Maps API', detail: 'Máxima precisão, pay-per-use' },
+          ].map((item, i) => (
+            <View
+              key={i}
+              style={{
+                paddingHorizontal: 11,
+                paddingVertical: 9,
+                borderRadius: 10,
+                backgroundColor: c.surface2,
+                borderWidth: 1,
+                borderColor: c.border,
+              }}
+            >
+              <Text style={{ color: c.textFaint, fontFamily: 'Poppins_700Bold', fontSize: 9, letterSpacing: 0.6, textTransform: 'uppercase', marginBottom: 2 }}>
+                {item.layer}
+              </Text>
+              <Text style={{ color: c.text, fontFamily: 'Poppins_700Bold', fontSize: 12.5, marginBottom: 1 }}>
+                {item.tech}
+              </Text>
+              <Text style={{ color: c.textMuted, fontFamily: 'Poppins_400Regular', fontSize: 11, lineHeight: 15 }}>
+                {item.detail}
+              </Text>
+            </View>
+          ))}
+        </View>
+      </PanelCard>
+
+      <PanelCard title="Instalação">
+        <Muted>
+          Scripts de instalação automática estão disponíveis no repositório para Linux, macOS, Windows e Android (Termux). Cada script instala dependências, configura o banco e inicia o sistema completo.
+        </Muted>
+        <View style={{ height: 12 }} />
+        <View style={{ gap: 8 }}>
+          {[
+            {
+              platform: 'Linux / macOS',
+              cmd: 'curl -fsSL https://raw.githubusercontent.com/esmagafetos/Viax-Scout/main/install.sh | bash',
+              icon: 'desktop-outline' as const,
+            },
+            {
+              platform: 'Windows (PowerShell)',
+              cmd: 'iwr -useb https://raw.githubusercontent.com/esmagafetos/Viax-Scout/main/install.ps1 | iex',
+              icon: 'logo-windows' as const,
+            },
+            {
+              platform: 'Android — Termux',
+              cmd: 'curl -fsSL https://raw.githubusercontent.com/esmagafetos/Viax-Scout/main/install-termux.sh | bash',
+              icon: 'phone-portrait-outline' as const,
+            },
+          ].map((item) => (
+            <View
+              key={item.platform}
+              style={{
+                paddingHorizontal: 12,
+                paddingVertical: 10,
+                borderRadius: 10,
+                backgroundColor: c.surface2,
+                borderWidth: 1,
+                borderColor: c.border,
+              }}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                <Ionicons name={item.icon} size={14} color={c.textMuted} />
+                <Text style={{ color: c.text, fontFamily: 'Poppins_600SemiBold', fontSize: 12 }}>
+                  {item.platform}
+                </Text>
+              </View>
+              <View style={{ backgroundColor: c.bg, borderWidth: 1, borderColor: c.border, borderRadius: 6, paddingHorizontal: 9, paddingVertical: 7 }}>
+                <Text selectable style={{ color: c.textMuted, fontFamily: 'Poppins_400Regular', fontSize: 10.5, lineHeight: 15 }}>
+                  {item.cmd}
+                </Text>
+              </View>
+            </View>
+          ))}
+        </View>
+        <Text style={{ color: c.textFaint, fontFamily: 'Poppins_400Regular', fontSize: 10.5, marginTop: 10, lineHeight: 15 }}>
+          Pré-requisitos:{' '}
+          <Text style={{ fontFamily: 'Poppins_600SemiBold' }}>Node.js 18+</Text>,{' '}
+          <Text style={{ fontFamily: 'Poppins_600SemiBold' }}>pnpm</Text> e{' '}
+          <Text style={{ fontFamily: 'Poppins_600SemiBold' }}>PostgreSQL 14+</Text>. O script instala automaticamente o que estiver faltando (requer conexão com internet).
         </Text>
       </PanelCard>
 

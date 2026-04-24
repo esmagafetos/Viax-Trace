@@ -218,6 +218,18 @@ export function AppHeader() {
                   }}
                 />
                 <DropdownItem
+                  icon="person-outline"
+                  label="Perfil"
+                  color={c.text}
+                  onPress={() => {
+                    closeMenu();
+                    router.push({
+                      pathname: '/(tabs)/settings',
+                      params: { tab: 'perfil' },
+                    } as any);
+                  }}
+                />
+                <DropdownItem
                   icon="document-text-outline"
                   label="Documentação"
                   color={c.text}
