@@ -9,7 +9,7 @@ import {
   Text,
 } from 'react-native';
 import { Link, useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/lib/auth';
 import { useColors } from '@/hooks/useColors';
 import {
@@ -46,6 +46,7 @@ function validatePassword(password: string): string | null {
 export default function RegisterScreen() {
   const c = useColors();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { register } = useAuth();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -86,13 +87,14 @@ export default function RegisterScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.root, { backgroundColor: c.bg }]}>
-      <View style={styles.toggleWrap}>
+    <SafeAreaView style={[styles.root, { backgroundColor: c.bg }]} edges={['top', 'bottom', 'left', 'right']}>
+      <View style={[styles.toggleWrap, { top: insets.top + 12 }]}>
         <ThemeToggle />
       </View>
 
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+          <View style={styles.container}>
           {!hasApiUrl() && (
             <Card style={{ gap: 10, borderColor: c.accent, marginBottom: 14 }}>
               <Text style={{ color: c.accent, fontFamily: 'Poppins_600SemiBold', fontSize: 13 }}>
@@ -181,6 +183,7 @@ export default function RegisterScreen() {
               </View>
             </CardBody>
           </Card>
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -189,7 +192,8 @@ export default function RegisterScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  toggleWrap: { position: 'absolute', top: 14, right: 14, zIndex: 10 },
-  scroll: { padding: 22, justifyContent: 'center', flexGrow: 1 },
+  toggleWrap: { position: 'absolute', right: 14, zIndex: 10 },
+  scroll: { paddingHorizontal: 22, paddingVertical: 28, justifyContent: 'center', flexGrow: 1, alignItems: 'center' },
+  container: { width: '100%', maxWidth: 440 },
   footerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap' },
 });

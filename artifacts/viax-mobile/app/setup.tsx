@@ -9,7 +9,7 @@ import {
   Text,
   Alert,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/lib/auth';
@@ -90,6 +90,7 @@ function validateGoogleMapsKey(key: string): string | null {
 export default function SetupScreen() {
   const c = useColors();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { user } = useAuth();
 
   // Server config
@@ -197,13 +198,14 @@ export default function SetupScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.root, { backgroundColor: c.bg }]}>
-      <View style={styles.toggleWrap}>
+    <SafeAreaView style={[styles.root, { backgroundColor: c.bg }]} edges={['top', 'bottom', 'left', 'right']}>
+      <View style={[styles.toggleWrap, { top: insets.top + 12 }]}>
         <ThemeToggle />
       </View>
 
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+          <View style={styles.container}>
           {/* Outer card mirrors web Setup wrapper */}
           <Card style={{ padding: 0, overflow: 'hidden' }}>
             <View style={{ paddingHorizontal: 18, paddingTop: 22, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: c.border, gap: 8 }}>
@@ -495,6 +497,7 @@ export default function SetupScreen() {
               {user ? 'Pular por agora' : 'Voltar para o login'}
             </Text>
           </Pressable>
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -503,8 +506,9 @@ export default function SetupScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  toggleWrap: { position: 'absolute', top: 14, right: 14, zIndex: 10 },
-  scroll: { padding: 18, gap: 16 },
+  toggleWrap: { position: 'absolute', right: 14, zIndex: 10 },
+  scroll: { paddingHorizontal: 18, paddingVertical: 28, alignItems: 'center' },
+  container: { width: '100%', maxWidth: 560, gap: 16 },
   code: {
     flexDirection: 'row',
     alignItems: 'center',
