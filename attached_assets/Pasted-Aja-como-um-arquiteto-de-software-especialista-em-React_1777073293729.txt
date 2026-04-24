@@ -1,0 +1,159 @@
+Aja como um arquiteto de software especialista em React Native + Expo sênior, com foco em criar aplicativos Android nativos de alta performance e fidelidade visual. Você receberá a tarefa de **RECONSTRUIR DO ZERO** o aplicativo móvel para o SaaS 'Viax-Scout', apagando completamente qualquer código existente no diretório `artifacts/viax-mobile`.
+
+---
+
+## ⚠️ REGRA OBRIGATÓRIA (ANTES DE QUALQUER COISA)
+
+1. **DELETE TOTALMENTE** o diretório `artifacts/viax-mobile` existente.
+2. Reinicialize um novo projeto Expo com TypeScript exatamente como especificado abaixo.
+3. **NÃO REAPROVEITE** nenhum arquivo, configuração ou componente do app antigo.
+
+---
+
+## 📦 STACK EXIGIDA (sem exceções)
+
+- **React Native** (New Architecture habilitada — JSI + Fabric)
+- **Expo SDK** (managed workflow)
+- **TypeScript** (modo estrito)
+- **NativeWind** (Tailwind CSS para React Native)
+- **React Native Reanimated** (SUBSTITUI O FRAMER MOTION — framer motion não é aceito)
+- **React Navigation** + **expo-router** (navegação por abas)
+- **TanStack Query** (React Query) para estado do servidor
+- **expo-file-system**, **expo-document-picker**, **expo-sharing**
+- **react-native-sse** (para Server-Sent Events)
+- **@shopify/react-native-skia** (para gráficos — VICTORY NATIVE NÃO É ACEITO)
+- **AsyncStorage** (persistência local)
+
+---
+
+## 🚫 PROIBIÇÕES TAXATIVAS
+
+- ❌ Nenhum uso de `framer-motion` (não é estável no React Native)
+- ❌ Nenhum uso de `victory-native` (performance ruim com grandes datasets)
+- ❌ Nenhum menu lateral não solicitado (apenas navegação por abas)
+- ❌ Nenhuma tela "Sobre" ou "Documentação" (não existem no web original)
+- ❌ NENHUMA adaptação ou "simplificação" — o app DEVE SER ESPELHO 1:1
+
+---
+
+## 🧱 NÍVEL 1: Fundação e Sistema de Design (100% obrigatório)
+
+**Roteiro bloqueante (um item depende do anterior):**
+
+1. **Configuração Inicial**: `npx create-expo-app viax-mobile --template blank-typescript`. Configure NativeWind seguindo a documentação oficial. Instale todas as dependências listadas acima.
+2. **Sistema de Design**: Extraia do repositório web (`artifacts/viax-scout`) todas as cores, espaçamentos e tipografia via arquivo de tema do Tailwind. Nada pode ser "aproximado" — deve ser exato.
+3. **Casca de Navegação**: Implemente `expo-router` com três abas inferiores: **Dashboard** → `/`, **Processar** → `/process`, **Ferramenta** → `/tool`, **Histórico** → `/history`, **Configurações** → `/settings`. O nome "Ferramenta de Condomínios" é o correto (não "Tool").
+4. **Tela de Configurar Servidor** (`/setup`): O app DEVE iniciar nesta tela se nenhuma URL estiver salva. Campos: URL da API (placeholder: `http://192.168.0.10:8080`). Persistir via AsyncStorage. Ao salvar, testar a conectividade (`/api/health`). Redirecionar para `/` se sucesso.
+5. **Autenticação**: Implemente AuthContext completo com token JWT, login, logout, perfil do usuário. As telas de login e criação de conta devem ser **replicadas pixel a pixel** do web — use as classes do NativeWind.
+6. **QueryClient**: Configure TanStack Query com retry padrão 1, staleTime 5 segundos. Envolva o app com `<QueryClientProvider>`.
+
+**Critério validação nível 1 (só avance após check):**
+- [ ] `expo start` roda sem erros.
+- [ ] O app pede URL do servidor no primeiro acesso.
+- [ ] Login com credenciais válidas redireciona para `/`.
+- [ ] O logout limpa o token e redireciona para `/setup`.
+- [ ] As abas trocam de tela e o título da aba ativa fica destacado.
+
+---
+
+## 🧱 NÍVEL 2: Dashboard (100% obrigatório)
+
+**Roteiro:**
+
+1. **Hooks de API**: Crie `useDashboardData` e `useAnalysisHistory` com TanStack Query, apontando para `/api/dashboard` e `/api/analyses`.
+2. **Componentes visuais** (todos obrigatórios):
+   - Card **Total de Análises** (número inteiro grande + label + ícone)
+   - Card **Nuances (Divergências)** (destaque em amarelo/laranja)
+   - Card **Controle Financeiro** (exibe `totalCost` da API, botão "Configurar agora")
+3. **Gráfico de Barras** (`Nuances por Dia`): Use **React Native Skia** — construa um gráfico de barras simples: eixo X = datas, eixo Y = quantidade de nuances. A transição deve ser suave e os dados atualizarem sem travamentos.
+4. **Três estados visuais obrigatórios** (componentes reutilizáveis):
+   - **Loading**: esqueleto com shimmer (use `Reanimated` para o efeito pulsante)
+   - **Empty**: ilustração/ícone amigável + texto
+   - **Error**: mensagem + botão "Tentar novamente" que refaz a query
+5. **Animações**: Use `React Native Reanimated` para a entrada dos cards (fade + scale). Transição de 400ms, easing OutCubic.
+
+**Critério validação nível 2:**
+- [ ] O dashboard exibe dados reais da API (conectada via Termux).
+- [ ] O gráfico Skia desenha corretamente os valores.
+- [ ] Os estados loading, empty e error são visualmente idênticos à web.
+- [ ] As animações de entrada ocorrem conforme especificado.
+
+---
+
+## 🧱 NÍVEL 3: Processamento & Histórico (100% obrigatório)
+
+**Roteiro:**
+
+1. **Tela de Processamento** (`/process`):
+   - Botão "Selecionar arquivo" → `expo-document-picker` aceita `['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'text/csv']`.
+   - Após escolha, exibe nome do arquivo, tamanho em KB e um botão "Trocar arquivo".
+   - Ao clicar em "Iniciar Processamento": faz POST para `/api/process/upload` com FormData.
+2. **SSE em tempo real**:
+   - Recebe do backend um `eventSourceUrl` (ex: `/api/process/stream?id=...`).
+   - Conecta via `react-native-sse` e exibe **cada linha processada** em uma lista rolável (exatamente como no web: `[1/25] Rua Porto Alegre, 188...`).
+   - Atualiza uma **barra de progresso** (0% → 100%) à medida que as mensagens SSE chegam.
+   - Conclusão do processamento: exibe sumário (total de endereços, nuances, similaridade média) e redireciona para `/history`.
+3. **Tela de Histórico** (`/history`):
+   - `SectionList` agrupando análises por data (ex: "ANÁLISES · 23/04/2026").
+   - Linha de cada análise: # ID, nome do arquivo, total de endereços, quantidade de nuances.
+   - Botão de download em cada linha → `expo-file-system` baixa o CSV e `expo-sharing` compartilha.
+4. **Estados da tela de Histórico**: reutilizar os mesmos componentes de loading/empty/error do dashboard.
+
+**Critério validação nível 3:**
+- [ ] Upload e processamento SSE funcionam completamente (endereços aparecendo um a um).
+- [ ] Barra de progresso varia de acordo com o percentual real concluído.
+- [ ] O histórico lista análises feitas e permite download do CSV.
+- [ ] Os estados vazio, carregando e erro da lista são idênticos aos da web.
+
+---
+
+## 🧱 NÍVEL 4: Ferramenta de Condomínios, Tema e Polimento Final (100% obrigatório)
+
+**Roteiro:**
+
+1. **Tela de Ferramenta de Condomínios** (`/tool`):
+   - Consome rota `/api/tools/condominiums`.
+   - Exibe cards de condomínios como no web: título + status ("DISPONÍVEL · 1086 LOTES" ou "EM DESENVOLVIMENTO").
+   - Ao selecionar um condomínio disponível, exibir área de upload específica (mesmo componente de upload do nivel 3, mas enviando o `condominiumId` no payload).
+2. **Alternância de Tema Escuro/Claro**:
+   - Botão/toggle na tela `/settings`.
+   - Persistir preferência no AsyncStorage.
+   - A troca deve ser instantânea e afetar todas as telas (use `NativeWind` com classes `dark:`).
+   - A paleta de cores escura deve ser **exatamente** a mesma da web.
+3. **Estados Globais e Edge Cases**:
+   - Monitore conectividade via `NetInfo`. Quando offline, exiba um **banner não intrusivo** no topo e desabilite ações que exigem rede.
+   - Todas as chamadas de API tratam timeout (10s) e erros de rede, exibindo `Error` state com botão retry.
+   - Ao reiniciar o app, restaurar sessão via AsyncStorage (token + URL do servidor).
+4. **Polimento Final**:
+   - `SafeAreaView` em todas as telas.
+   - `KeyboardAvoidingView` nas telas de login, criação de conta e configurações (onde há formulários longos).
+   - Adicione feedback tátil (`expo-haptics`) em: login, finalização do upload, download de relatório e alternância de tema.
+   - Alinhamento pixel-perfect: compare com os prints do web.
+
+**Critério final do nível 4 (validação definitiva):**
+- [ ] Ferramenta de Condomínios replica o fluxo web perfeitamente.
+- [ ] Alternância de tema funciona e persiste.
+- [ ] Tratamento offline está implementado (banner + desativação).
+- [ ] O app submete a **todos os requisitos de UI/UX** e não há diferenças perceptíveis do web original.
+
+---
+
+## 🧪 CHECKLIST FINAL DE VALIDAÇÃO (só entregue se tudo estiver verde)
+
+- [ ] Build do app conclui sem warnings ou erros no Expo.
+- [ ] Todas as 5 abas funcionam consistentemente.
+- [ ] Autenticação + servidor customizável (URL persistida) + logout.
+- [ ] Dashboard com gráfico Skia funcional.
+- [ ] Processamento SSE com streaming linha a linha e barra de progresso.
+- [ ] Histórico com agrupamento por data e download de CSV.
+- [ ] Ferramenta de Condomínios com upload condicional.
+- [ ] Tema escuro/claro instantâneo.
+- [ ] Tratamento de offline e erros globais.
+- [ ] Navegação consistente sem menus laterais extras.
+- [ ] O app é visualmente INDISTINGUÍVEL dos prints do web.
+
+---
+
+## 🚀 INSTRUÇÃO FINAL
+
+**Apague o diretório `artifacts/viax-mobile` agora mesmo.** Não mantenha nenhum resquício do código antigo. Em seguida, siga rigorosamente os níveis de 1 a 4, **validando cada critério** antes de avançar. Você deve entregar um app Android nativo que seja um espelho perfeito do Viax-Scout web. Não invente, não simplifique, não adicione telas extras. Mãos à obra.
