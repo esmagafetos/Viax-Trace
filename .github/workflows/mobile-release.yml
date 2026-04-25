@@ -107,19 +107,62 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: Build APK on EAS
+        id: easbuild
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
           EAS_BUILD_NO_EXPO_GO_WARNING: "true"
         run: |
-          set -o pipefail
+          set +e
           eas build \
             --platform android \
             --profile "${{ steps.meta.outputs.profile }}" \
             --non-interactive \
             --json \
             --wait > build-output.json
+          BUILD_EXIT=$?
           echo "---- build-output.json ----"
-          cat build-output.json
+          cat build-output.json || true
+          exit $BUILD_EXIT
+
+      - name: Fetch EAS build logs on failure
+        if: failure() && steps.easbuild.conclusion == 'failure'
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          set +e
+          if [ ! -s build-output.json ]; then
+            echo "build-output.json missing or empty"
+            exit 0
+          fi
+          BUILD_ID=$(node -e "
+            const fs = require('fs');
+            const raw = fs.readFileSync('build-output.json','utf8').trim();
+            const s = raw.indexOf('['); const e = raw.lastIndexOf(']');
+            if (s === -1 || e === -1) { process.exit(0); }
+            const arr = JSON.parse(raw.slice(s, e + 1));
+            if (arr[0] && arr[0].id) console.log(arr[0].id);
+          ")
+          echo "EAS Build ID: $BUILD_ID"
+          if [ -z "$BUILD_ID" ]; then
+            echo "Could not extract build id"; exit 0
+          fi
+          echo "===== eas build:view ====="
+          eas build:view --json "$BUILD_ID" > build-detail.json 2>&1 || true
+          cat build-detail.json || true
+          echo ""
+          echo "===== Build log (tail 300 lines) ====="
+          LOG_URL=$(node -e "
+            try {
+              const b = JSON.parse(require('fs').readFileSync('build-detail.json','utf8'));
+              const u = (b.logFiles && b.logFiles[0]) || b.buildLogsUrl || '';
+              console.log(u);
+            } catch(e) {}
+          ")
+          echo "Log URL: $LOG_URL"
+          if [ -n "$LOG_URL" ]; then
+            curl -sSL -H "Authorization: Bearer $EXPO_TOKEN" "$LOG_URL" -o eas-build.log || true
+            tail -300 eas-build.log || true
+          fi
 
       - name: Download APK artifact
         run: |
