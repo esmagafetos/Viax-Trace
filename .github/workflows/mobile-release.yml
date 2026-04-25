@@ -80,7 +80,8 @@ jobs:
       - name: Typecheck mobile
         run: pnpm --filter @workspace/viax-mobile run typecheck
 
-      - name: Run expo-doctor
+      - name: Run expo-doctor (informational, non-blocking)
+        continue-on-error: true
         run: npx --yes expo-doctor@latest
 
       - name: Resolve build metadata

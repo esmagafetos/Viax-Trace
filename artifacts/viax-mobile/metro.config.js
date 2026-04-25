@@ -7,11 +7,20 @@ const workspaceRoot = path.resolve(projectRoot, "../..");
 
 const config = getDefaultConfig(projectRoot);
 
-config.watchFolders = [workspaceRoot];
-config.resolver.nodeModulesPaths = [
-  path.resolve(projectRoot, "node_modules"),
-  path.resolve(workspaceRoot, "node_modules"),
-];
+const defaultWatchFolders = Array.isArray(config.watchFolders) ? config.watchFolders : [];
+config.watchFolders = Array.from(new Set([...defaultWatchFolders, projectRoot, workspaceRoot]));
+
+const defaultNodeModulesPaths = Array.isArray(config.resolver.nodeModulesPaths)
+  ? config.resolver.nodeModulesPaths
+  : [];
+config.resolver.nodeModulesPaths = Array.from(
+  new Set([
+    ...defaultNodeModulesPaths,
+    path.resolve(projectRoot, "node_modules"),
+    path.resolve(workspaceRoot, "node_modules"),
+  ]),
+);
+
 config.resolver.disableHierarchicalLookup = true;
 
 module.exports = withNativeWind(config, { input: "./global.css" });
