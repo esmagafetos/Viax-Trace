@@ -20,21 +20,30 @@ export default function SetupScreen() {
   const { show } = useToast();
   const insets = useSafeAreaInsets();
 
-  const [url, setUrl] = useState(serverUrl ?? "https://");
+  const [url, setUrl] = useState(serverUrl ?? "");
   const [testing, setTesting] = useState(false);
   const [tested, setTested] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const normalize = (raw: string) => {
-    let s = raw.trim();
+    let s = raw.trim().replace(/\/+$/, "");
     if (!s) return "";
-    if (!/^https?:\/\//i.test(s)) s = `https://${s}`;
-    return s.replace(/\/+$/, "");
+    // If the user already typed a protocol, respect it (don't force https).
+    if (/^https?:\/\//i.test(s)) return s;
+    // Otherwise, infer protocol from the host: local/private → http, everything else → https.
+    const hostPart = s.split("/")[0]!.split(":")[0]!.toLowerCase();
+    const isLocal =
+      hostPart === "localhost" ||
+      /^127\./.test(hostPart) ||
+      /^10\./.test(hostPart) ||
+      /^192\.168\./.test(hostPart) ||
+      /^172\.(1[6-9]|2\d|3[0-1])\./.test(hostPart);
+    return `${isLocal ? "http" : "https"}://${s}`;
   };
 
   const testConnection = async () => {
     const cleaned = normalize(url);
-    if (!cleaned || cleaned === "https://") {
+    if (!cleaned) {
       setError("Informe a URL do servidor.");
       return;
     }
@@ -89,14 +98,14 @@ export default function SetupScreen() {
         <ScrollView contentContainerStyle={{ padding: 22, paddingBottom: insets.bottom + 32, gap: 18 }}>
           <Input
             label="URL do servidor"
-            placeholder="https://api.suaempresa.com"
+            placeholder="http://localhost:8080"
             autoCapitalize="none"
             autoCorrect={false}
             keyboardType="url"
             value={url}
             onChangeText={(v) => { setUrl(v); setTested(false); setError(null); }}
             error={error}
-            hint="Ex: https://api.viax.com.br ou http://192.168.0.10:8080"
+            hint="Termux/local: http://localhost:8080 ou http://192.168.x.x:8080. Cloud: https://api.viax.com.br"
           />
 
           <Button
