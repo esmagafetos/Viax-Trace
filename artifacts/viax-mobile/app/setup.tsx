@@ -107,22 +107,31 @@ export default function SetupScreen() {
         </Text>
       </LinearGradient>
 
-      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
-        <ScrollView contentContainerStyle={{ padding: 22, paddingBottom: insets.bottom + 32, gap: 18 }}>
+      <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
+        <ScrollView
+          contentContainerStyle={{ padding: 22, paddingBottom: insets.bottom + 32, gap: 18 }}
+          keyboardShouldPersistTaps="handled"
+        >
 
           <View style={{ padding: 14, backgroundColor: t.surface2, borderRadius: radii.md, borderWidth: 1, borderColor: t.accent + "44" }}>
             <Text style={{ fontFamily: "Poppins_700Bold", fontSize: 12, color: t.accent, marginBottom: 6, letterSpacing: 0.4 }}>
-              COMO OBTER A URL
+              COMO INICIAR O SERVIDOR
             </Text>
             <Text style={{ fontFamily: "Poppins_400Regular", fontSize: 12, color: t.textFaint, lineHeight: 20 }}>
-              1. Abra o Termux no seu Android e inicie o servidor ViaX:Trace.{"\n"}
-              2. O terminal exibirá o endereço — algo como:{"\n"}
+              1. Abra o Termux no mesmo aparelho Android.{"\n"}
+              2. Execute o comando abaixo:{"\n"}
+              {"   "}
+              <Text style={{ fontFamily: "Poppins_600SemiBold", color: t.text }}>
+                bash ~/viax-system/start-backend.sh
+              </Text>
+              {"\n"}
+              3. Copie a URL exibida no terminal:{"\n"}
               {"   "}
               <Text style={{ fontFamily: "Poppins_600SemiBold", color: t.text }}>
                 http://127.0.0.1:8080
               </Text>
               {"\n"}
-              3. Cole esse endereço no campo abaixo e toque em "Testar conexão".
+              4. Cole no campo abaixo e toque em "Testar conexão".
             </Text>
           </View>
 
