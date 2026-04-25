@@ -1,42 +1,42 @@
-// termux.ts
+import { getLocalIpAddress } from "./network";
 
 /**
- * Detect Termux servers on the local network and retrieve available URLs.
+ * The default port used by the ViaX:Trace API server in Termux.
  */
+export const TERMUX_DEFAULT_PORT = 8080;
 
-import { NetworkInterfaceInfo, networkInterfaces } from 'os';
-import * as dgram from 'dgram';
-
-// Function to detect Termux servers
-function detectTermuxServers(callback: (servers: string[]) => void) {
-    const servers: string[] = [];
-    const message = Buffer.from('termux-seek');
-    const socket = dgram.createSocket('udp4');
-
-    socket.on('message', (msg, rinfo) => {
-        if (msg.toString() === 'termux-announce') {
-            servers.push(`http://${rinfo.address}:8080`); // Assuming default Termux server port
-        }
-    });
-
-    // Broadcast the message to the local network
-    socket.bind(() => {
-        socket.setBroadcast(true);
-        const addressInfo = networkInterfaces();
-        Object.values(addressInfo).forEach((network) => {
-            network.forEach((info: NetworkInterfaceInfo) => {
-                if (info.family === 'IPv4' && !info.internal) {
-                    socket.send(message, 0, message.length, 8080, info.address);
-                }
-            });
-        });
-        // Stop listening after 3 seconds
-        setTimeout(() => {
-            socket.close();
-            callback(servers);
-        }, 3000);
-    });
+/**
+ * Build the expected local server URL based on the device's current IP address.
+ * Since the server runs inside Termux on the same Android device, the loopback
+ * address 127.0.0.1 is always reliable regardless of the WiFi network.
+ */
+export function getTermuxLoopbackUrl(port: number = TERMUX_DEFAULT_PORT): string {
+  return `http://127.0.0.1:${port}`;
 }
 
-// Export the function for use in other modules
-export { detectTermuxServers };
+/**
+ * Build a suggested server URL using the device's LAN IP (useful when connecting
+ * from another device on the same network).
+ * Returns null if the local IP cannot be determined.
+ */
+export async function getTermuxLanUrl(
+  port: number = TERMUX_DEFAULT_PORT,
+): Promise<string | null> {
+  const ip = await getLocalIpAddress();
+  if (!ip) return null;
+  return `http://${ip}:${port}`;
+}
+
+/**
+ * Return the suggested URLs for the Termux server running on this device.
+ * The loopback URL (127.0.0.1) is always the primary option.
+ */
+export async function getTermuxSuggestedUrls(
+  port: number = TERMUX_DEFAULT_PORT,
+): Promise<{ loopback: string; lan: string | null }> {
+  const lanUrl = await getTermuxLanUrl(port);
+  return {
+    loopback: getTermuxLoopbackUrl(port),
+    lan: lanUrl,
+  };
+}
