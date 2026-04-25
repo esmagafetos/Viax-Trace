@@ -25,12 +25,15 @@ export default function SetupScreen() {
   const [tested, setTested] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const normalize = (raw: string) => {
+  const normalize = (raw: string): string => {
     let s = raw.trim().replace(/\/+$/, "");
     if (!s) return "";
-    // If the user already typed a protocol, respect it (don't force https).
-    if (/^https?:\/\//i.test(s)) return s;
-    // Otherwise, infer protocol from the host: local/private → http, everything else → https.
+
+    if (/^https?:\/\//i.test(s)) {
+      // Replace "localhost" with "127.0.0.1" for Android compatibility
+      return s.replace(/^(https?:\/\/)localhost(:\d+)?/i, (_, proto, port) => `${proto}127.0.0.1${port ?? ""}`);
+    }
+
     const hostPart = s.split("/")[0]!.split(":")[0]!.toLowerCase();
     const isLocal =
       hostPart === "localhost" ||
@@ -38,7 +41,13 @@ export default function SetupScreen() {
       /^10\./.test(hostPart) ||
       /^192\.168\./.test(hostPart) ||
       /^172\.(1[6-9]|2\d|3[0-1])\./.test(hostPart);
-    return `${isLocal ? "http" : "https"}://${s}`;
+
+    const proto = isLocal ? "http" : "https";
+
+    // Replace "localhost" with "127.0.0.1" so Android resolves it via IPv4
+    const normalized = s.replace(/^localhost(:\d+)?/i, (_, port) => `127.0.0.1${port ?? ""}`);
+
+    return `${proto}://${normalized}`;
   };
 
   const testConnection = async () => {
@@ -51,17 +60,21 @@ export default function SetupScreen() {
     setTesting(true);
     try {
       await setServerUrl(cleaned);
-      const r = await api<{ ok: boolean }>("/healthz");
-      if (r && (r as any).ok !== false) {
+      const r = await api<{ status: string }>("/healthz");
+      if (r && (r as any).status !== undefined) {
         setTested(true);
         void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         show("Conexão estabelecida.", "success");
       } else {
-        throw new Error("Resposta inesperada.");
+        throw new Error("Resposta inesperada do servidor.");
       }
     } catch (e: any) {
       setTested(false);
-      setError(e?.message ?? "Não foi possível conectar.");
+      const msg: string =
+        e?.message === "Network request failed"
+          ? "Servidor inacessível. Verifique se o Termux está rodando e a URL está correta."
+          : (e?.message ?? "Não foi possível conectar.");
+      setError(msg);
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     } finally {
       setTesting(false);
@@ -90,22 +103,39 @@ export default function SetupScreen() {
           Configurar servidor
         </Text>
         <Text style={{ color: "rgba(240,237,232,0.65)", fontFamily: "Poppins_400Regular", fontSize: 13, marginTop: 8, lineHeight: 19 }}>
-          Informe o endereço do seu servidor ViaX:Trace para começar a auditar suas entregas.
+          Informe o endereço exibido pelo Termux para conectar ao backend ViaX:Trace.
         </Text>
       </LinearGradient>
 
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={{ padding: 22, paddingBottom: insets.bottom + 32, gap: 18 }}>
+
+          <View style={{ padding: 14, backgroundColor: t.surface2, borderRadius: radii.md, borderWidth: 1, borderColor: t.accent + "44" }}>
+            <Text style={{ fontFamily: "Poppins_700Bold", fontSize: 12, color: t.accent, marginBottom: 6, letterSpacing: 0.4 }}>
+              COMO OBTER A URL
+            </Text>
+            <Text style={{ fontFamily: "Poppins_400Regular", fontSize: 12, color: t.textFaint, lineHeight: 20 }}>
+              1. Abra o Termux no seu Android e inicie o servidor ViaX:Trace.{"\n"}
+              2. O terminal exibirá o endereço — algo como:{"\n"}
+              {"   "}
+              <Text style={{ fontFamily: "Poppins_600SemiBold", color: t.text }}>
+                http://127.0.0.1:8080
+              </Text>
+              {"\n"}
+              3. Cole esse endereço no campo abaixo e toque em "Testar conexão".
+            </Text>
+          </View>
+
           <Input
-            label="URL do servidor"
-            placeholder="http://localhost:8080"
+            label="URL do servidor Termux"
+            placeholder="http://127.0.0.1:8080"
             autoCapitalize="none"
             autoCorrect={false}
             keyboardType="url"
             value={url}
             onChangeText={(v) => { setUrl(v); setTested(false); setError(null); }}
             error={error}
-            hint="Termux/local: http://localhost:8080 ou http://192.168.x.x:8080. Cloud: https://api.viax.com.br"
+            hint="Use a URL exibida no terminal do Termux. Nunca use https:// para servidor local."
           />
 
           <Button
@@ -124,7 +154,7 @@ export default function SetupScreen() {
             onPress={proceed}
           />
 
-          <View style={{ marginTop: 8, padding: 14, backgroundColor: t.surface2, borderRadius: radii.md, borderWidth: 1, borderColor: t.borderStrong }}>
+          <View style={{ marginTop: 4, padding: 14, backgroundColor: t.surface2, borderRadius: radii.md, borderWidth: 1, borderColor: t.borderStrong }}>
             <Text style={{ fontFamily: "Poppins_600SemiBold", fontSize: 12, color: t.textMuted, marginBottom: 6, letterSpacing: 0.4 }}>
               DICA
             </Text>
