@@ -1,0 +1,62 @@
+name: Mobile OTA Update
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: "EAS Update branch (production / preview / development)"
+        required: true
+        default: "production"
+        type: choice
+        options:
+          - production
+          - preview
+          - development
+      message:
+        description: "Mensagem da atualização"
+        required: true
+        default: "Atualização OTA"
+
+  push:
+    branches: [main]
+    paths:
+      - "artifacts/viax-mobile/app/**"
+      - "artifacts/viax-mobile/components/**"
+      - "artifacts/viax-mobile/lib/**"
+      - "artifacts/viax-mobile/hooks/**"
+      - "artifacts/viax-mobile/constants/**"
+      - "artifacts/viax-mobile/assets/**"
+
+jobs:
+  publish-ota:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.26.1
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Setup EAS CLI
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Publish OTA update
+        working-directory: artifacts/viax-mobile
+        run: |
+          BRANCH="${{ github.event.inputs.branch || 'production' }}"
+          MSG="${{ github.event.inputs.message || format('Auto OTA — {0}', github.event.head_commit.message) }}"
+          eas update --branch "$BRANCH" --message "$MSG" --non-interactive

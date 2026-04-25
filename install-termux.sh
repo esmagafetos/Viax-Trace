@@ -203,17 +203,37 @@ if [[ "$NEEDS_BUILD" == "true" ]]; then
 fi
 
 echo "Iniciando API..."
-PORT=8080 node artifacts/api-server/dist/index.mjs &
+PORT=8080 HOST=0.0.0.0 node artifacts/api-server/dist/index.mjs &
 API_PID=$!
 
 echo "Iniciando Frontend..."
 (cd artifacts/viax-scout && PORT=5173 BASE_PATH=/ pnpm exec vite --host 0.0.0.0) &
 WEB_PID=$!
 
+# Detecta o IP LAN do aparelho (Wi-Fi)
+LAN_IP=$(ip -4 addr show 2>/dev/null | grep -oP '(?<=inet\s)192\.168\.\d+\.\d+' | head -1)
+LAN_IP=${LAN_IP:-$(ip -4 addr show 2>/dev/null | grep -oP '(?<=inet\s)10\.\d+\.\d+\.\d+' | head -1)}
+
 echo ""
-echo "ViaX:Trace rodando!"
-echo "   Frontend : http://localhost:5173"
-echo "   API      : http://localhost:8080"
+echo "============================================================"
+echo " ViaX:Trace rodando!"
+echo "============================================================"
+echo "   Frontend (navegador) : http://localhost:5173"
+echo "   API (servidor)       : http://localhost:8080"
+if [[ -n "$LAN_IP" ]]; then
+  echo ""
+  echo "   Acesso via rede local (outro aparelho):"
+  echo "     Frontend : http://${LAN_IP}:5173"
+  echo "     API      : http://${LAN_IP}:8080"
+fi
+echo ""
+echo " >>> Para o app movel (ViaX:Trace) <<<"
+echo "   Mesmo aparelho (recomendado): http://localhost:8080"
+if [[ -n "$LAN_IP" ]]; then
+  echo "   Outro aparelho (mesma Wi-Fi): http://${LAN_IP}:8080"
+fi
+echo "   Cole esta URL em: app -> Configurar servidor -> API Server"
+echo "============================================================"
 echo ""
 echo "Para ativar GeocodeR BR (precisao maxima): bash ~/viax-system/start-geocodebr.sh"
 echo "Acesse pelo navegador: http://127.0.0.1:5173"
