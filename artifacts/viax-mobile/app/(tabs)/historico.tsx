@@ -96,7 +96,7 @@ export default function HistoricoScreen() {
 
                 <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
                   <Pill label={a.status === "done" ? "Concluído" : a.status} tone={a.status === "done" ? "ok" : "accent"} />
-                  <Pill label={a.parserMode === "google" ? "Google" : "Built-in"} tone="neutral" />
+                  <Pill label={a.parserMode === "ai" ? "IA" : a.parserMode === "googlemaps" ? "Google Maps" : "Built-in"} tone="neutral" />
                   <Pill label={`${a.nuances} nuances`} tone={a.nuances > 0 ? "accent" : "ok"} />
                 </View>
 

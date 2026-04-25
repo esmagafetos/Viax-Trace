@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as DocumentPicker from "expo-document-picker";
@@ -16,10 +16,11 @@ import { streamSSE } from "@/lib/sse";
 import { api } from "@/lib/api";
 import { useToast } from "@/components/Toast";
 import { formatBytes, formatMs } from "@/lib/format";
-import type { Condominium, SSEResult } from "@/lib/types";
+import type { Condominium, CondoResult, CondoResultRow } from "@/lib/types";
 
 type Picked = { uri: string; name: string; size: number };
 type Phase = "idle" | "ready" | "running" | "done" | "error";
+type FilterMode = "all" | "ordenada" | "sem_condominio" | "nuance";
 
 export default function FerramentaScreen() {
   const t = useTheme();
@@ -33,8 +34,10 @@ export default function FerramentaScreen() {
   const [phase, setPhase] = useState<Phase>("idle");
   const [progress, setProgress] = useState(0);
   const [step, setStep] = useState("");
-  const [result, setResult] = useState<SSEResult | null>(null);
+  const [stepLog, setStepLog] = useState<string[]>([]);
+  const [result, setResult] = useState<CondoResult | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [filter, setFilter] = useState<FilterMode>("all");
   const cancelRef = useRef<{ cancel: () => void } | null>(null);
 
   useEffect(() => {
@@ -63,7 +66,7 @@ export default function FerramentaScreen() {
       if (ext !== "xlsx" && ext !== "csv") { show("Use .xlsx ou .csv.", "error"); return; }
       if ((a.size ?? 0) > 10 * 1024 * 1024) { show("Acima de 10MB.", "error"); return; }
       setFile({ uri: a.uri, name: a.name ?? "arquivo", size: a.size ?? 0 });
-      setResult(null); setErrorMsg(null); setStep(""); setProgress(0);
+      setResult(null); setErrorMsg(null); setStep(""); setStepLog([]); setProgress(0);
       setPhase(selected ? "ready" : "idle");
       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch (e: any) {
@@ -79,16 +82,22 @@ export default function FerramentaScreen() {
 
   const start = () => {
     if (!file || !selected) return;
-    setPhase("running"); setProgress(0); setStep("Enviando arquivo..."); setResult(null); setErrorMsg(null);
+    setPhase("running"); setProgress(0); setStep("Enviando arquivo..."); setStepLog([]); setResult(null); setErrorMsg(null);
     cancelRef.current = streamSSE({
       path: "/condominium/process",
       fileUri: file.uri,
       fileName: file.name,
       fields: { condominioId: selected },
       handlers: {
-        onStep: (d) => { setStep(d.step); if (typeof d.progress === "number") setProgress(d.progress); },
+        onStep: (d) => {
+          setStep(d.step);
+          setStepLog((prev) => [...prev.slice(-40), d.step]);
+          if (typeof d.progress === "number") setProgress(d.progress);
+        },
         onResult: (d) => {
-          setResult(d as SSEResult);
+          const payload: CondoResult = (d?.result ?? d) as CondoResult;
+          setResult(payload);
+          setProgress(1);
           setPhase("done");
           void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           show("Rota gerada!", "success");
@@ -104,12 +113,21 @@ export default function FerramentaScreen() {
   };
 
   const cancel = () => { cancelRef.current?.cancel(); setPhase(file && selected ? "ready" : "idle"); };
-  const reset = () => { setFile(null); setResult(null); setErrorMsg(null); setPhase(selected ? "idle" : "idle"); setStep(""); setProgress(0); };
+  const reset = () => { setFile(null); setResult(null); setErrorMsg(null); setPhase("idle"); setStep(""); setStepLog([]); setProgress(0); setFilter("all"); };
 
   const exportCsv = async () => {
     if (!result) return;
-    const header = ["Linha", "Endereço", "Resultado"].join(";");
-    const rows = result.rows.map((r) => [r.linha, csvEscape(r.endereco), csvEscape(r.motivo ?? "")].join(";"));
+    const header = ["Ordem", "Linha", "Endereço Original", "Quadra", "Lote", "Classificação", "Instrução", "Motivo"].join(";");
+    const rows = result.detalhes.map((r) => [
+      r.ordem ?? "",
+      r.linha,
+      csvEscape(r.enderecoOriginal),
+      r.quadra ?? "",
+      r.lote ?? "",
+      csvEscape(r.classificacao),
+      csvEscape(r.instrucao ?? ""),
+      csvEscape(r.motivo ?? ""),
+    ].join(";"));
     const csv = [header, ...rows].join("\n");
     const path = `${FileSystem.cacheDirectory}viax-rota-${Date.now()}.csv`;
     await FileSystem.writeAsStringAsync(path, csv, { encoding: FileSystem.EncodingType.UTF8 });
@@ -118,8 +136,16 @@ export default function FerramentaScreen() {
     }
   };
 
+  const filteredRows = useMemo<CondoResultRow[]>(() => {
+    if (!result) return [];
+    if (filter === "ordenada") return result.detalhes.filter((r) => r.classificacao === "ordenada");
+    if (filter === "sem_condominio") return result.detalhes.filter((r) => r.classificacao === "encontrada_sem_condominio");
+    if (filter === "nuance") return result.detalhes.filter((r) => r.classificacao === "nuance");
+    return result.detalhes;
+  }, [result, filter]);
+
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: t.bg }} contentContainerStyle={{ paddingTop: insets.top + 18, paddingHorizontal: 18, paddingBottom: insets.bottom + 96 }}>
+    <ScrollView style={{ flex: 1, backgroundColor: t.bg }} contentContainerStyle={{ paddingTop: insets.top + 16, paddingHorizontal: 16, paddingBottom: insets.bottom + 96 }}>
       <ScreenHeader title="Ferramenta de rotas" subtitle="Otimize entregas em condomínios suportados" />
 
       <Card style={{ marginBottom: 14 }}>
@@ -158,7 +184,7 @@ export default function FerramentaScreen() {
                   <View style={{ flex: 1 }}>
                     <Text style={{ fontFamily: "Poppins_600SemiBold", fontSize: 13, color: t.text }}>{c.nome}</Text>
                     <Text style={{ fontFamily: "Poppins_400Regular", fontSize: 11, color: t.textFaint, marginTop: 1 }}>
-                      {c.cidade}{c.totalUnidades ? ` · ${c.totalUnidades} unidades` : ""}
+                      {c.totalLotes ? `${c.totalLotes} lotes` : "—"}
                     </Text>
                   </View>
                   <Pill label={dev ? "Em breve" : "Ativo"} tone={dev ? "neutral" : "ok"} />
@@ -201,11 +227,20 @@ export default function FerramentaScreen() {
           <Card style={{ marginBottom: 14 }}>
             <View style={{ alignItems: "center", paddingVertical: 8, gap: 10 }}>
               <ActivityIndicator color={t.accent} />
-              <Text style={{ fontFamily: "Poppins_500Medium", fontSize: 13, color: t.text, textAlign: "center" }}>{step || "Processando..."}</Text>
+              <Text style={{ fontFamily: "Poppins_500Medium", fontSize: 13, color: t.text, textAlign: "center" }} numberOfLines={2}>{step || "Processando..."}</Text>
               <View style={{ height: 6, backgroundColor: t.surface2, borderRadius: 999, width: "100%", overflow: "hidden" }}>
                 <View style={{ height: "100%", width: `${Math.max(2, Math.min(100, Math.round(progress * 100)))}%`, backgroundColor: t.accent }} />
               </View>
             </View>
+            {stepLog.length > 1 && (
+              <View style={{ marginTop: 10, padding: 10, borderRadius: 10, backgroundColor: t.surface2, maxHeight: 100 }}>
+                <ScrollView>
+                  {stepLog.slice(-6).map((s, i) => (
+                    <Text key={i} style={{ fontFamily: "Poppins_400Regular", fontSize: 10, color: t.textFaint, marginBottom: 2 }} numberOfLines={1}>{s}</Text>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
           </Card>
         </Animated.View>
       )}
@@ -223,14 +258,59 @@ export default function FerramentaScreen() {
       )}
 
       {phase === "done" && result && (
-        <Card>
-          <CardHeader title="Rota gerada" right={<Pill label="Concluído" tone="ok" />} />
-          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 14, marginBottom: 12 }}>
-            <Stat title="Endereços" value={String(result.totalAddresses)} />
-            <Stat title="Tempo" value={formatMs(result.processingTimeMs)} />
-          </View>
-          <Button label="Exportar CSV" variant="secondary" leftIcon={<Ionicons name="download-outline" size={16} color={t.text} />} onPress={exportCsv} />
-        </Card>
+        <>
+          <Card style={{ marginBottom: 14 }}>
+            <CardHeader title={`Rota — ${result.condominio?.nome ?? ""}`} right={<Pill label="Concluído" tone="ok" />} />
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+              <ColorStat label="Total" value={result.totalLinhas} color={t.text} bg={t.surface2} />
+              <ColorStat label="Ordenadas" value={result.totalOrdenadas} color={t.ok} bg={t.okDim} />
+              <ColorStat label="Sem Condomínio" value={result.totalSemCondominio} color="#1565c0" bg="rgba(21,101,192,0.12)" />
+              <ColorStat label="Nuances" value={result.totalNuances} color={t.accent} bg={t.accentDim} />
+            </View>
+            <View style={{ marginTop: 12, flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+              <Text style={{ fontFamily: "Poppins_400Regular", fontSize: 11, color: t.textFaint }}>
+                Tempo: {formatMs(result.metricas?.tempo_ms ?? 0)}
+              </Text>
+              <Pressable onPress={exportCsv} hitSlop={6} style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                <Ionicons name="download-outline" size={14} color={t.accent} />
+                <Text style={{ fontFamily: "Poppins_600SemiBold", fontSize: 12, color: t.accent }}>Exportar CSV</Text>
+              </Pressable>
+            </View>
+          </Card>
+
+          <Card padded={false} style={{ marginBottom: 14, overflow: "hidden" }}>
+            <View style={{ paddingHorizontal: 14, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: t.border }}>
+              <Text style={{ fontFamily: "Poppins_700Bold", fontSize: 11, color: t.textMuted, letterSpacing: 1, textTransform: "uppercase" }}>
+                Sequência ({filteredRows.length})
+              </Text>
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, padding: 12 }}>
+              {([
+                { v: "all" as const, l: `Todos (${result.detalhes.length})` },
+                { v: "ordenada" as const, l: `Ordenadas (${result.totalOrdenadas})` },
+                { v: "sem_condominio" as const, l: `S/Cond. (${result.totalSemCondominio})` },
+                { v: "nuance" as const, l: `Nuances (${result.totalNuances})` },
+              ]).map((f) => {
+                const sel = filter === f.v;
+                return (
+                  <Pressable key={f.v} onPress={() => { setFilter(f.v); void Haptics.selectionAsync(); }}
+                    style={{ paddingVertical: 6, paddingHorizontal: 12, borderRadius: 999, borderWidth: 1, borderColor: sel ? t.accent : t.borderStrong, backgroundColor: sel ? t.accent : "transparent" }}>
+                    <Text numberOfLines={1} style={{ fontFamily: "Poppins_600SemiBold", fontSize: 11, color: sel ? "#fff" : t.textMuted }}>{f.l}</Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+
+            <View style={{ paddingHorizontal: 12, paddingBottom: 12, gap: 8 }}>
+              {filteredRows.slice(0, 60).map((r) => <RouteRow key={`${r.linha}`} row={r} />)}
+              {filteredRows.length > 60 && (
+                <Text style={{ fontFamily: "Poppins_400Regular", fontSize: 11, color: t.textFaint, textAlign: "center", marginTop: 8 }}>
+                  +{filteredRows.length - 60} linhas no CSV exportado
+                </Text>
+              )}
+            </View>
+          </Card>
+        </>
       )}
     </ScrollView>
   );
@@ -241,12 +321,55 @@ function csvEscape(v: string): string {
   return /[;"\n]/.test(s) ? `"${s}"` : s;
 }
 
-function Stat({ title, value }: { title: string; value: string }) {
+function ColorStat({ label, value, color, bg }: { label: string; value: number; color: string; bg: string }) {
   const t = useTheme();
   return (
-    <View style={{ flex: 1, minWidth: 90 }}>
-      <Text style={{ fontFamily: "Poppins_500Medium", fontSize: 10, color: t.textFaint, letterSpacing: 1, textTransform: "uppercase" }}>{title}</Text>
-      <Text style={{ fontFamily: "Poppins_700Bold", fontSize: 18, color: t.text, marginTop: 2 }}>{value}</Text>
+    <View style={{ flexBasis: "47%", flexGrow: 1, padding: 12, borderRadius: 10, backgroundColor: bg, borderWidth: 1, borderColor: t.border }}>
+      <Text style={{ fontFamily: "Poppins_800ExtraBold", fontSize: 22, color, lineHeight: 24, letterSpacing: -0.5 }}>{value}</Text>
+      <Text style={{ fontFamily: "Poppins_600SemiBold", fontSize: 9, color: t.textFaint, letterSpacing: 0.6, textTransform: "uppercase", marginTop: 4 }}>{label}</Text>
+    </View>
+  );
+}
+
+function RouteRow({ row }: { row: CondoResultRow }) {
+  const t = useTheme();
+  const map = {
+    ordenada: { color: t.ok, bg: t.okDim, label: "Ordenada" },
+    encontrada_sem_condominio: { color: "#1565c0", bg: "rgba(21,101,192,0.12)", label: "Sem condomínio" },
+    nuance: { color: t.accent, bg: t.accentDim, label: "Nuance" },
+  } as Record<string, { color: string; bg: string; label: string }>;
+  const m = map[row.classificacao] ?? { color: t.textMuted, bg: t.surface2, label: row.classificacao };
+
+  return (
+    <View style={{ padding: 10, backgroundColor: t.surface2, borderRadius: radii.md, borderLeftWidth: 3, borderLeftColor: m.color }}>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 4 }}>
+        {row.ordem != null && (
+          <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: t.accent, alignItems: "center", justifyContent: "center" }}>
+            <Text style={{ fontFamily: "Poppins_700Bold", fontSize: 12, color: "#fff" }}>{row.ordem}</Text>
+          </View>
+        )}
+        <View style={{ flex: 1 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+            <Text style={{ fontFamily: "Poppins_600SemiBold", fontSize: 11, color: t.textFaint }}>L{row.linha}</Text>
+            {row.quadra && <Pill label={`Q${row.quadra}`} tone="neutral" />}
+            {row.lote && <Pill label={`L${row.lote}`} tone="neutral" />}
+            <View style={{ paddingHorizontal: 7, paddingVertical: 2, borderRadius: 99, backgroundColor: m.bg }}>
+              <Text style={{ fontFamily: "Poppins_700Bold", fontSize: 9, color: m.color, letterSpacing: 0.4 }}>{m.label.toUpperCase()}</Text>
+            </View>
+          </View>
+        </View>
+      </View>
+      <Text style={{ fontFamily: "Poppins_500Medium", fontSize: 12, color: t.text }} numberOfLines={2}>{row.enderecoOriginal}</Text>
+      {row.instrucao && (
+        <View style={{ marginTop: 6, padding: 8, borderRadius: 8, backgroundColor: t.surface, borderLeftWidth: 2, borderLeftColor: t.accent }}>
+          <Text style={{ fontFamily: "Poppins_400Regular", fontSize: 11, color: t.textMuted, fontStyle: "italic", lineHeight: 15 }}>
+            ↳ {row.instrucao}
+          </Text>
+        </View>
+      )}
+      {row.motivo && !row.instrucao && (
+        <Text style={{ fontFamily: "Poppins_400Regular", fontSize: 10, color: t.textFaint, marginTop: 4 }}>{row.motivo}</Text>
+      )}
     </View>
   );
 }
