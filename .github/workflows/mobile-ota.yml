@@ -14,7 +14,7 @@ on:
           - development
       message:
         description: "Mensagem da atualização"
-        required: true
+        required: false
         default: "Atualização OTA"
 
   push:
@@ -42,7 +42,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: 20
           cache: pnpm
 
       - name: Install dependencies
@@ -56,7 +56,7 @@ jobs:
 
       - name: Publish OTA update
         working-directory: artifacts/viax-mobile
-        run: |
-          BRANCH="${{ github.event.inputs.branch || 'production' }}"
-          MSG="${{ github.event.inputs.message || format('Auto OTA — {0}', github.event.head_commit.message) }}"
-          eas update --branch "$BRANCH" --message "$MSG" --non-interactive
+        env:
+          OTA_BRANCH: ${{ github.event.inputs.branch || 'production' }}
+          OTA_MESSAGE: ${{ github.event.inputs.message || format('Auto OTA — {0}', github.sha) }}
+        run: eas update --branch "$OTA_BRANCH" --message "$OTA_MESSAGE" --non-interactive
