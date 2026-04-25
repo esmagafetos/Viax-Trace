@@ -9,22 +9,15 @@
       <stop offset="0%" stop-color="#e8703a"/>
       <stop offset="100%" stop-color="#c43d10"/>
     </linearGradient>
-    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
-      <feGaussianBlur in="SourceAlpha" stdDeviation="14"/>
-      <feOffset dx="0" dy="10" result="offset"/>
-      <feComponentTransfer><feFuncA type="linear" slope="0.28"/></feComponentTransfer>
-      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
-    </filter>
   </defs>
-  <g transform="translate(280, 280) scale(16)">
+  <g transform="translate(160, 160) scale(25.6)">
+    <ellipse cx="22" cy="22.6" rx="6.2" ry="1.8" fill="#000000" opacity="0.16"/>
     <path d="M7 7 C 7 7, 7 16, 14 18 C 20 20, 21 21, 21 21"
           stroke="url(#curve)" stroke-width="2.6"
           stroke-linecap="round" stroke-linejoin="round" fill="none"/>
     <circle cx="7" cy="7" r="3" fill="url(#curve)"/>
     <circle cx="7" cy="7" r="1.1" fill="#faf9f6" opacity="0.85"/>
-    <g filter="url(#shadow)">
-      <circle cx="21" cy="21" r="5.2" fill="url(#pin)"/>
-      <circle cx="21" cy="21" r="2.1" fill="#ffffff"/>
-    </g>
+    <circle cx="21" cy="21" r="5.2" fill="url(#pin)"/>
+    <circle cx="21" cy="21" r="2.1" fill="#ffffff"/>
   </g>
 </svg>

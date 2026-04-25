@@ -21,10 +21,12 @@
   <rect width="1242" height="1242" fill="url(#bg)"/>
   <circle cx="621" cy="621" r="500" fill="url(#glow)"/>
   <g transform="translate(481, 481) scale(10)">
+    <ellipse cx="22" cy="22.6" rx="6.2" ry="1.8" fill="#000000" opacity="0.18"/>
     <path d="M7 7 C 7 7, 7 16, 14 18 C 20 20, 21 21, 21 21"
           stroke="url(#curve)" stroke-width="2.6"
           stroke-linecap="round" stroke-linejoin="round" fill="none"/>
     <circle cx="7" cy="7" r="3" fill="url(#curve)"/>
+    <circle cx="7" cy="7" r="1.1" fill="#faf9f6" opacity="0.85"/>
     <circle cx="21" cy="21" r="5.2" fill="url(#pin)"/>
     <circle cx="21" cy="21" r="2.1" fill="#ffffff"/>
   </g>

@@ -32,6 +32,7 @@
     "android": {
       "package": "com.viax.trace",
       "edgeToEdgeEnabled": true,
+      "usesCleartextTraffic": true,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#faf9f6"
