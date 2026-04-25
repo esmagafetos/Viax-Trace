@@ -11,6 +11,7 @@
     "prebuild": "expo prebuild --platform android --clean"
   },
   "dependencies": {
+    "@babel/runtime": "^7.29.0",
     "@expo-google-fonts/poppins": "^0.4.1",
     "@expo/metro-runtime": "~6.1.2",
     "@expo/vector-icons": "^15.0.2",
