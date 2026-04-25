@@ -9,6 +9,15 @@
     "newArchEnabled": true,
     "backgroundColor": "#f4f3ef",
     "icon": "./assets/icon.png",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/323f3ec3-5a87-4888-93bc-eb6488e2e32e",
+      "enabled": true,
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0
+    },
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",

@@ -1,0 +1,31 @@
+Starting Metro Bundler
+Android node_modules/.pnpm/expo-router@6.0.23_@expo+metro-runtime@6.1.2_@types+react-dom@19.2.3_@types+react@19.1._7da8fe1091aecdc820091fc60a493ec5/node_modules/expo-router/entry.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Android node_modules/.pnpm/expo-router@6.0.23_@expo+metro-runtime@6.1.2_@types+react-dom@19.2.3_@types+react@19.1._7da8fe1091aecdc820091fc60a493ec5/node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓▓░░░░░ 73.9% (391/464)
+Android Bundling failed 6949ms node_modules/.pnpm/expo-router@6.0.23_@expo+metro-runtime@6.1.2_@types+react-dom@19.2.3_@types+react@19.1._7da8fe1091aecdc820091fc60a493ec5/node_modules/expo-router/entry.js (741 modules)
+Error: Unable to resolve module whatwg-fetch from /home/expo/workingdir/build/node_modules/.pnpm/@expo+metro-runtime@6.1.2_expo@54.0.33_react-dom@19.1.0_react@19.1.0__react-native@0.81_98026a05792048d9871e86202e07ccd2/node_modules/@expo/metro-runtime/src/location/install.native.ts: whatwg-fetch could not be found within the project or in these directories:
+  node_modules
+  ../../node_modules
+[0m [90m 3 |[39m
+ [90m 4 |[39m [90m// Ensure fetch is installed before adding our fetch polyfill to ensure Headers and Request are available globally.[39m
+[31m[1m>[22m[39m[90m 5 |[39m [36mimport[39m [32m'whatwg-fetch'[39m[33m;[39m
+ [90m   |[39m         [31m[1m^[22m[39m
+ [90m 6 |[39m [90m// This MUST be imported to ensure URL is installed.[39m
+ [90m 7 |[39m [36mimport[39m [32m'expo'[39m[33m;[39m
+ [90m 8 |[39m [90m// This file configures the runtime environment to increase compatibility with WinterCG.[39m[0m
+
+Import stack:
+
+ node_modules/.pnpm/@expo+metro-runtime@6.1.2_expo@54.0.33_react-dom@19.1.0_react@19.1.0__react-native@0.81_98026a05792048d9871e86202e07ccd2/node_modules/@expo/metro-runtime/src/location/install.native.ts
+ | import "whatwg-fetch"
+
+ node_modules/.pnpm/@expo+metro-runtime@6.1.2_expo@54.0.33_react-dom@19.1.0_react@19.1.0__react-native@0.81_98026a05792048d9871e86202e07ccd2/node_modules/@expo/metro-runtime/src/index.ts
+ | import "./location/install"
+
+ node_modules/.pnpm/expo-router@6.0.23_@expo+metro-runtime@6.1.2_@types+react-dom@19.2.3_@types+react@19.1._7da8fe1091aecdc820091fc60a493ec5/node_modules/expo-router/entry-classic.js
+ | import "@expo/metro-runtime"
+
+ node_modules/.pnpm/expo-router@6.0.23_@expo+metro-runtime@6.1.2_@types+react-dom@19.2.3_@types+react@19.1._7da8fe1091aecdc820091fc60a493ec5/node_modules/expo-router/entry.js
+ | import "expo-router/entry-classic"
+
+ 
+ | import "/home/expo/workingdir/build/node_modules/.pnpm/expo-router@6.0.23_@expo+metro-runtime@6.1.2_@types+react-dom@19.2.3_@types+react@19.1._7da8fe1091aecdc820091fc60a493ec5/node_modules/expo-router/entry.js"
