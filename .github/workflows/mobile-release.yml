@@ -61,6 +61,9 @@ jobs:
           # Ensure release signing falls back to debug keystore so unsigned CI builds work.
           ls -la android/
 
+      - name: Apply Android overrides (cleartext for Termux LAN)
+        run: bash scripts/apply-android-overrides.sh
+
       - name: Resolve API_BASE
         id: api
         run: |
@@ -76,6 +79,9 @@ jobs:
 
       - name: Flutter pub get
         run: flutter pub get
+
+      - name: Generate launcher icons
+        run: dart run flutter_launcher_icons || true
 
       - name: Analyze (non-blocking)
         run: flutter analyze --no-fatal-infos --no-fatal-warnings || true

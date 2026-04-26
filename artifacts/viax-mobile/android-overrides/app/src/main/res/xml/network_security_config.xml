@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ViaX:Trace — Network security config
+
+  Permite tráfego em texto plano (HTTP) somente para hosts locais usados pelo
+  backend rodando no Termux do próprio aparelho ou em outro dispositivo da
+  mesma rede Wi-Fi. Todo o tráfego para a Internet (https://...replit.app)
+  continua exigindo TLS.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">localhost</domain>
+        <domain includeSubdomains="true">127.0.0.1</domain>
+        <domain includeSubdomains="true">10.0.2.2</domain>
+        <domain-suffix>.local</domain-suffix>
+
+        <!-- Faixas privadas RFC 1918 -->
+        <domain includeSubdomains="true">10.0.0.0/8</domain>
+        <domain includeSubdomains="true">172.16.0.0/12</domain>
+        <domain includeSubdomains="true">192.168.0.0/16</domain>
+    </domain-config>
+</network-security-config>

@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'api/api_client.dart';
 import 'router.dart';
 import 'state/auth_provider.dart';
+import 'state/server_config.dart';
 import 'state/settings_provider.dart';
 import 'theme/theme.dart';
 
@@ -16,20 +17,25 @@ Future<void> main() async {
     statusBarIconBrightness: Brightness.dark,
   ));
 
-  final api = ApiClient();
-  await api.init();
+  final config = ServerConfig();
+  await config.load();
 
-  runApp(ViaXApp(api: api));
+  final api = ApiClient();
+  await api.init(config);
+
+  runApp(ViaXApp(api: api, config: config));
 }
 
 class ViaXApp extends StatelessWidget {
   final ApiClient api;
-  const ViaXApp({super.key, required this.api});
+  final ServerConfig config;
+  const ViaXApp({super.key, required this.api, required this.config});
 
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
+        ChangeNotifierProvider<ServerConfig>.value(value: config),
         Provider<ApiClient>.value(value: api),
         ChangeNotifierProvider(create: (_) => AuthProvider(api)..bootstrap()),
         ChangeNotifierProvider(create: (_) => SettingsProvider(api)),
@@ -38,7 +44,7 @@ class ViaXApp extends StatelessWidget {
         builder: (context, auth, _) {
           final router = createRouter(auth);
           return MaterialApp.router(
-            title: 'ViaX:Scout',
+            title: 'ViaX:Trace',
             debugShowCheckedModeBanner: false,
             theme: buildTheme(Brightness.light),
             darkTheme: buildTheme(Brightness.dark),

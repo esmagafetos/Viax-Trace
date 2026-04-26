@@ -4,18 +4,20 @@ import 'package:dio/dio.dart';
 import 'package:dio_cookie_manager/dio_cookie_manager.dart';
 import 'package:path_provider/path_provider.dart';
 
-const String kApiBaseDefault = 'https://viax-scout.replit.app';
-const String kApiBase = String.fromEnvironment('API_BASE', defaultValue: kApiBaseDefault);
+import '../state/server_config.dart';
 
 class ApiClient {
   late final Dio dio;
   late final PersistCookieJar cookieJar;
+  late final ServerConfig _config;
   bool _ready = false;
 
-  String get baseUrl => kApiBase;
+  String get baseUrl => _config.baseUrl;
+  ServerConfig get config => _config;
 
-  Future<void> init() async {
+  Future<void> init(ServerConfig config) async {
     if (_ready) return;
+    _config = config;
     final dir = await getApplicationDocumentsDirectory();
     final cookieDir = Directory('${dir.path}/.viax_cookies');
     if (!cookieDir.existsSync()) cookieDir.createSync(recursive: true);
@@ -25,7 +27,6 @@ class ApiClient {
     );
 
     dio = Dio(BaseOptions(
-      baseUrl: '$kApiBase/api',
       connectTimeout: const Duration(seconds: 20),
       receiveTimeout: const Duration(seconds: 60),
       sendTimeout: const Duration(seconds: 60),
@@ -35,7 +36,37 @@ class ApiClient {
       validateStatus: (status) => status != null && status < 500,
     ));
     dio.interceptors.add(CookieManager(cookieJar));
+    dio.interceptors.add(InterceptorsWrapper(
+      onRequest: (options, handler) {
+        if (!options.path.startsWith('http')) {
+          options.baseUrl = '${_config.baseUrl}/api';
+        }
+        handler.next(options);
+      },
+    ));
+    _config.addListener(_onConfigChange);
     _ready = true;
+  }
+
+  void _onConfigChange() async {
+    try {
+      await cookieJar.deleteAll();
+    } catch (_) {}
+  }
+
+  Future<bool> testConnection(String url) async {
+    final clean = url.endsWith('/') ? url.substring(0, url.length - 1) : url;
+    try {
+      final probe = Dio(BaseOptions(
+        connectTimeout: const Duration(seconds: 6),
+        receiveTimeout: const Duration(seconds: 6),
+        validateStatus: (s) => s != null && s < 500,
+      ));
+      final r = await probe.get('$clean/api/auth/me');
+      return r.statusCode != null && r.statusCode! < 500;
+    } catch (_) {
+      return false;
+    }
   }
 
   // ── Auth ────────────────────────────────────────────────────────────

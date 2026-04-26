@@ -1,0 +1,15 @@
+<svg width="640" height="160" viewBox="0 0 640 160" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <g transform="translate(20, 30)">
+    <path d="M14 14 C 14 14, 14 50, 42 58 C 65 65, 70 70, 70 70"
+          stroke="#1a1917" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="14" cy="14" r="8" fill="#1a1917"/>
+    <circle cx="70" cy="70" r="14" fill="#d4521a"/>
+    <circle cx="70" cy="70" r="6" fill="#ffffff"/>
+  </g>
+  <text x="120" y="78" font-family="Poppins, Helvetica, Arial, sans-serif" font-size="44" font-weight="700" fill="#1a1917" letter-spacing="-0.5">
+    ViaX<tspan fill="rgba(26,25,23,0.4)" font-weight="400">:</tspan>Trace
+  </text>
+  <text x="120" y="108" font-family="Poppins, Helvetica, Arial, sans-serif" font-size="14" font-weight="600" fill="rgba(26,25,23,0.45)" letter-spacing="2">
+    AUDITORIA DE ROTAS
+  </text>
+</svg>
