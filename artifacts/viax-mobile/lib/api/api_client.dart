@@ -10,6 +10,7 @@ class ApiClient {
   late final Dio dio;
   late final PersistCookieJar cookieJar;
   late final ServerConfig _config;
+  String _lastBaseUrl = '';
   bool _ready = false;
 
   String get baseUrl => _config.baseUrl;
@@ -18,6 +19,7 @@ class ApiClient {
   Future<void> init(ServerConfig config) async {
     if (_ready) return;
     _config = config;
+    _lastBaseUrl = _config.baseUrl;
     final dir = await getApplicationDocumentsDirectory();
     final cookieDir = Directory('${dir.path}/.viax_cookies');
     if (!cookieDir.existsSync()) cookieDir.createSync(recursive: true);
@@ -27,6 +29,7 @@ class ApiClient {
     );
 
     dio = Dio(BaseOptions(
+      baseUrl: '${_config.baseUrl}/api',
       connectTimeout: const Duration(seconds: 20),
       receiveTimeout: const Duration(seconds: 60),
       sendTimeout: const Duration(seconds: 60),
@@ -36,19 +39,15 @@ class ApiClient {
       validateStatus: (status) => status != null && status < 500,
     ));
     dio.interceptors.add(CookieManager(cookieJar));
-    dio.interceptors.add(InterceptorsWrapper(
-      onRequest: (options, handler) {
-        if (!options.path.startsWith('http')) {
-          options.baseUrl = '${_config.baseUrl}/api';
-        }
-        handler.next(options);
-      },
-    ));
     _config.addListener(_onConfigChange);
     _ready = true;
   }
 
   void _onConfigChange() async {
+    final newBase = _config.baseUrl;
+    if (newBase == _lastBaseUrl) return;
+    _lastBaseUrl = newBase;
+    dio.options.baseUrl = '$newBase/api';
     try {
       await cookieJar.deleteAll();
     } catch (_) {}
