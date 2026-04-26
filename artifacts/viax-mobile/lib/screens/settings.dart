@@ -13,6 +13,7 @@ import '../theme/theme.dart';
 import '../widgets/layout.dart';
 import '../widgets/spinner.dart';
 import '../widgets/toast.dart';
+import '../widgets/user_avatar.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -120,6 +121,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (mounted) showToast(context, 'Senha alterada!', success: true);
     } on ApiError catch (e) {
       if (mounted) showToast(context, e.message);
+    } catch (_) {
+      if (mounted) showToast(context, 'Erro ao alterar senha.');
     } finally {
       if (mounted) setState(() => _savingPwd = false);
     }
@@ -256,34 +259,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 children: [
                   Stack(
                     children: [
-                      Container(
-                        width: 64,
-                        height: 64,
-                        decoration: BoxDecoration(
-                          color: context.accentDim,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: context.borderStrong),
-                        ),
-                        clipBehavior: Clip.antiAlias,
-                        child: (user?.avatarUrl != null && user!.avatarUrl!.isNotEmpty)
-                            ? Image.network(
-                                user.avatarUrl!.startsWith('http')
-                                    ? user.avatarUrl!
-                                    : '${context.read<ApiClient>().baseUrl}${user.avatarUrl}',
-                                fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => Center(
-                                    child: Text((user.name).isNotEmpty ? user.name[0].toUpperCase() : 'U',
-                                        style: TextStyle(color: context.accent, fontWeight: FontWeight.w800, fontSize: 22))),
-                              )
-                            : Center(
-                                child: Text((user?.name ?? 'U').isNotEmpty ? user!.name[0].toUpperCase() : 'U',
-                                    style: TextStyle(color: context.accent, fontWeight: FontWeight.w800, fontSize: 22))),
+                      UserAvatar(
+                        name: user?.name ?? '',
+                        avatarUrl: user?.avatarUrl,
+                        size: 64,
+                        fontSize: 22,
+                        border: Border.all(color: context.borderStrong),
                       ),
                       if (_avatarUploading)
                         Positioned.fill(
                           child: Container(
-                            decoration: const BoxDecoration(color: Color(0x66000000), shape: BoxShape.circle),
-                            child: const Center(child: AppSpinner(size: 18, color: Colors.white)),
+                            decoration: const BoxDecoration(
+                              color: Color(0x66000000),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Center(
+                              child: AppSpinner(size: 18, color: Colors.white),
+                            ),
                           ),
                         ),
                     ],
