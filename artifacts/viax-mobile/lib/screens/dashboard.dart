@@ -682,110 +682,106 @@ class _HeroBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     return ClipRRect(
       borderRadius: BorderRadius.circular(16),
-      child: Stack(
-        fit: StackFit.passthrough,
-        children: [
-          Container(
-            width: double.infinity,
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Color(0xFF1A0E08),
-                  Color(0xFF2D1408),
-                  Color(0xFF3D1C0C),
-                  Color(0xFF1F0A18),
-                ],
-                stops: [0.0, 0.4, 0.7, 1.0],
-              ),
-              border: Border.all(color: const Color(0x33D4521A)),
-            ),
-            child: CustomPaint(
-              painter: _HeroBackgroundPainter(),
-              child: Padding(
-                padding: const EdgeInsets.all(18),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+      child: Container(
+        width: double.infinity,
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Color(0xFF1A0E08),
+              Color(0xFF2D1408),
+              Color(0xFF3D1C0C),
+              Color(0xFF1F0A18),
+            ],
+            stops: [0.0, 0.4, 0.7, 1.0],
+          ),
+          border: Border.all(color: const Color(0x33D4521A)),
+        ),
+        child: CustomPaint(
+          painter: _HeroBackgroundPainter(),
+          child: Padding(
+            padding: const EdgeInsets.all(18),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        const BrandLockup(
-                          markSize: 28,
-                          wordmarkSize: 18,
-                          showSubtitle: true,
-                          horizontal: true,
-                          dark: true,
-                        ),
-                        const Spacer(),
-                        InkWell(
-                          onTap: onDismiss,
-                          borderRadius: BorderRadius.circular(99),
-                          child: Padding(
-                            padding: const EdgeInsets.all(4),
-                            child: Icon(Icons.close,
-                                size: 16, color: Colors.white.withValues(alpha: 0.45)),
-                          ),
-                        ),
-                      ],
+                    const BrandLockup(
+                      markSize: 28,
+                      wordmarkSize: 18,
+                      showSubtitle: true,
+                      horizontal: true,
+                      dark: true,
                     ),
-                    const SizedBox(height: 14),
-                    Wrap(
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      spacing: 8,
-                      runSpacing: 4,
-                      children: [
-                        Text('Olá, $userName!',
-                            style: const TextStyle(
-                                fontSize: 14.5,
-                                fontWeight: FontWeight.w700,
-                                color: Color(0xFFF0EDE8))),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: const Color(0x40D4521A),
-                            borderRadius: BorderRadius.circular(99),
-                            border: Border.all(color: const Color(0x66D4521A)),
-                          ),
-                          child: const Text('v8.0',
-                              style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w700,
-                                  letterSpacing: 0.8,
-                                  color: Color(0xFFE8A882))),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Geocodificação multi-camada · Detecção de nuances avançada · Suporte a Travessa e Passagem',
-                      style: TextStyle(
-                          fontSize: 12, color: Colors.white.withValues(alpha: 0.5), height: 1.4),
-                    ),
-                    const SizedBox(height: 14),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 42,
-                      child: ElevatedButton.icon(
-                        onPressed: onPrimary,
-                        icon: const Icon(Icons.upload_file, size: 15),
-                        label: const Text('Nova Análise',
-                            style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                        style: ElevatedButton.styleFrom(
-                          shape: const StadiumBorder(),
-                          backgroundColor: const Color(0xFFD4521A),
-                          foregroundColor: Colors.white,
-                          elevation: 0,
-                        ),
+                    const Spacer(),
+                    InkWell(
+                      onTap: onDismiss,
+                      borderRadius: BorderRadius.circular(99),
+                      child: Padding(
+                        padding: const EdgeInsets.all(4),
+                        child: Icon(Icons.close,
+                            size: 16, color: Colors.white.withValues(alpha: 0.45)),
                       ),
                     ),
                   ],
                 ),
-              ),
+                const SizedBox(height: 14),
+                Wrap(
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 8,
+                  runSpacing: 4,
+                  children: [
+                    Text('Olá, $userName!',
+                        style: const TextStyle(
+                            fontSize: 14.5,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFFF0EDE8))),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: const Color(0x40D4521A),
+                        borderRadius: BorderRadius.circular(99),
+                        border: Border.all(color: const Color(0x66D4521A)),
+                      ),
+                      child: const Text('v8.0',
+                          style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.8,
+                              color: Color(0xFFE8A882))),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Geocodificação multi-camada · Detecção de nuances avançada · Suporte a Travessa e Passagem',
+                  style: TextStyle(
+                      fontSize: 12, color: Colors.white.withValues(alpha: 0.5), height: 1.4),
+                ),
+                const SizedBox(height: 14),
+                SizedBox(
+                  width: double.infinity,
+                  height: 42,
+                  child: ElevatedButton.icon(
+                    onPressed: onPrimary,
+                    icon: const Icon(Icons.upload_file, size: 15),
+                    label: const Text('Nova Análise',
+                        style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                    style: ElevatedButton.styleFrom(
+                      shape: const StadiumBorder(),
+                      backgroundColor: const Color(0xFFD4521A),
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }
