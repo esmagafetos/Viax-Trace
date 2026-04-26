@@ -2,52 +2,54 @@ import 'package:flutter/material.dart';
 
 import '../theme/theme.dart';
 
-/// ViaX:Trace brand mark — bold "X" + orange dot accent.
+/// ViaX:Trace brand mark — espelha 1:1 o `LogoIcon`/`AppIcon` da web
+/// (`artifacts/viax-scout/src/components/ViaXLogo.tsx`):
+///   - curva: M10 10 C 10 10, 10 20, 17 22 C 23 24, 24 25, 24 25
+///   - ponto de origem: circle(10, 10) r=3
+///   - pin de destino: circle(30, 30) r=5.5 (laranja) + r=2.2 branco
 ///
-/// Espelha o ícone do app (mesmas proporções e composição) pra garantir
-/// consistência visual entre a tela inicial do dispositivo e as telas
-/// internas do produto. Renderizado via [CustomPainter] pra ser nítido em
-/// qualquer densidade e adaptar cores ao tema claro/escuro.
+/// Renderizado via [CustomPainter] pra ser nítido em qualquer densidade,
+/// adaptando cores ao tema claro/escuro quando [withBackground] = false.
 class BrandMark extends StatelessWidget {
   /// Lado do quadrado (largura = altura).
   final double size;
 
-  /// Se `true`, desenha o fundo arredondado escuro (igual ao ícone do app).
-  /// Se `false`, desenha apenas o glifo (X + ponto) na cor do tema.
+  /// Se `true`, desenha o fundo arredondado (igual ao ícone do app).
+  /// Se `false`, desenha apenas o glifo (curva + ponto + pin).
   final bool withBackground;
 
-  /// Sobrescreve a cor do "X" (default: branco se [withBackground] estiver
-  /// ativo, `context.text` caso contrário).
-  final Color? xColor;
+  /// Sobrescreve a cor do glifo (default: `#1a1917` se houver fundo,
+  /// `context.text` caso contrário).
+  final Color? glyphColor;
 
-  /// Sobrescreve a cor do ponto (default: laranja da marca).
-  final Color? dotColor;
+  /// Sobrescreve a cor do pin laranja (default: `#d4521a`).
+  final Color? accentColor;
 
-  /// Sobrescreve a cor do fundo (default: `#1A1917`, marrom-quase-preto da marca).
+  /// Sobrescreve a cor do fundo (default: `#ffffff`, igual ao favicon web).
   final Color? backgroundColor;
 
   const BrandMark({
     super.key,
     this.size = 56,
     this.withBackground = true,
-    this.xColor,
-    this.dotColor,
+    this.glyphColor,
+    this.accentColor,
     this.backgroundColor,
   });
 
   @override
   Widget build(BuildContext context) {
-    final bg = backgroundColor ?? const Color(0xFF1A1917);
-    final fg = xColor ?? (withBackground ? Colors.white : context.text);
-    final accent = dotColor ?? const Color(0xFFD4521A);
+    final bg = backgroundColor ?? Colors.white;
+    final glyph = glyphColor ?? (withBackground ? const Color(0xFF1A1917) : context.text);
+    final accent = accentColor ?? const Color(0xFFD4521A);
     return SizedBox(
       width: size,
       height: size,
       child: CustomPaint(
         painter: _BrandMarkPainter(
           bgColor: withBackground ? bg : null,
-          xColor: fg,
-          dotColor: accent,
+          glyphColor: glyph,
+          accentColor: accent,
         ),
       ),
     );
@@ -56,62 +58,64 @@ class BrandMark extends StatelessWidget {
 
 class _BrandMarkPainter extends CustomPainter {
   final Color? bgColor;
-  final Color xColor;
-  final Color dotColor;
+  final Color glyphColor;
+  final Color accentColor;
 
   _BrandMarkPainter({
     required this.bgColor,
-    required this.xColor,
-    required this.dotColor,
+    required this.glyphColor,
+    required this.accentColor,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
-    // Tudo escalado a partir do design 1024x1024 do ícone do app.
     final s = size.width;
-    final scale = s / 1024.0;
+    // Coordenadas do design web AppIcon (40x40). Tudo escalado por (s/40).
+    final k = s / 40.0;
 
     if (bgColor != null) {
-      final radius = 230.0 * scale;
+      final radius = 9.0 * k;
       final rect = Rect.fromLTWH(0, 0, s, s);
       final rrect = RRect.fromRectAndRadius(rect, Radius.circular(radius));
       canvas.drawRRect(rrect, Paint()..color = bgColor!);
     }
 
-    final cx = s / 2;
-    final cy = s / 2;
-
-    // Tamanhos do glifo: usar a mesma proporção do app icon completo
-    // (versão "legacy" com fundo, que ocupa toda a área).
-    final hasBg = bgColor != null;
-    final reach = (hasBg ? 200.0 : 150.0) * scale;
-    final strokeW = (hasBg ? 120.0 : 100.0) * scale;
-    final dotOffset = (hasBg ? 248.0 : 180.0) * scale;
-    final dotR = (hasBg ? 58.0 : 46.0) * scale;
+    // Curva: M10 10 C 10 10, 10 20, 17 22 C 23 24, 24 25, 24 25
+    final path = Path()
+      ..moveTo(10 * k, 10 * k)
+      ..cubicTo(10 * k, 10 * k, 10 * k, 20 * k, 17 * k, 22 * k)
+      ..cubicTo(23 * k, 24 * k, 24 * k, 25 * k, 24 * k, 25 * k);
 
     final stroke = Paint()
-      ..color = xColor
-      ..strokeWidth = strokeW
+      ..color = glyphColor
+      ..strokeWidth = 2.2 * k
       ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round
       ..style = PaintingStyle.stroke;
+    canvas.drawPath(path, stroke);
 
-    canvas.drawLine(Offset(cx - reach, cy - reach), Offset(cx + reach, cy + reach), stroke);
-    canvas.drawLine(Offset(cx + reach, cy - reach), Offset(cx - reach, cy + reach), stroke);
+    // Ponto de origem (escuro): circle(10, 10) r=3
+    canvas.drawCircle(Offset(10 * k, 10 * k), 3 * k, Paint()..color = glyphColor);
 
-    canvas.drawCircle(
-      Offset(cx + dotOffset, cy + dotOffset),
-      dotR,
-      Paint()..color = dotColor,
-    );
+    // Pin laranja: circle(30, 30) r=5.5
+    canvas.drawCircle(Offset(30 * k, 30 * k), 5.5 * k, Paint()..color = accentColor);
+
+    // Centro branco do pin (apenas com fundo, pra contraste com o ícone real;
+    // sem fundo o "branco" seria a cor do scaffold e poderia sumir, então usamos
+    // a cor do fundo do app como destaque).
+    final innerColor = bgColor ?? Colors.white;
+    canvas.drawCircle(Offset(30 * k, 30 * k), 2.2 * k, Paint()..color = innerColor);
   }
 
   @override
   bool shouldRepaint(covariant _BrandMarkPainter old) =>
-      old.bgColor != bgColor || old.xColor != xColor || old.dotColor != dotColor;
+      old.bgColor != bgColor ||
+      old.glyphColor != glyphColor ||
+      old.accentColor != accentColor;
 }
 
-/// Logotipo composto: brand mark + wordmark empilhados verticalmente.
-/// Usado nas telas de boas-vindas/login/cadastro pra apresentação da marca.
+/// Logotipo composto: brand mark + wordmark "ViaX:Trace" empilhados.
+/// Usado nas telas de boas-vindas/login/cadastro.
 class BrandLockup extends StatelessWidget {
   final double markSize;
   final double wordmarkSize;
@@ -131,32 +135,23 @@ class BrandLockup extends StatelessWidget {
       children: [
         BrandMark(size: markSize),
         const SizedBox(height: 14),
-        // Wordmark inline (sem o widget ViaXLogo pra manter alinhamento central)
-        DefaultTextStyle.merge(
-          style: TextStyle(
-            fontSize: wordmarkSize,
-            fontWeight: FontWeight.w800,
-            letterSpacing: -0.5,
-            color: context.text,
-          ),
-          child: RichText(
-            textAlign: TextAlign.center,
-            text: TextSpan(
-              style: TextStyle(
-                fontSize: wordmarkSize,
-                fontWeight: FontWeight.w800,
-                letterSpacing: -0.5,
-                color: context.text,
-              ),
-              children: [
-                const TextSpan(text: 'ViaX'),
-                TextSpan(
-                  text: ':',
-                  style: TextStyle(color: context.textFaint, fontWeight: FontWeight.w300),
-                ),
-                TextSpan(text: 'Trace', style: TextStyle(color: context.accent)),
-              ],
+        RichText(
+          textAlign: TextAlign.center,
+          text: TextSpan(
+            style: TextStyle(
+              fontSize: wordmarkSize,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.5,
+              color: context.text,
             ),
+            children: [
+              const TextSpan(text: 'ViaX'),
+              TextSpan(
+                text: ':',
+                style: TextStyle(color: context.textFaint, fontWeight: FontWeight.w300),
+              ),
+              TextSpan(text: 'Trace', style: TextStyle(color: context.accent)),
+            ],
           ),
         ),
         if (showSubtitle)
