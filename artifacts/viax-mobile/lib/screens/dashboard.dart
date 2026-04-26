@@ -123,15 +123,43 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     return LayoutBuilder(
       builder: (ctx, c) {
-        final cols = c.maxWidth > 540 ? 5 : c.maxWidth > 360 ? 3 : 2;
-        return GridView.count(
-          crossAxisCount: cols,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          mainAxisSpacing: 10,
-          crossAxisSpacing: 10,
-          childAspectRatio: 1.45,
-          children: tiles,
+        // Wide screen: single row of 5
+        if (c.maxWidth > 540) {
+          return GridView.count(
+            crossAxisCount: 5,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            mainAxisSpacing: 10,
+            crossAxisSpacing: 10,
+            childAspectRatio: 1.45,
+            children: tiles,
+          );
+        }
+        // Phone: manual 3+2 rows — no empty cell, consistent height
+        const h = 80.0;
+        const gap = 10.0;
+        return Column(
+          children: [
+            SizedBox(
+              height: h,
+              child: Row(children: [
+                Expanded(child: tiles[0]),
+                const SizedBox(width: gap),
+                Expanded(child: tiles[1]),
+                const SizedBox(width: gap),
+                Expanded(child: tiles[2]),
+              ]),
+            ),
+            const SizedBox(height: gap),
+            SizedBox(
+              height: h,
+              child: Row(children: [
+                Expanded(child: tiles[3]),
+                const SizedBox(width: gap),
+                Expanded(child: tiles[4]),
+              ]),
+            ),
+          ],
         );
       },
     );
@@ -655,8 +683,10 @@ class _HeroBanner extends StatelessWidget {
     return ClipRRect(
       borderRadius: BorderRadius.circular(16),
       child: Stack(
+        fit: StackFit.passthrough,
         children: [
           Container(
+            width: double.infinity,
             decoration: BoxDecoration(
               gradient: const LinearGradient(
                 begin: Alignment.topLeft,
