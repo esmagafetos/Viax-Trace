@@ -138,7 +138,34 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _financialPanel(Map<String, dynamic>? f) {
-    if (f == null) return const SizedBox.shrink();
+    if (f == null) {
+      return Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: context.surface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: context.borderStrong),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Controle Financeiro',
+                style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: context.text)),
+            const SizedBox(height: 6),
+            Text(
+              'Configure seu valor por rota e ciclo de pagamento para ver estimativas de receita e controle de despesas.',
+              style: TextStyle(fontSize: 12, color: context.textFaint, height: 1.5),
+            ),
+            const SizedBox(height: 14),
+            ElevatedButton(
+              onPressed: () => context.go('/settings'),
+              style: ElevatedButton.styleFrom(shape: const StadiumBorder(), backgroundColor: context.accent),
+              child: const Text('Configurar agora', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600)),
+            ),
+          ],
+        ),
+      );
+    }
     final fmtBRL = NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$');
     final hasValor = f['valorPorRota'] != null;
 
@@ -232,14 +259,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       child: _moneyCell('Despesas\nFixas', fmtBRL.format(despesas),
                           context.accent),
                     ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: _moneyCell(
-                          'Lucro\nBruto',
-                          fmtBRL.format(lucro),
-                          lucro >= 0 ? context.ok : context.accent),
-                    ),
                   ],
+                ),
+                const SizedBox(height: 8),
+                _lucroBrutoCell(
+                  fmtBRL.format(lucro),
+                  lucro >= 0 ? context.ok : context.accent,
                 ),
                 const SizedBox(height: 18),
                 LayoutBuilder(builder: (ctx, c) {
@@ -362,7 +387,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Widget _moneyCell(String label, String value, Color color) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
       decoration: BoxDecoration(
         color: context.surface2,
         borderRadius: BorderRadius.circular(10),
@@ -377,13 +402,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
             alignment: Alignment.centerLeft,
             child: Text(value,
                 style: TextStyle(
-                    fontSize: 14,
+                    fontSize: 15,
                     fontWeight: FontWeight.w800,
                     color: color,
                     letterSpacing: -0.3,
                     height: 1.1)),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 5),
           Text(label.toUpperCase(),
               style: TextStyle(
                   fontSize: 9,
@@ -391,6 +416,54 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   letterSpacing: 0.5,
                   height: 1.2,
                   color: context.textFaint)),
+        ],
+      ),
+    );
+  }
+
+  Widget _lucroBrutoCell(String value, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('LUCRO BRUTO',
+                    style: TextStyle(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.6,
+                        color: context.textFaint)),
+                const SizedBox(height: 5),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(value,
+                      style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800,
+                          color: color,
+                          letterSpacing: -0.5,
+                          height: 1.1)),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(Icons.trending_up_rounded, color: color, size: 18),
+          ),
         ],
       ),
     );

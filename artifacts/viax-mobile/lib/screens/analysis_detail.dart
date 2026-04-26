@@ -125,14 +125,42 @@ class _AnalysisDetailScreenState extends State<AnalysisDetailScreen> {
               CardSection(
                 child: Padding(
                   padding: const EdgeInsets.all(18),
-                  child: Center(
-                    child: Text(
-                        'Os detalhes individuais desta análise não foram salvos. Reprocesse o arquivo para ver o gráfico e a lista completa.',
+                  child: Column(
+                    children: [
+                      Icon(Icons.bar_chart_outlined,
+                          size: 32, color: context.textFaint),
+                      const SizedBox(height: 10),
+                      Text(
+                        'Gráfico e detalhes não disponíveis',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                            color: context.text,
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w700)),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Esta análise não possui detalhes individuais salvos. Importe o arquivo novamente na tela Processar para ver o gráfico completo.',
                         textAlign: TextAlign.center,
                         style: TextStyle(
                             color: context.textFaint,
-                            fontSize: 12.5,
-                            height: 1.4)),
+                            fontSize: 12,
+                            height: 1.5)),
+                      const SizedBox(height: 16),
+                      ElevatedButton.icon(
+                        onPressed: () => context.go('/process'),
+                        icon: const Icon(Icons.upload_file_outlined, size: 16),
+                        label: const Text('Ir para Processar',
+                            style: TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w600)),
+                        style: ElevatedButton.styleFrom(
+                          shape: const StadiumBorder(),
+                          backgroundColor: context.accent,
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
