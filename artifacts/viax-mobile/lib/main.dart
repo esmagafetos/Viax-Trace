@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import 'api/api_client.dart';
 import 'router.dart';
 import 'state/auth_provider.dart';
+import 'state/processing_service.dart';
 import 'state/server_config.dart';
 import 'state/settings_provider.dart';
 import 'state/theme_provider.dart';
@@ -52,6 +53,7 @@ class ViaXApp extends StatelessWidget {
         ChangeNotifierProvider<ThemeProvider>.value(value: themeProv),
         ChangeNotifierProvider(create: (_) => AuthProvider(api)..bootstrap()),
         ChangeNotifierProvider(create: (_) => SettingsProvider(api)),
+        ChangeNotifierProvider(create: (_) => ProcessingService()),
       ],
       child: Consumer2<AuthProvider, ThemeProvider>(
         builder: (context, auth, theme, _) {

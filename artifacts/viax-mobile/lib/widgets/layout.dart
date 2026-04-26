@@ -1,8 +1,11 @@
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../state/auth_provider.dart';
+import '../state/processing_service.dart';
 import '../state/theme_provider.dart';
 import '../theme/theme.dart';
 import 'brand_mark.dart';
@@ -73,6 +76,7 @@ class AppLayout extends StatelessWidget {
               ),
             ),
           ),
+          ProcessingBanner(currentPath: currentPath),
         ],
       ),
     );
@@ -101,15 +105,20 @@ class _Header extends StatelessWidget {
     // breakpoint que o `mobile-nav-scroll` do web).
     final compact = width < 760;
 
-    return Material(
-      color: context.surface,
-      elevation: 0,
+    // Glassy header — espelha o `.header-glass` do web (surface 85%
+     // + backdrop-filter blur(12px)).
+    return ClipRect(
+      child: BackdropFilter(
+        filter: ui.ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+        child: DecoratedBox(
+      decoration: BoxDecoration(
+        color: context.surface.withValues(alpha: 0.85),
+        border: Border(bottom: BorderSide(color: context.border)),
+      ),
       child: SafeArea(
         bottom: false,
         child: DecoratedBox(
-          decoration: BoxDecoration(
-            border: Border(bottom: BorderSide(color: context.border)),
-          ),
+          decoration: const BoxDecoration(),
           child: Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 1200),
@@ -177,6 +186,8 @@ class _Header extends StatelessWidget {
               ),
             ),
           ),
+        ),
+      ),
         ),
       ),
     );
@@ -467,4 +478,103 @@ class CardHeaderLabel extends StatelessWidget {
           color: context.textMuted,
         ),
       );
+}
+
+/// Floating bottom banner shown across all AppLayout screens whenever a
+/// processing job is active (and the user is on a different page than the
+/// job's return path). Tapping it navigates back to the originating screen.
+class ProcessingBanner extends StatelessWidget {
+  final String currentPath;
+  const ProcessingBanner({super.key, required this.currentPath});
+
+  @override
+  Widget build(BuildContext context) {
+    final svc = context.watch<ProcessingService>();
+    final onSourceScreen = svc.returnPath == currentPath;
+    final shouldShow = svc.active && !onSourceScreen;
+
+    if (!shouldShow) return const SizedBox.shrink();
+
+    final mq = MediaQuery.of(context);
+    final lastStep = svc.steps.isNotEmpty ? svc.steps.last : 'Processando…';
+
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(12, 4, 12, mq.padding.bottom > 0 ? 4 : 12),
+        child: Material(
+          color: Colors.transparent,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(14),
+            child: BackdropFilter(
+              filter: ui.ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+              child: InkWell(
+                onTap: () => context.go(svc.returnPath),
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: context.surface.withValues(alpha: 0.92),
+                    border: Border.all(color: context.borderStrong),
+                    borderRadius: BorderRadius.circular(14),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.18),
+                        blurRadius: 24,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.4,
+                          color: context.accent,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              svc.label,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w700,
+                                color: context.text,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              lastStep,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: context.textFaint,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Icon(Icons.arrow_forward_ios,
+                          size: 13, color: context.textMuted),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }

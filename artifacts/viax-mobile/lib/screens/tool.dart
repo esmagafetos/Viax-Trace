@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../api/api_client.dart';
-import '../api/sse_client.dart';
+import '../state/processing_service.dart';
 import '../theme/theme.dart';
 import '../widgets/layout.dart';
 import '../widgets/spinner.dart';
@@ -21,16 +21,26 @@ class _ToolScreenState extends State<ToolScreen> {
   String? _filePath;
   String? _fileName;
   int? _fileSize;
-  final List<String> _steps = [];
-  bool _processing = false;
   bool _loading = true;
-  Map<String, dynamic>? _result;
   String _activeFilter = 'all';
+  bool _runInBackground = false;
+  String? _shownErrorOnce;
 
   @override
   void initState() {
     super.initState();
     _loadCondos();
+  }
+
+  @override
+  void dispose() {
+    if (!_runInBackground) {
+      final svc = context.read<ProcessingService>();
+      if (svc.kind == 'condominium' && svc.active) {
+        Future.microtask(svc.cancel);
+      }
+    }
+    super.dispose();
   }
 
   Future<void> _loadCondos() async {
@@ -59,58 +69,56 @@ class _ToolScreenState extends State<ToolScreen> {
         _filePath = f.path;
         _fileName = f.name;
         _fileSize = f.size;
-        _result = null;
-        _steps.clear();
+        _shownErrorOnce = null;
       });
+      final svc = context.read<ProcessingService>();
+      if (svc.kind == 'condominium') svc.clear();
     }
   }
 
   Future<void> _process() async {
-    final selected = _condos.firstWhere((c) => c['id'] == _selectedId, orElse: () => {});
+    final selected =
+        _condos.firstWhere((c) => c['id'] == _selectedId, orElse: () => {});
     if (selected.isEmpty || _filePath == null) return;
     if (selected['status'] != 'ativo') {
       showToast(context, 'Este condomínio ainda está em desenvolvimento.');
       return;
     }
-    setState(() {
-      _processing = true;
-      _steps.clear();
-      _result = null;
-    });
     final api = context.read<ApiClient>();
-    try {
-      await for (final ev in uploadAndStream(
-        api: api,
-        endpointPath: '/condominium/process',
-        filePath: _filePath!,
-        extraFields: {'condominioId': _selectedId},
-      )) {
-        if (!mounted) break;
-        if (ev.event == 'step' && ev.data is Map && ev.data['step'] is String) {
-          setState(() {
-            _steps.add(ev.data['step'] as String);
-            if (_steps.length > 30) _steps.removeAt(0);
-          });
-        } else if (ev.event == 'result' && ev.data is Map && ev.data['result'] is Map) {
-          setState(() {
-            _result = Map<String, dynamic>.from(ev.data['result'] as Map);
-            _steps.add('✓ Sequência logística pronta!');
-          });
-        } else if (ev.event == 'error' && ev.data is Map && ev.data['error'] is String) {
-          if (mounted) showToast(context, ev.data['error'] as String);
-        }
-      }
-    } catch (e) {
-      if (mounted) showToast(context, 'Erro de conexão: $e');
-    } finally {
-      if (mounted) setState(() => _processing = false);
-    }
+    final svc = context.read<ProcessingService>();
+    setState(() => _shownErrorOnce = null);
+    await svc.start(
+      api: api,
+      endpointPath: '/condominium/process',
+      filePath: _filePath!,
+      label: _fileName ?? 'Processando rota',
+      returnPath: '/tool',
+      kind: 'condominium',
+      extraFields: {'condominioId': _selectedId},
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final selected = _condos.firstWhere((c) => c['id'] == _selectedId, orElse: () => {});
-    final canProcess = _filePath != null && !_processing && selected['status'] == 'ativo';
+    final svc = context.watch<ProcessingService>();
+    final isMine = svc.kind == 'condominium';
+    final processing = isMine && svc.active;
+    final steps = isMine ? svc.steps : const <String>[];
+    final result = isMine ? svc.result : null;
+    final svcError = isMine ? svc.error : null;
+
+    if (svcError != null && _shownErrorOnce != svcError) {
+      _shownErrorOnce = svcError;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) showToast(context, svcError);
+      });
+    }
+
+    final selected =
+        _condos.firstWhere((c) => c['id'] == _selectedId, orElse: () => {});
+    final canProcess = _filePath != null &&
+        !processing &&
+        selected['status'] == 'ativo';
 
     return AppLayout(
       currentPath: '/tool',
@@ -118,75 +126,41 @@ class _ToolScreenState extends State<ToolScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text('Ferramenta de Condomínios',
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, letterSpacing: -0.5, color: context.text)),
+              style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.5,
+                  color: context.text)),
           const SizedBox(height: 4),
-          Text('Rastreamento interno de entregas em condomínios fechados — Nova Califórnia (Tamoios).',
-              style: TextStyle(fontSize: 13, color: context.textFaint, height: 1.5)),
+          Text(
+              'Rastreamento interno de entregas em condomínios fechados — Nova Califórnia (Tamoios).',
+              style: TextStyle(
+                  fontSize: 13, color: context.textFaint, height: 1.5)),
           const SizedBox(height: 16),
           CardSection(
             header: const CardHeaderLabel('Selecionar Condomínio'),
+            padding: const EdgeInsets.all(14),
             child: _loading
-                ? const Padding(padding: EdgeInsets.all(20), child: Center(child: AppSpinner()))
+                ? const Padding(
+                    padding: EdgeInsets.all(20),
+                    child: Center(child: AppSpinner()))
                 : Column(
                     children: [
-                      for (final c in _condos)
-                        _condoCard(c),
+                      for (final c in _condos) _condoCard(c),
                     ],
                   ),
           ),
           const SizedBox(height: 16),
           CardSection(
-            header: CardHeaderLabel('Importar Rota — ${selected['nome'] ?? '—'}'),
+            header: CardHeaderLabel(
+                'Importar Rota — ${selected['nome'] ?? '—'}'),
+            padding: const EdgeInsets.all(14),
             child: Column(
               children: [
-                InkWell(
-                  onTap: _pickFile,
-                  borderRadius: BorderRadius.circular(10),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 18),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                          color: _filePath != null ? context.accent : context.borderStrong, width: 1.4),
-                    ),
-                    child: Column(
-                      children: [
-                        Container(
-                          width: 52,
-                          height: 52,
-                          decoration: BoxDecoration(
-                            color: context.accentDim,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: context.borderStrong),
-                          ),
-                          child: Icon(Icons.upload_file_outlined, color: context.accent, size: 26),
-                        ),
-                        const SizedBox(height: 10),
-                        Text(_fileName ?? 'Arraste o arquivo aqui',
-                            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: context.text),
-                            textAlign: TextAlign.center),
-                        const SizedBox(height: 4),
-                        Text(_fileSize == null ? 'XLSX ou CSV · máx 10MB' : '${(_fileSize! / 1024).toStringAsFixed(1)} KB',
-                            style: TextStyle(fontSize: 11, color: context.textFaint),
-                            textAlign: TextAlign.center),
-                        const SizedBox(height: 12),
-                        ElevatedButton(
-                          onPressed: _pickFile,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: context.accent,
-                            foregroundColor: Colors.white,
-                            elevation: 0,
-                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.pill)),
-                            textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-                          ),
-                          child: Text(_filePath == null ? 'Selecionar arquivo' : 'Trocar arquivo'),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 14),
+                _dropzone(processing),
+                const SizedBox(height: 12),
+                _backgroundToggle(processing),
+                const SizedBox(height: 12),
                 SizedBox(
                   width: double.infinity,
                   height: 48,
@@ -197,14 +171,18 @@ class _ToolScreenState extends State<ToolScreen> {
                       disabledBackgroundColor: context.borderStrong,
                     ),
                     onPressed: canProcess ? _process : null,
-                    child: _processing
-                        ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white))
+                    child: processing
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2.4, color: Colors.white))
                         : const Text('Iniciar'),
                   ),
                 ),
-                if (_processing && _steps.isNotEmpty) ...[
+                if (processing && steps.isNotEmpty) ...[
                   const SizedBox(height: 14),
-                  for (final s in _steps)
+                  for (final s in steps)
                     Padding(
                       padding: const EdgeInsets.symmetric(vertical: 2),
                       child: Row(
@@ -214,9 +192,15 @@ class _ToolScreenState extends State<ToolScreen> {
                               margin: const EdgeInsets.only(top: 5),
                               width: 6,
                               height: 6,
-                              decoration: BoxDecoration(color: context.accent, shape: BoxShape.circle)),
+                              decoration: BoxDecoration(
+                                  color: context.accent,
+                                  shape: BoxShape.circle)),
                           const SizedBox(width: 8),
-                          Expanded(child: Text(s, style: TextStyle(fontSize: 12, color: context.textFaint))),
+                          Expanded(
+                              child: Text(s,
+                                  style: TextStyle(
+                                      fontSize: 12,
+                                      color: context.textFaint))),
                         ],
                       ),
                     ),
@@ -224,11 +208,126 @@ class _ToolScreenState extends State<ToolScreen> {
               ],
             ),
           ),
-          if (_result != null) ...[
+          if (result != null) ...[
             const SizedBox(height: 16),
-            _resultPanel(),
+            _resultPanel(result),
           ],
         ],
+      ),
+    );
+  }
+
+  Widget _dropzone(bool processing) {
+    return InkWell(
+      onTap: processing ? null : _pickFile,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 18),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+              color: _filePath != null
+                  ? context.accent
+                  : context.borderStrong,
+              width: 1.4),
+        ),
+        child: Column(
+          children: [
+            Container(
+              width: 52,
+              height: 52,
+              decoration: BoxDecoration(
+                color: context.accentDim,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: context.borderStrong),
+              ),
+              child: Icon(Icons.upload_file_outlined,
+                  color: context.accent, size: 26),
+            ),
+            const SizedBox(height: 10),
+            Text(_fileName ?? 'Arraste o arquivo aqui',
+                style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: context.text),
+                textAlign: TextAlign.center),
+            const SizedBox(height: 4),
+            Text(
+                _fileSize == null
+                    ? 'XLSX ou CSV · máx 10MB'
+                    : '${(_fileSize! / 1024).toStringAsFixed(1)} KB',
+                style: TextStyle(fontSize: 11, color: context.textFaint),
+                textAlign: TextAlign.center),
+            const SizedBox(height: 12),
+            ElevatedButton(
+              onPressed: processing ? null : _pickFile,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: context.accent,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 20, vertical: 10),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppRadii.pill)),
+                textStyle: const TextStyle(
+                    fontSize: 12, fontWeight: FontWeight.w700),
+              ),
+              child: Text(_filePath == null
+                  ? 'Selecionar arquivo'
+                  : 'Trocar arquivo'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _backgroundToggle(bool processing) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(10),
+      onTap: () => setState(() => _runInBackground = !_runInBackground),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: _runInBackground ? context.accentDim : context.surface2,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: _runInBackground
+                ? context.accent.withValues(alpha: 0.5)
+                : context.border,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              _runInBackground
+                  ? Icons.check_box
+                  : Icons.check_box_outline_blank,
+              size: 18,
+              color: _runInBackground ? context.accent : context.textMuted,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Executar em segundo plano',
+                      style: TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w700,
+                          color: context.text)),
+                  const SizedBox(height: 2),
+                  Text(
+                    _runInBackground
+                        ? 'Você pode navegar em outras telas — o processamento continua.'
+                        : 'O processamento será interrompido se você sair desta tela.',
+                    style: TextStyle(fontSize: 10.5, color: context.textFaint),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -258,7 +357,10 @@ class _ToolScreenState extends State<ToolScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(c['nome'] ?? '',
-                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: context.text)),
+                        style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: context.text)),
                     const SizedBox(height: 2),
                     Text(
                       isAvail
@@ -274,7 +376,8 @@ class _ToolScreenState extends State<ToolScreen> {
                   ],
                 ),
               ),
-              if (isActive) Icon(Icons.check_circle, color: context.accent, size: 20),
+              if (isActive)
+                Icon(Icons.check_circle, color: context.accent, size: 20),
             ],
           ),
         ),
@@ -282,8 +385,7 @@ class _ToolScreenState extends State<ToolScreen> {
     );
   }
 
-  Widget _resultPanel() {
-    final r = _result!;
+  Widget _resultPanel(Map<String, dynamic> r) {
     final classColor = {
       'ordenada': context.ok,
       'encontrada_sem_condominio': const Color(0xFF7C3AED),
@@ -313,12 +415,18 @@ class _ToolScreenState extends State<ToolScreen> {
           childAspectRatio: 2.0,
           children: [
             StatTile(value: '${r['totalLinhas'] ?? 0}', label: 'Total'),
-            StatTile(value: '${r['totalOrdenadas'] ?? 0}', label: 'Ordenadas', accent: context.ok),
+            StatTile(
+                value: '${r['totalOrdenadas'] ?? 0}',
+                label: 'Ordenadas',
+                accent: context.ok),
             StatTile(
                 value: '${r['totalSemCondominio'] ?? 0}',
                 label: 'Sem condomínio',
                 accent: const Color(0xFF7C3AED)),
-            StatTile(value: '${r['totalNuances'] ?? 0}', label: 'Nuances', accent: context.accent),
+            StatTile(
+                value: '${r['totalNuances'] ?? 0}',
+                label: 'Nuances',
+                accent: context.accent),
           ],
         ),
         const SizedBox(height: 14),
@@ -326,25 +434,37 @@ class _ToolScreenState extends State<ToolScreen> {
           scrollDirection: Axis.horizontal,
           child: Row(
             children: [
-              for (final f in const ['all', 'ordenada', 'encontrada_sem_condominio', 'nuance'])
+              for (final f in const [
+                'all',
+                'ordenada',
+                'encontrada_sem_condominio',
+                'nuance'
+              ])
                 Padding(
                   padding: const EdgeInsets.only(right: 6),
                   child: GestureDetector(
                     onTap: () => setState(() => _activeFilter = f),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
-                        color: _activeFilter == f ? context.accent : context.surface2,
+                        color: _activeFilter == f
+                            ? context.accent
+                            : context.surface2,
                         borderRadius: BorderRadius.circular(AppRadii.pill),
                         border: Border.all(
-                            color: _activeFilter == f ? context.accent : context.borderStrong),
+                            color: _activeFilter == f
+                                ? context.accent
+                                : context.borderStrong),
                       ),
                       child: Text(
                         classLabel[f] ?? f,
                         style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w700,
-                            color: _activeFilter == f ? Colors.white : context.textMuted),
+                            color: _activeFilter == f
+                                ? Colors.white
+                                : context.textMuted),
                       ),
                     ),
                   ),
@@ -354,17 +474,22 @@ class _ToolScreenState extends State<ToolScreen> {
         ),
         const SizedBox(height: 12),
         CardSection(
-          header: CardHeaderLabel('Sequência — ${(r['condominio'] as Map?)?['nome'] ?? ''}'),
+          header: CardHeaderLabel(
+              'Sequência — ${(r['condominio'] as Map?)?['nome'] ?? ''}'),
           padding: EdgeInsets.zero,
           child: Column(
             children: [
               if (filtered.isEmpty)
                 Padding(
                   padding: const EdgeInsets.all(20),
-                  child: Center(child: Text('Nenhum item.', style: TextStyle(color: context.textFaint, fontSize: 13))),
+                  child: Center(
+                      child: Text('Nenhum item.',
+                          style: TextStyle(
+                              color: context.textFaint, fontSize: 13))),
                 ),
               for (int i = 0; i < filtered.length && i < 200; i++)
-                _row(Map<String, dynamic>.from(filtered[i] as Map), classColor, i == 0),
+                _row(Map<String, dynamic>.from(filtered[i] as Map),
+                    classColor, i == 0),
             ],
           ),
         ),
@@ -372,7 +497,8 @@ class _ToolScreenState extends State<ToolScreen> {
     );
   }
 
-  Widget _row(Map<String, dynamic> row, Map<String, Color> colors, bool first) {
+  Widget _row(
+      Map<String, dynamic> row, Map<String, Color> colors, bool first) {
     final clsf = row['classificacao']?.toString() ?? 'nuance';
     final color = colors[clsf] ?? context.accent;
     return Container(
@@ -392,7 +518,10 @@ class _ToolScreenState extends State<ToolScreen> {
             ),
             child: Center(
               child: Text(row['ordem']?.toString() ?? '—',
-                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12, color: color)),
+                  style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 12,
+                      color: color)),
             ),
           ),
           const SizedBox(width: 10),
@@ -403,22 +532,30 @@ class _ToolScreenState extends State<ToolScreen> {
                 Text(
                   '${row['quadra'] != null ? "Quadra ${row['quadra']}" : "Quadra ?"}'
                   '${row['lote'] != null ? " · Lote ${row['lote']}" : ""}',
-                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: context.text),
+                  style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: context.text),
                 ),
                 if (row['instrucao'] != null) ...[
                   const SizedBox(height: 3),
                   Text('➜ ${row['instrucao']}',
-                      style: TextStyle(fontSize: 11, color: context.textMuted)),
+                      style: TextStyle(
+                          fontSize: 11, color: context.textMuted)),
                 ],
                 const SizedBox(height: 3),
                 Text(row['enderecoOriginal']?.toString() ?? '',
                     style: TextStyle(fontSize: 11, color: context.textFaint),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis),
-                if (row['motivo'] != null && row['motivo'].toString().isNotEmpty) ...[
+                if (row['motivo'] != null &&
+                    row['motivo'].toString().isNotEmpty) ...[
                   const SizedBox(height: 2),
                   Text(row['motivo'].toString(),
-                      style: TextStyle(fontSize: 10.5, color: context.textFaint, fontStyle: FontStyle.italic)),
+                      style: TextStyle(
+                          fontSize: 10.5,
+                          color: context.textFaint,
+                          fontStyle: FontStyle.italic)),
                 ],
               ],
             ),
