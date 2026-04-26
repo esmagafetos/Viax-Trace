@@ -1,62 +1,20 @@
-name: Mobile OTA Update
+name: Mobile OTA (Deprecated)
+
+# Replaced by Flutter native builds.
+# - Android: .github/workflows/mobile-release.yml (Flutter Gradle, Ubuntu)
+# - iOS:     .github/workflows/mobile-ios.yml     (Flutter Xcode, macOS, --no-codesign)
+#
+# This workflow is intentionally manual-only and a no-op so it does not
+# trigger on pushes. Kept as a stub for historical references.
 
 on:
   workflow_dispatch:
-    inputs:
-      branch:
-        description: "EAS Update branch (production / preview / development)"
-        required: true
-        default: "production"
-        type: choice
-        options:
-          - production
-          - preview
-          - development
-      message:
-        description: "Mensagem da atualização"
-        required: false
-        default: "Atualização OTA"
-
-  push:
-    branches: [main]
-    paths:
-      - "artifacts/viax-mobile/app/**"
-      - "artifacts/viax-mobile/components/**"
-      - "artifacts/viax-mobile/lib/**"
-      - "artifacts/viax-mobile/hooks/**"
-      - "artifacts/viax-mobile/constants/**"
-      - "artifacts/viax-mobile/assets/**"
 
 jobs:
-  publish-ota:
+  notice:
+    name: OTA workflow removed
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10.26.1
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Setup EAS CLI
-        uses: expo/expo-github-action@v8
-        with:
-          eas-version: latest
-          token: ${{ secrets.EXPO_TOKEN }}
-
-      - name: Publish OTA update
-        working-directory: artifacts/viax-mobile
-        env:
-          OTA_BRANCH: ${{ github.event.inputs.branch || 'production' }}
-          OTA_MESSAGE: ${{ github.event.inputs.message || format('Auto OTA — {0}', github.sha) }}
-        run: eas update --branch "$OTA_BRANCH" --message "$OTA_MESSAGE" --non-interactive
+      - run: |
+          echo "::warning::EAS Update was removed. The mobile app is now Flutter."
+          echo "Trigger 'Mobile Release (Flutter Android APK)' or 'Mobile Release (Flutter iOS — unsigned)' instead."

@@ -17,7 +17,7 @@ pnpm workspace monorepo with React+Vite frontend and Express API backend.
 - Geocoder: coordinate-first validation — reverse geocode spreadsheet GPS with **Photon (primary) → Overpass API (secondary, multi-mirror, radius 40m→90m) → Nominatim (last resort)**; forward geocoding also Photon-first. Google Maps available as premium option via `instanceMode: "googlemaps"`.
 - Process: SSE-based XLSX/CSV upload (fetch + ReadableStream), max 500 addresses, 10MB file limit
 - Avatar: stored as base64 data URL in DB, uploaded via multipart POST
-- **Mobile (Expo SDK 54, expo-router)**: paridade 1:1 com a web — Docs page completa, Toast global (`<ToastProvider>` em `_layout.tsx`), primitivos `Progress`/`Skeleton`/`Accordion`/`SectionCard`, tokens `okDim`/`destructive`/`Shadows`, export CSV real (expo-file-system/legacy + expo-sharing) em Process e Tool, avatar upload via `expo-image-picker` → multipart `/api/users/avatar`
+- **Mobile (Flutter, native Android + iOS)**: 1:1 native mirror of the web. The previous Expo/React Native app was deleted and replaced with a Flutter app at `artifacts/viax-mobile/`. Same routes (Setup, Login, Register, Dashboard, Process, Tool, History, Settings, Docs), same color/typography tokens, same SSE flow.
 
 ## Branding
 
@@ -39,21 +39,18 @@ pnpm workspace monorepo with React+Vite frontend and Express API backend.
 2. **ViaX Scout** (`artifacts/viax-scout`) — React+Vite frontend, port 5173
    - Proxy: `/api/*` → `http://localhost:8080` (Vite proxy config)
    - Pages: Login, Register, Setup, Dashboard, Process, History, Settings
-3. **ViaX Mobile** (`artifacts/viax-mobile`, v2.0.0) — Expo SDK 54 Android app, **fully rebuilt from scratch** (April 2026). Strict stack as required: Expo SDK 54 + RN New Architecture + TypeScript strict + NativeWind v4 + Reanimated v4 + expo-router v6 + TanStack Query v5 + react-native-sse + @shopify/react-native-skia (NOT victory-native) + AsyncStorage + expo-file-system/document-picker/sharing + expo-haptics + NetInfo. **No framer-motion, no victory-native, no Sobre/Documentação screens.**
-   - **5 bottom tabs** (`app/(tabs)/`): `index` (Dashboard), `processar`, `ferramenta`, `historico`, `configuracoes`.
-   - **Auth gate** (`app/index.tsx`): Splash → if no `serverUrl` → `/setup`; else if no `user` → `/(auth)/login`; else `/(tabs)`.
-   - **Server URL config** (`app/setup.tsx`): persisted via AsyncStorage key `@viax/serverUrl`; `Test connection` calls `/api/healthz` then unlocks Continue.
-   - **Session-cookie auth** (`lib/api.ts`): hand-rolled fetch client with `CookieJar` that captures `Set-Cookie` from responses and stores merged jar in AsyncStorage (`@viax/cookies`); attaches `Cookie` header on every request including SSE multipart.
-   - **SSE streaming** (`lib/sse.ts`): XHR-based multipart upload → reads response body as event stream and parses `event:` / `data:` blocks; supports cancel + upload progress. Used by Processar and Ferramenta tabs.
-   - **Skia charts** (`components/Sparkline.tsx`): `Sparkline`, `BarChart`, `Donut` built with `@shopify/react-native-skia` Path/Canvas — used on Dashboard.
-   - **Theme** (`lib/theme.ts`): light/dark tokens from web (`#d4521a` accent, Poppins, 14px radii, hero gradient `#1a0e08 → #2d1408 → #3d1c0c → #1f0a18`); follows OS color scheme.
-   - **UI primitives** (`components/ui/`): `Button` (5 variants, haptics), `Input` (label/hint/error/icons), `Card`/`CardHeader`/`StatTile`/`Pill`. Toast via `<ToastProvider>` in `_layout.tsx`.
-   - **Logo** (`components/Logo.tsx`): vector SVG port of `<LogoIcon />` (path + 3 circles) using `react-native-svg`.
-   - All API calls use the session cookie (web also uses sessions — no JWT). Logout clears cookie jar + cached user.
-   - Safe-area handling via `react-native-safe-area-context` `useSafeAreaInsets()` on every screen header and tab bar bottom padding.
-   - **Native app icons** generated from SVG sources in `assets/source/{icon,adaptive-icon,splash}.svg` — rendered to `assets/{icon,adaptive-icon,splash,favicon}.png` via `rsvg-convert` (locally via `magick`). Cream `#faf9f6` background, dark→cream tracing curve, orange `#d4521a` destination pin with white core. Wired into `app.json` (`icon`, `splash`, `android.adaptiveIcon`, `web.favicon`).
-   - **EAS build config** (`artifacts/viax-mobile/eas.json`): three profiles (`development` / `preview` / `production`); production uses `appVersionSource=local` so version comes from `app.json` (`2.0.0`).
-   - **Release workflow** (`.github/workflows/mobile-release.yml`): default profile is now `production`; auto-installs `librsvg` and **regenerates icons from SVG** in CI before EAS build; produces tag `mobile-v<version>` (production) or `mobile-v<version>-preview-<ts>-<sha>` (preview); rich Markdown release notes with build metadata table, stack summary, v2.0.0 changelog, install instructions; APK attached as `viax-trace-v<version>-<sha>.apk`.
+3. **ViaX Mobile** (`artifacts/viax-mobile`, v1.0.0) — **Native Flutter app** for Android + iOS (April 2026). The previous Expo/React Native scaffold was deleted entirely and replaced with a clean Flutter project. Stack: Flutter stable + Dart 3.4 + `go_router` (routing) + `provider` (state) + `dio` + `cookie_jar` (session cookie auth, mirrors web `credentials: include`) + `dio_cookie_manager` + raw `http` for SSE multipart streaming + `fl_chart` (financial line chart) + `file_picker` (xlsx/csv) + `image_picker` (avatar gallery) + `google_fonts` (Poppins) + `intl`.
+   - **Screens** (`lib/screens/`): `setup.dart`, `login.dart`, `register.dart`, `dashboard.dart`, `process.dart`, `tool.dart`, `history.dart`, `settings.dart` (6 tabs: Perfil, Financeiro, Instâncias, Parser, Tolerância, Sobre), `docs.dart` (5 sections + FAQ + GitHubBanner + quick links).
+   - **Routing** (`lib/router.dart`): `go_router` with redirect guards — public (`/setup`, `/login`, `/register`) vs protected (`/dashboard`, `/process`, `/tool`, `/history`, `/settings`, `/docs`).
+   - **API** (`lib/api/api_client.dart`): Dio + `PersistCookieJar` storing the Express session cookie under app-documents/.viax_cookies. All endpoints typed: auth/users/dashboard/analyses/condominium.
+   - **SSE** (`lib/api/sse_client.dart`): hand-rolled multipart POST that streams `text/event-stream`, parses `event:` / `data:` lines split by `\n\n`, yields `SseEvent` instances. Used by Process + Tool screens for `/api/process/upload` and `/api/condominium/process`.
+   - **Theme** (`lib/theme/theme.dart`): exact CSS-variable mirror — light/dark, Poppins via `google_fonts`, accent `#d4521a` (light) / `#e8703a` (dark), ok `#1a7a4a` (light) / `#2ea863` (dark), 14px card radii, pill buttons. `extension AppPalette on BuildContext` for ergonomic `context.text` / `context.accent` etc.
+   - **Widgets** (`lib/widgets/`): `AppLayout` (top bar with `ViaXLogo` + avatar PopupMenu, bottom 5-tab nav: Painel/Processar/Condomínios/Histórico/Docs), `CardSection`/`CardHeaderLabel`, `StatTile`, `AppSpinner`, `ViaXLogo`, `GitHubBanner`, `showToast`.
+   - **State** (`lib/state/`): `AuthProvider` (bootstrap → `/auth/me`, login/register/logout), `SettingsProvider` (load/save user settings).
+   - **API base** is configurable at build time via `--dart-define=API_BASE=...`; defaults to `https://viax-scout.replit.app`.
+   - **Android workflow** (`.github/workflows/mobile-release.yml`): Ubuntu + Java 17 + `subosito/flutter-action@v2` (stable). Runs `flutter create --platforms=android,ios .` to regenerate platform scaffolding from pubspec, then `flutter build apk --release` (universal + split-per-abi). Produces tag `mobile-v<version>-<sha>` and attaches universal/arm64-v8a/armeabi-v7a/x86_64 APKs to a GitHub Release.
+   - **iOS workflow** (`.github/workflows/mobile-ios.yml`): macos-14 runner + `flutter build ios --release --no-codesign`, packages an unsigned `.ipa` (zips Payload/Runner.app) and uploads as workflow artifact (no signing → no Apple Developer account required).
+   - **Old EAS Update workflow** (`mobile-ota.yml`) is kept as a no-op stub (cannot be deleted by the agent), with a `workflow_dispatch`-only trigger that prints a deprecation notice.
 
 ## Stack
 
@@ -66,7 +63,7 @@ pnpm workspace monorepo with React+Vite frontend and Express API backend.
 - **Validation**: Zod (`zod/v4`), `drizzle-zod`
 - **API codegen**: Orval (from `lib/api-spec/openapi.yaml`)
 - **Frontend**: React 19.1.0 (pinned for Expo compat), Vite 7, TanStack Query, Wouter router, Tailwind CSS v4
-- **Mobile**: Expo SDK 54 + React Native 0.81 + expo-router 6 (`artifacts/viax-mobile`)
+- **Mobile**: Flutter (stable) + Dart 3.4, native Android + iOS (`artifacts/viax-mobile`)
 - **Geocoder microservice**: R 4.5 + Plumber + geocodebr (IPEA/CNEFE) (`artifacts/geocodebr-service`)
 
 ## Key Commands

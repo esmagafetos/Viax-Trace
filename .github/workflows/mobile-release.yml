@@ -1,4 +1,4 @@
-name: Mobile Release (Android APK)
+name: Mobile Release (Flutter Android APK)
 
 on:
   push:
@@ -8,16 +8,13 @@ on:
       - '.github/workflows/mobile-release.yml'
   workflow_dispatch:
     inputs:
-      profile:
-        description: 'EAS build profile'
+      api_base:
+        description: 'API base URL baked into the APK (defaults to repo secret API_BASE or https://viax-scout.replit.app)'
         required: false
-        default: 'production'
-        type: choice
-        options:
-          - preview
-          - production
+        default: ''
+        type: string
       release_notes:
-        description: 'Notas adicionais para o release (opcional)'
+        description: 'Release notes (optional)'
         required: false
         default: ''
         type: string
@@ -28,238 +25,121 @@ concurrency:
 
 jobs:
   build:
-    name: Build & Release Android APK
+    name: Build Flutter Android APK
     runs-on: ubuntu-latest
     permissions:
       contents: write
     defaults:
       run:
         working-directory: artifacts/viax-mobile
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
         with:
-          node-version: 20
-          cache: pnpm
-          cache-dependency-path: pnpm-lock.yaml
+          distribution: temurin
+          java-version: '17'
 
-      - name: Setup Expo & EAS
-        uses: expo/expo-github-action@v8
+      - name: Setup Flutter (stable)
+        uses: subosito/flutter-action@v2
         with:
-          eas-version: latest
-          expo-version: latest
-          token: ${{ secrets.EXPO_TOKEN }}
+          channel: stable
+          cache: true
 
-      - name: Install dependencies
-        working-directory: ${{ github.workspace }}
-        run: pnpm install --frozen-lockfile
+      - name: Show Flutter version
+        run: flutter --version
 
-      - name: Install librsvg + ImageMagick (for icon rendering)
+      - name: Regenerate Android/iOS platform scaffolding
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends librsvg2-bin imagemagick
+          # Pubspec already exists; this fills in android/, ios/, etc. without touching lib/.
+          flutter create --org com.viax --project-name viax_scout --platforms=android,ios .
+          # Ensure release signing falls back to debug keystore so unsigned CI builds work.
+          ls -la android/
 
-      - name: Regenerate app icons from SVG sources
+      - name: Resolve API_BASE
+        id: api
         run: |
-          set -eux
-          mkdir -p assets
-          rsvg-convert -w 1024 -h 1024 assets/source/icon.svg          -o assets/icon.png
-          rsvg-convert -w 1024 -h 1024 assets/source/adaptive-icon.svg -o assets/adaptive-icon.png
-          rsvg-convert -w 1242 -h 1242 assets/source/splash.svg        -o assets/splash.png
-          rsvg-convert -w 48   -h 48   assets/source/icon.svg          -o assets/favicon.png
-          ls -lh assets/*.png
+          INPUT_BASE="${{ github.event.inputs.api_base }}"
+          SECRET_BASE="${{ secrets.API_BASE }}"
+          if [ -n "$INPUT_BASE" ]; then
+            echo "value=$INPUT_BASE" >> "$GITHUB_OUTPUT"
+          elif [ -n "$SECRET_BASE" ]; then
+            echo "value=$SECRET_BASE" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=https://viax-scout.replit.app" >> "$GITHUB_OUTPUT"
+          fi
 
-      - name: Typecheck mobile
-        run: pnpm --filter @workspace/viax-mobile run typecheck
+      - name: Flutter pub get
+        run: flutter pub get
 
-      - name: Run expo-doctor (informational, non-blocking)
-        continue-on-error: true
-        run: npx --yes expo-doctor@latest
+      - name: Analyze (non-blocking)
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings || true
 
-      - name: Resolve build metadata
+      - name: Build release APK
+        run: |
+          flutter build apk --release \
+            --dart-define=API_BASE=${{ steps.api.outputs.value }}
+          ls -lh build/app/outputs/flutter-apk/
+
+      - name: Build split-per-ABI APKs
+        run: |
+          flutter build apk --release --split-per-abi \
+            --dart-define=API_BASE=${{ steps.api.outputs.value }}
+          ls -lh build/app/outputs/flutter-apk/
+
+      - name: Compute version & tag
         id: meta
         run: |
-          set -eu
-          SHORT_SHA=$(git rev-parse --short HEAD)
-          BUILD_TS=$(date -u +%Y%m%d-%H%M%S)
-          BUILD_DATE=$(date -u +"%Y-%m-%d %H:%M UTC")
-          PROFILE="${{ github.event.inputs.profile || 'production' }}"
-          VERSION=$(node -p "require('./package.json').version")
-          if [ "$PROFILE" = "production" ]; then
-            TAG="mobile-v${VERSION}"
-          else
-            TAG="mobile-v${VERSION}-${PROFILE}-${BUILD_TS}-${SHORT_SHA}"
-          fi
-          {
-            echo "tag=${TAG}"
-            echo "short_sha=${SHORT_SHA}"
-            echo "profile=${PROFILE}"
-            echo "version=${VERSION}"
-            echo "build_date=${BUILD_DATE}"
-          } >> "$GITHUB_OUTPUT"
+          VERSION=$(grep '^version:' pubspec.yaml | awk '{print $2}')
+          SHA=${GITHUB_SHA::7}
+          TAG="mobile-v${VERSION}-${SHA}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
 
-      - name: Build APK on EAS
-        id: easbuild
-        env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-          EAS_BUILD_NO_EXPO_GO_WARNING: "true"
+      - name: Stage artifacts
         run: |
-          set +e
-          eas build \
-            --platform android \
-            --profile "${{ steps.meta.outputs.profile }}" \
-            --non-interactive \
-            --json \
-            --wait > build-output.json
-          BUILD_EXIT=$?
-          echo "---- build-output.json ----"
-          cat build-output.json || true
-          exit $BUILD_EXIT
+          mkdir -p ../../release-artifacts
+          cp build/app/outputs/flutter-apk/app-release.apk \
+            "../../release-artifacts/viax-scout-${{ steps.meta.outputs.version }}-universal.apk"
+          for abi in arm64-v8a armeabi-v7a x86_64; do
+            f="build/app/outputs/flutter-apk/app-${abi}-release.apk"
+            if [ -f "$f" ]; then
+              cp "$f" "../../release-artifacts/viax-scout-${{ steps.meta.outputs.version }}-${abi}.apk"
+            fi
+          done
+          ls -lh ../../release-artifacts/
 
-      - name: Fetch EAS build logs on failure
-        if: failure() && steps.easbuild.conclusion == 'failure'
-        env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-        run: |
-          set +e
-          if [ ! -s build-output.json ]; then
-            echo "build-output.json missing or empty"
-            exit 0
-          fi
-          BUILD_ID=$(node -e "
-            const fs = require('fs');
-            const raw = fs.readFileSync('build-output.json','utf8').trim();
-            const s = raw.indexOf('['); const e = raw.lastIndexOf(']');
-            if (s === -1 || e === -1) { process.exit(0); }
-            const arr = JSON.parse(raw.slice(s, e + 1));
-            if (arr[0] && arr[0].id) console.log(arr[0].id);
-          ")
-          echo "EAS Build ID: $BUILD_ID"
-          if [ -z "$BUILD_ID" ]; then
-            echo "Could not extract build id"; exit 0
-          fi
-          echo "===== eas build:view ====="
-          eas build:view --json "$BUILD_ID" > build-detail.json 2>&1 || true
-          cat build-detail.json || true
-          echo ""
-          echo "===== Build log (tail 300 lines) ====="
-          LOG_URL=$(node -e "
-            try {
-              const b = JSON.parse(require('fs').readFileSync('build-detail.json','utf8'));
-              const u = (b.logFiles && b.logFiles[0]) || b.buildLogsUrl || '';
-              console.log(u);
-            } catch(e) {}
-          ")
-          echo "Log URL: $LOG_URL"
-          if [ -n "$LOG_URL" ]; then
-            curl -sSL -H "Authorization: Bearer $EXPO_TOKEN" "$LOG_URL" -o eas-build.log || true
-            tail -300 eas-build.log || true
-          fi
-
-      - name: Download APK artifact
-        run: |
-          set -eu
-          APK_URL=$(node -e "
-            const fs = require('fs');
-            const raw = fs.readFileSync('build-output.json','utf8').trim();
-            const start = raw.indexOf('[');
-            const end = raw.lastIndexOf(']');
-            if (start === -1 || end === -1) { console.error('no JSON array in EAS output'); process.exit(1); }
-            const builds = JSON.parse(raw.slice(start, end + 1));
-            const url = builds[0] && builds[0].artifacts && builds[0].artifacts.buildUrl;
-            if (!url) { console.error('no buildUrl in EAS response'); process.exit(1); }
-            console.log(url);
-          ")
-          echo "APK URL: $APK_URL"
-          mkdir -p out
-          curl -fL "$APK_URL" -o "out/viax-trace-v${{ steps.meta.outputs.version }}-${{ steps.meta.outputs.short_sha }}.apk"
-          ls -lh out
-
-      - name: Compute APK size
-        id: apk
-        run: |
-          APK_FILE=$(ls out/*.apk | head -n1)
-          APK_SIZE=$(du -h "$APK_FILE" | cut -f1)
-          APK_NAME=$(basename "$APK_FILE")
-          {
-            echo "file=${APK_FILE}"
-            echo "name=${APK_NAME}"
-            echo "size=${APK_SIZE}"
-          } >> "$GITHUB_OUTPUT"
-
-      - name: Compose release notes
-        id: notes
-        run: |
-          cat > release-notes.md <<EOF
-          # ViaX:Trace Mobile — v${{ steps.meta.outputs.version }}
-
-          APK Android assinado, gerado automaticamente via **EAS Build** no perfil
-          \`${{ steps.meta.outputs.profile }}\`.
-
-          ## Informações da build
-
-          | Campo            | Valor |
-          |------------------|-------|
-          | Versão           | \`${{ steps.meta.outputs.version }}\` |
-          | Perfil EAS       | \`${{ steps.meta.outputs.profile }}\` |
-          | Data da build    | ${{ steps.meta.outputs.build_date }} |
-          | Commit           | [\`${{ steps.meta.outputs.short_sha }}\`](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}) |
-          | Tamanho do APK   | ${{ steps.apk.outputs.size }} |
-          | Arquivo          | \`${{ steps.apk.outputs.name }}\` |
-          | Pacote Android   | \`com.viax.trace\` |
-          | SDK Expo         | 54 (New Architecture) |
-
-          ## Stack
-
-          Expo SDK 54 · React Native New Architecture · TypeScript estrito · NativeWind v4 ·
-          Reanimated v4 · expo-router v6 · TanStack Query v5 · react-native-sse ·
-          @shopify/react-native-skia · AsyncStorage · expo-haptics · NetInfo.
-
-          ## Novidades da v2.0.0
-
-          - Reescrita completa do app mobile do zero com a nova arquitetura.
-          - 5 abas inferiores: **Dashboard**, **Processar**, **Ferramenta**, **Histórico**, **Configurações**.
-          - Tela de **Setup** para configurar a URL do servidor (\`@viax/serverUrl\`) com teste de conexão via \`/api/healthz\`.
-          - Autenticação por **cookie de sessão** (sem JWT) com cookie jar persistido em AsyncStorage.
-          - **SSE com upload multipart** para Processar e Ferramenta com progresso em tempo real.
-          - Gráficos **Skia** (donut, barras, sparkline) no Dashboard.
-          - Tema light/dark espelhado da web (acento \`#d4521a\`, fonte Poppins).
-          - Exportação de CSV via \`expo-file-system\` + \`expo-sharing\`.
-          - Ícone nativo elegante derivado do logo SVG do projeto.
-
-          ## Como instalar
-
-          1. Baixe o APK abaixo no seu Android.
-          2. Em **Configurações → Segurança**, habilite **Instalar de fontes desconhecidas**
-             para o navegador usado no download.
-          3. Toque no APK baixado para instalar.
-          4. Ao abrir o app, configure a URL do seu servidor ViaX:Trace
-             (rodando localmente via Termux ou em outro host) na tela inicial.
-
-          ${{ github.event.inputs.release_notes && format('## Notas adicionais
-
-          {0}', github.event.inputs.release_notes) || '' }}
-          EOF
-          echo "Generated release notes:"
-          cat release-notes.md
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: viax-scout-android-${{ steps.meta.outputs.version }}-${{ steps.meta.outputs.sha }}
+          path: release-artifacts/*.apk
+          retention-days: 30
 
       - name: Create GitHub Release
+        if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.meta.outputs.tag }}
-          name: ViaX:Trace Mobile v${{ steps.meta.outputs.version }}
-          body_path: artifacts/viax-mobile/release-notes.md
-          files: artifacts/viax-mobile/out/*.apk
+          name: ViaX:Scout ${{ steps.meta.outputs.version }} (Android)
+          body: |
+            **Flutter Android build** — generated automatically from commit `${{ steps.meta.outputs.sha }}`.
+
+            **API base:** `${{ steps.api.outputs.value }}`
+
+            ${{ github.event.inputs.release_notes }}
+
+            ## Install
+            Download `viax-scout-${{ steps.meta.outputs.version }}-universal.apk` and install on your Android device.
+            (Enable "Install from unknown sources" if needed.)
+          files: release-artifacts/*.apk
           draft: false
-          prerelease: ${{ steps.meta.outputs.profile == 'preview' }}
-          fail_on_unmatched_files: true
+          prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

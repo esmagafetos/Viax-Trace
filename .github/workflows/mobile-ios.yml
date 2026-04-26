@@ -1,0 +1,91 @@
+name: Mobile Release (Flutter iOS — unsigned)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'artifacts/viax-mobile/**'
+      - '.github/workflows/mobile-ios.yml'
+  workflow_dispatch:
+    inputs:
+      api_base:
+        description: 'API base URL baked into the IPA'
+        required: false
+        default: ''
+        type: string
+
+concurrency:
+  group: mobile-ios-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build Flutter iOS (no codesign)
+    runs-on: macos-14
+    permissions:
+      contents: write
+    defaults:
+      run:
+        working-directory: artifacts/viax-mobile
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Flutter (stable)
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Show Flutter version
+        run: flutter --version
+
+      - name: Regenerate iOS scaffolding
+        run: flutter create --org com.viax --project-name viax_scout --platforms=ios,android .
+
+      - name: Resolve API_BASE
+        id: api
+        run: |
+          INPUT_BASE="${{ github.event.inputs.api_base }}"
+          SECRET_BASE="${{ secrets.API_BASE }}"
+          if [ -n "$INPUT_BASE" ]; then
+            echo "value=$INPUT_BASE" >> "$GITHUB_OUTPUT"
+          elif [ -n "$SECRET_BASE" ]; then
+            echo "value=$SECRET_BASE" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=https://viax-scout.replit.app" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      - name: Build iOS (no codesign)
+        run: |
+          flutter build ios --release --no-codesign \
+            --dart-define=API_BASE=${{ steps.api.outputs.value }}
+
+      - name: Package unsigned IPA
+        run: |
+          mkdir -p Payload
+          cp -R build/ios/iphoneos/Runner.app Payload/Runner.app
+          zip -qry viax-scout-unsigned.ipa Payload
+          rm -rf Payload
+          ls -lh viax-scout-unsigned.ipa
+
+      - name: Compute version
+        id: meta
+        run: |
+          VERSION=$(grep '^version:' pubspec.yaml | awk '{print $2}')
+          SHA=${GITHUB_SHA::7}
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: viax-scout-ios-unsigned-${{ steps.meta.outputs.version }}-${{ steps.meta.outputs.sha }}
+          path: artifacts/viax-mobile/viax-scout-unsigned.ipa
+          retention-days: 30
