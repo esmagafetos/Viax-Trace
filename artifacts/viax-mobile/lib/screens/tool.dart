@@ -120,8 +120,8 @@ class _ToolScreenState extends State<ToolScreen> {
           Text('Ferramenta de Condomínios',
               style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, letterSpacing: -0.5, color: context.text)),
           const SizedBox(height: 4),
-          Text('Rastreamento interno de entregas em condomínios fechados.',
-              style: TextStyle(fontSize: 13, color: context.textFaint)),
+          Text('Rastreamento interno de entregas em condomínios fechados — Nova Califórnia (Tamoios).',
+              style: TextStyle(fontSize: 13, color: context.textFaint, height: 1.5)),
           const SizedBox(height: 16),
           CardSection(
             header: const CardHeaderLabel('Selecionar Condomínio'),
@@ -143,7 +143,7 @@ class _ToolScreenState extends State<ToolScreen> {
                   onTap: _pickFile,
                   borderRadius: BorderRadius.circular(10),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 24),
+                    padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 18),
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(
@@ -152,20 +152,36 @@ class _ToolScreenState extends State<ToolScreen> {
                     child: Column(
                       children: [
                         Container(
-                          width: 48,
-                          height: 48,
+                          width: 52,
+                          height: 52,
                           decoration: BoxDecoration(
                             color: context.accentDim,
                             borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: context.borderStrong),
                           ),
-                          child: Icon(Icons.description_outlined, color: context.accent),
+                          child: Icon(Icons.upload_file_outlined, color: context.accent, size: 26),
                         ),
-                        const SizedBox(height: 8),
-                        Text(_fileName ?? 'Arraste a planilha aqui',
-                            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: context.text)),
+                        const SizedBox(height: 10),
+                        Text(_fileName ?? 'Arraste o arquivo aqui',
+                            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: context.text),
+                            textAlign: TextAlign.center),
                         const SizedBox(height: 4),
-                        Text(_fileSize == null ? 'XLSX ou CSV' : '${(_fileSize! / 1024).toStringAsFixed(1)} KB',
-                            style: TextStyle(fontSize: 11, color: context.textFaint)),
+                        Text(_fileSize == null ? 'XLSX ou CSV · máx 10MB' : '${(_fileSize! / 1024).toStringAsFixed(1)} KB',
+                            style: TextStyle(fontSize: 11, color: context.textFaint),
+                            textAlign: TextAlign.center),
+                        const SizedBox(height: 12),
+                        ElevatedButton(
+                          onPressed: _pickFile,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: context.accent,
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.pill)),
+                            textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                          ),
+                          child: Text(_filePath == null ? 'Selecionar arquivo' : 'Trocar arquivo'),
+                        ),
                       ],
                     ),
                   ),

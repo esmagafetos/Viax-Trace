@@ -13,8 +13,8 @@ class DocsScreen extends StatelessWidget {
       icon: Icons.info_outline,
       title: 'O que é o ViaX:Trace?',
       body:
-          'O ViaX:Trace é um sistema SaaS de auditoria de rotas logísticas. Valida planilhas de entrega (XLSX/CSV) comparando endereços declarados pelos motoristas com coordenadas GPS capturadas durante a entrega.\n\n'
-          'Quando há discrepância entre o endereço informado e a localização real do GPS, o sistema classifica o item como uma nuance — que pode indicar erro de digitação, endereço incorreto ou potencial fraude.',
+          'O ViaX:Trace é um sistema SaaS de auditoria de rotas logísticas. Ele valida planilhas de entrega (XLSX ou CSV) comparando os endereços declarados pelos motoristas com as coordenadas GPS capturadas durante a entrega.\n\n'
+          'Quando há discrepância entre o endereço informado e a localização real do GPS, o sistema classifica o item como uma nuance — que pode indicar erro de digitação, endereço incorreto, ou potencial fraude.',
     ),
     _DocSection(
       icon: Icons.warning_amber_outlined,
@@ -22,59 +22,90 @@ class DocsScreen extends StatelessWidget {
       body:
           'Uma nuance é detectada quando a rua/logradouro informado no endereço de entrega não corresponde (ou corresponde com baixa similaridade) à via real identificada pelas coordenadas GPS.\n\n'
           'Exemplos de nuances:\n'
-          '• Endereço informa "Rua das Flores, 123" mas GPS aponta para "Av. Brasil, 123"\n'
-          '• Divergência de bairro ou complemento\n'
-          '• Endereço com erro de grafia\n\n'
+          '• Endereço informa "Rua das Flores, 123" mas o GPS aponta para "Av. Brasil, 123"\n'
+          '• Divergência de nome de bairro ou complemento\n'
+          '• Endereço com erro de grafia que impede correspondência\n\n'
           'Exemplos que NÃO são nuance:\n'
-          '• "Rua Sinagoga, 49, Travessa B" → GPS na Travessa B (via secundária reconhecida)\n'
+          '• "Rua Sinagoga, 49, Travessa B" → GPS na Travessa B (o sistema reconhece padrões de via secundária)\n'
           '• Variações de siglas como "Av." vs "Avenida" (normalização automática)',
     ),
     _DocSection(
       icon: Icons.upload_file_outlined,
       title: 'Como processar uma planilha',
       body:
-          '1. Prepare o arquivo: XLSX ou CSV com colunas de endereço e coordenadas GPS (lat/lon).\n\n'
-          '2. Vá em Processar Rota e faça upload do arquivo.\n\n'
-          '3. Aguarde o processamento — o progresso é exibido em tempo real.\n\n'
-          '4. Revise os resultados. Cada linha é classificada como OK ou Nuance.\n\n'
-          '5. Exporte o relatório final.',
+          '1. Prepare o arquivo\n'
+          'O arquivo deve ser XLSX ou CSV com pelo menos as colunas de endereço e coordenadas GPS (latitude e longitude).\n\n'
+          '2. Vá em "Processar Rota"\n'
+          'No menu de navegação, toque em Processar. Faça upload do arquivo ou arraste-o para a área indicada.\n\n'
+          '3. Aguarde o processamento\n'
+          'O sistema processa cada endereço em tempo real via geocodificação multi-camada. O progresso é exibido em tempo real (SSE).\n\n'
+          '4. Revise os resultados\n'
+          'Cada linha é classificada com:\n'
+          '• OK — Endereço confere com o GPS\n'
+          '• Nuance — Discrepância detectada, requer revisão\n\n'
+          '5. Exporte o relatório\n'
+          'Baixe o relatório final em XLSX com todos os resultados e detalhes de similaridade.',
     ),
     _DocSection(
       icon: Icons.grid_view_outlined,
       title: 'Formato do arquivo',
       body:
-          'Colunas obrigatórias (case-insensitive):\n'
-          '• endereco / address — Endereço completo\n'
-          '• latitude / lat — Latitude decimal (ex: -23.5505)\n'
-          '• longitude / lon / lng — Longitude decimal\n\n'
-          'Colunas opcionais:\n'
+          'O sistema aceita planilhas com as seguintes colunas (case-insensitive):\n\n'
+          'Colunas obrigatórias:\n'
+          '• endereco / endereço / address — Endereço completo da entrega\n'
+          '• latitude / lat — Coordenada de latitude (decimal, ex: -23.5505)\n'
+          '• longitude / lon / lng — Coordenada de longitude (decimal, ex: -46.6333)\n\n'
+          'Colunas opcionais (auxiliam na precisão):\n'
           '• cidade / city\n'
           '• bairro / neighborhood\n'
-          '• cep',
+          '• cep\n\n'
+          'Formatos de endereço suportados:\n'
+          '• Rua das Flores, 123\n'
+          '• Av. Brasil, 456, Ap 12\n'
+          '• Rua Sinagoga, 49, Travessa B (Apt 1)\n'
+          '• Farmácia Bom Jesus - Rua X, 50',
     ),
     _DocSection(
       icon: Icons.location_on_outlined,
       title: 'Como funciona a geocodificação',
       body:
-          'Estratégia multi-camada para máxima precisão em endereços brasileiros:\n\n'
-          'Camada 1 — Reversa (GPS → Rua):\n'
-          '• Photon (OSM, sem rate limit)\n'
-          '• Overpass API (geometria OSM precisa)\n'
-          '• Nominatim (fallback)\n\n'
-          'Camada 2 — Direta (Endereço → Coordenada):\n'
-          '• BrasilAPI (CEP nacional)\n'
-          '• Google Maps (premium opcional)\n\n'
-          'Normalização inteligente de siglas, POIs e vias secundárias antes da comparação.',
+          'O sistema usa uma estratégia de geocodificação multi-camada para máxima precisão em endereços brasileiros:\n\n'
+          'Camada 1 — Geocodificação reversa (GPS → Rua)\n'
+          'As coordenadas GPS são convertidas em nome de rua usando:\n'
+          '1. Photon — OSM Photon API (rápido, sem rate limit)\n'
+          '2. Overpass API — Consulta direta à geometria OSM (preciso)\n'
+          '3. Nominatim — Fallback com dados OSM completos\n\n'
+          'Camada 2 — Geocodificação direta (Endereço → Coordenada)\n'
+          'O endereço extraído é geocodificado para verificar distância:\n'
+          '4. BrasilAPI — Dados de CEP nacionais\n'
+          '5. Google Maps — Fallback premium para casos difíceis\n\n'
+          'Normalização inteligente\n'
+          'Antes da comparação, o sistema normaliza siglas, remove anotações de motoristas, identifica POIs e promove vias secundárias (Travessa, Passagem, etc.) quando o GPS confirma que são a via real de entrega.',
     ),
     _DocSection(
       icon: Icons.help_outline,
       title: 'Perguntas frequentes',
       faqs: [
-        ('Funciona em cidades pequenas?', 'Sim. Múltiplas fontes OSM têm boa cobertura no Brasil. Em áreas muito rurais a precisão pode ser menor.'),
-        ('O que é o limiar de similaridade?', 'Percentual mínimo de correspondência entre rua informada e oficial. Padrão 68%.'),
-        ('Por que "Travessa B" não é nuance?', 'O sistema reconhece o padrão "Logradouro de referência, número, Via de entrega".'),
-        ('Quantos endereços de uma vez?', 'Sem limite fixo. Planilhas com 500+ endereços podem levar alguns minutos.'),
-        ('Os dados são seguros?', 'Sim. Todo o processamento é em servidor seguro, criptografado, acessível só ao seu usuário.'),
+        (
+          'O sistema funciona para cidades pequenas do interior?',
+          'Sim. O sistema usa múltiplas fontes OSM que têm boa cobertura no Brasil, incluindo cidades do interior. Para endereços muito rurais, a precisão pode ser menor e o sistema indicará confiança reduzida.',
+        ),
+        (
+          'O que é o limiar de similaridade?',
+          'O sistema calcula um percentual de correspondência entre o nome da rua informada e o nome oficial obtido pelo GPS. O limiar padrão é 68% — abaixo disso, o item é marcado como nuance. Padrões conhecidos (siglas, vias secundárias) têm tratamento especial.',
+        ),
+        (
+          'Por que "Rua Sinagoga, Travessa B" não é mais nuance?',
+          'O sistema reconhece o padrão brasileiro "Logradouro de referência, número, Via de entrega". Quando o GPS confirma que a via de entrega (ex: Travessa B) é a rua real, o endereço é validado automaticamente.',
+        ),
+        (
+          'Quantos endereços posso processar de uma vez?',
+          'Não há limite técnico fixo por planilha, mas planilhas com mais de 500 endereços podem levar alguns minutos, pois cada endereço requer consultas a APIs externas. O progresso é exibido em tempo real.',
+        ),
+        (
+          'Os dados são armazenados com segurança?',
+          'Sim. Todo o processamento ocorre em nosso servidor seguro. Os arquivos são armazenados de forma criptografada e apenas você tem acesso aos seus resultados.',
+        ),
       ],
     ),
   ];

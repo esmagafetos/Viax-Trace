@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 
 import '../api/api_client.dart';
 import '../state/auth_provider.dart';
+import '../state/server_config.dart';
 import '../state/settings_provider.dart';
 import '../theme/theme.dart';
 import '../widgets/layout.dart';
@@ -189,6 +190,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           if (_activeTab == 'instancias') _instanciasTab(),
           if (_activeTab == 'parser') _parserTab(),
           if (_activeTab == 'tolerancia') _toleranciaTab(),
+          if (_activeTab == 'servidor') _servidorTab(),
           if (_activeTab == 'sobre') _sobreTab(),
         ],
       ),
@@ -202,6 +204,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ('instancias', 'Instâncias'),
       ('parser', 'Parser'),
       ('tolerancia', 'Tolerância'),
+      ('servidor', 'Servidor'),
       ('sobre', 'Sobre'),
     ];
     return SingleChildScrollView(
@@ -553,6 +556,87 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _saveButton('Salvar Tolerância', _savingSettings, _saveSettings),
         ],
       ),
+    );
+  }
+
+  Widget _servidorTab() {
+    final cfg = context.watch<ServerConfig>();
+    final ctrl = TextEditingController(text: cfg.baseUrl);
+    Future<void> save() async {
+      final url = ctrl.text.trim();
+      if (url.isEmpty) {
+        showToast(context, 'Informe a URL do servidor.');
+        return;
+      }
+      await context.read<ServerConfig>().setBaseUrl(url);
+      if (mounted) showToast(context, 'Servidor atualizado!', success: true);
+    }
+
+    Future<void> reset() async {
+      await context.read<ServerConfig>().reset();
+      if (mounted) showToast(context, 'Servidor padrão restaurado.', success: true);
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        CardSection(
+          header: const CardHeaderLabel('Servidor da API'),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'Endereço do servidor ViaX:Trace usado pelo aplicativo. Mantenha o padrão para usar o serviço oficial em nuvem ou aponte para sua própria instância.',
+                style: TextStyle(fontSize: 12, color: context.textMuted, height: 1.6),
+              ),
+              const SizedBox(height: 14),
+              _label('URL DO SERVIDOR'),
+              TextField(
+                controller: ctrl,
+                keyboardType: TextInputType.url,
+                autocorrect: false,
+                decoration: const InputDecoration(hintText: 'https://viax-scout.replit.app'),
+              ),
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: cfg.isDefault ? context.ok : context.accent,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      cfg.isDefault ? 'Usando servidor padrão (oficial)' : 'Servidor personalizado configurado',
+                      style: TextStyle(fontSize: 11, color: context.textFaint),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              _saveButton('Salvar Servidor', false, save),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                height: 44,
+                child: OutlinedButton(
+                  onPressed: cfg.isDefault ? null : reset,
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(color: context.borderStrong),
+                    foregroundColor: context.textMuted,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.pill)),
+                  ),
+                  child: const Text('Restaurar padrão'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 

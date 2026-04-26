@@ -131,13 +131,29 @@ class _ProcessScreenState extends State<ProcessScreen> {
                           child: Icon(Icons.upload_file_outlined, color: context.accent, size: 26),
                         ),
                         const SizedBox(height: 10),
-                        Text(_fileName ?? 'Selecionar arquivo',
+                        Text(_fileName ?? 'Arraste o arquivo aqui',
                             style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: context.text),
                             textAlign: TextAlign.center),
                         const SizedBox(height: 4),
                         Text(
-                          _fileSize == null ? 'XLSX ou CSV · máx 10MB' : '${(_fileSize! / 1024).toStringAsFixed(1)} KB',
+                          _fileSize == null
+                              ? 'XLSX ou CSV · coluna "Destination Address" · máx 10MB'
+                              : '${(_fileSize! / 1024).toStringAsFixed(1)} KB',
                           style: TextStyle(fontSize: 11, color: context.textFaint),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 12),
+                        ElevatedButton(
+                          onPressed: _pickFile,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: context.accent,
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.pill)),
+                            textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                          ),
+                          child: Text(_filePath == null ? 'Selecionar arquivo' : 'Trocar arquivo'),
                         ),
                       ],
                     ),
