@@ -7,13 +7,13 @@ void _foregroundEntry() {
 
 class _ProcessTaskHandler extends TaskHandler {
   @override
-  void onStart(DateTime timestamp, TaskStarter starter) {}
+  Future<void> onStart(DateTime timestamp, TaskStarter starter) async {}
 
   @override
   void onRepeatEvent(DateTime timestamp) {}
 
   @override
-  Future<void> onDestroy(DateTime timestamp, bool isTimeout) async {}
+  Future<void> onDestroy(DateTime timestamp) async {}
 }
 
 class ForegroundProcessing {

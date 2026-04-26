@@ -9,7 +9,6 @@ import '../api/api_client.dart';
 import '../theme/theme.dart';
 import '../widgets/layout.dart';
 import '../widgets/spinner.dart';
-import '../widgets/toast.dart';
 
 class AnalysisDetailScreen extends StatefulWidget {
   final int id;
