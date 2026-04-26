@@ -181,7 +181,7 @@ class _ServerSetupScreenState extends State<ServerSetupScreen> {
                 decoration: BoxDecoration(
                   color: context.surface,
                   borderRadius: BorderRadius.circular(AppRadii.lg),
-                  border: Border.all(color: context.borderSubtle),
+                  border: Border.all(color: context.border),
                 ),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text('Como usar', style: TextStyle(color: context.text, fontWeight: FontWeight.w700, fontSize: 13)),
