@@ -44,7 +44,8 @@ ios/Runner.xcodeproj/xcuserdata/
 ios/Runner.xcodeproj/project.xcworkspace/xcuserdata/
 
 # Misc
-*.lock
+# NOTE: do NOT ignore pubspec.lock — Flutter recommends committing it for
+# applications (only libraries should ignore it). We also keep iOS Podfile.lock.
 *.log
 *.bak
 .DS_Store
