@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../api/api_client.dart';
 import '../state/auth_provider.dart';
@@ -640,55 +641,429 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  Future<void> _openUrl(String url) async {
+    final uri = Uri.tryParse(url);
+    if (uri == null) return;
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
   Widget _sobreTab() {
+    final repoLinks = const [
+      (
+        'https://github.com/esmagafetos/Viax-Scout',
+        Icons.code,
+        'GitHub — esmagafetos/Viax-Scout',
+        'Código-fonte, issues, pull requests e releases',
+        'Open Source',
+        Color(0xFF16A34A),
+        Color(0x1A16A34A),
+      ),
+      (
+        'https://github.com/esmagafetos/Viax-Scout/blob/main/README.md',
+        Icons.menu_book_outlined,
+        'Documentação (README)',
+        'Guia de instalação, configuração e uso',
+        'Docs',
+        Color(0xFF1D4ED8),
+        Color(0x1A1D4ED8),
+      ),
+      (
+        'https://github.com/esmagafetos/Viax-Scout/issues',
+        Icons.error_outline,
+        'Issues & Suporte',
+        'Reporte bugs, solicite funcionalidades ou tire dúvidas',
+        'Issues',
+        Color(0xFFB45309),
+        Color(0x1AB45309),
+      ),
+      (
+        'https://github.com/esmagafetos/Viax-Scout/releases',
+        Icons.local_offer_outlined,
+        'Releases & Changelog',
+        'Histórico de versões, notas de atualização',
+        'v8.0',
+        null,
+        null,
+      ),
+    ];
+
+    final stack = const [
+      ('Frontend', 'React 18 + Vite', 'TypeScript, Tailwind CSS, Wouter'),
+      ('Backend', 'Express 5', 'TypeScript, REST API, pino logger'),
+      ('Banco de Dados', 'PostgreSQL', 'Drizzle ORM, migrações automáticas'),
+      ('Monorepo', 'pnpm workspaces', 'Libs compartilhadas, builds isolados'),
+      ('Geocod. Brasil (CEP)', 'BrasilAPI v2', 'Primário BR — IBGE/Correios, lat/lon'),
+      ('Geocod. Brasil (CEP)', 'AwesomeAPI CEP', 'Fallback BR — lat/lon gratuito'),
+      ('Geocod. Global', 'Photon (Komoot)', 'Sem rate limit, dados OSM'),
+      ('Geocod. Global', 'Overpass + Nominatim', 'Fallback — geometria OSM precisa'),
+      ('Premium opcional', 'Google Maps API', 'Máxima precisão, pay-per-use'),
+    ];
+
+    final installs = const [
+      (
+        'Linux / macOS',
+        Icons.desktop_mac_outlined,
+        'curl -fsSL https://raw.githubusercontent.com/esmagafetos/Viax-Scout/main/install.sh | bash',
+      ),
+      (
+        'Windows (PowerShell)',
+        Icons.computer_outlined,
+        'iwr -useb https://raw.githubusercontent.com/esmagafetos/Viax-Scout/main/install.ps1 | iex',
+      ),
+      (
+        'Android — Termux',
+        Icons.smartphone_outlined,
+        'curl -fsSL https://raw.githubusercontent.com/esmagafetos/Viax-Scout/main/install-termux.sh | bash',
+      ),
+    ];
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        CardSection(
+        // Hero
+        Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [context.surface, context.surface2],
+            ),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: context.borderStrong),
+          ),
+          padding: const EdgeInsets.fromLTRB(20, 22, 20, 22),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(children: [
-                Text('ViaX:System',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: context.text, letterSpacing: -0.5)),
-                const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(color: context.accentDim, borderRadius: BorderRadius.circular(5)),
-                  child: Text('v8.0',
-                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: context.accent)),
-                ),
-              ]),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  RichText(
+                    text: TextSpan(
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800,
+                        color: context.text,
+                        letterSpacing: -0.6,
+                      ),
+                      children: [
+                        const TextSpan(text: 'ViaX'),
+                        TextSpan(
+                          text: ':',
+                          style: TextStyle(
+                            color: context.text.withOpacity(0.4),
+                            fontWeight: FontWeight.w300,
+                          ),
+                        ),
+                        const TextSpan(text: ' System'),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: context.accentDim,
+                      borderRadius: BorderRadius.circular(5),
+                    ),
+                    child: Text('v8.0',
+                        style: TextStyle(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w700,
+                            color: context.accent,
+                            letterSpacing: 0.6)),
+                  ),
+                ],
+              ),
               const SizedBox(height: 4),
               Text('Validação inteligente de rotas de entrega',
-                  style: TextStyle(fontSize: 12, color: context.textMuted)),
-              const SizedBox(height: 12),
+                  style: TextStyle(fontSize: 12.5, color: context.textMuted)),
+              const SizedBox(height: 14),
               Text(
-                'Sistema de auditoria de rotas logísticas que valida endereços contra coordenadas GPS via geocodificação reversa.',
-                style: TextStyle(fontSize: 13, color: context.textMuted, height: 1.6),
+                'Sistema de auditoria de rotas logísticas que valida endereços de planilhas de entrega contra coordenadas GPS reais via geocodificação reversa. Detecta automaticamente divergências entre o endereço informado e o local de coleta, gerando relatórios de nuances para análise operacional.',
+                style: TextStyle(fontSize: 13, color: context.textMuted, height: 1.7),
               ),
             ],
           ),
         ),
         const SizedBox(height: 14),
+
+        // Repositório & Documentação
         CardSection(
-          header: const CardHeaderLabel('Repositório'),
+          header: const CardHeaderLabel('Repositório & Documentação'),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: Icon(Icons.code, color: context.accent),
-                title: Text('GitHub — esmagafetos/Viax-Scout',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: context.text)),
-                subtitle: Text('Código-fonte, issues, releases',
-                    style: TextStyle(fontSize: 11, color: context.textFaint)),
-                trailing: Icon(Icons.open_in_new, size: 16, color: context.textFaint),
-                onTap: () {},
+              for (int i = 0; i < repoLinks.length; i++) ...[
+                InkWell(
+                  borderRadius: BorderRadius.circular(10),
+                  onTap: () => _openUrl(repoLinks[i].$1),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: context.surface2,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: context.border),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(repoLinks[i].$2, size: 18, color: context.textMuted),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(repoLinks[i].$3,
+                                  style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: context.text)),
+                              const SizedBox(height: 2),
+                              Text(repoLinks[i].$4,
+                                  style: TextStyle(
+                                      fontSize: 11, color: context.textFaint, height: 1.4)),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: repoLinks[i].$7 ?? context.accentDim,
+                            borderRadius: BorderRadius.circular(99),
+                          ),
+                          child: Text(repoLinks[i].$5,
+                              style: TextStyle(
+                                  fontSize: 9.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: repoLinks[i].$6 ?? context.accent,
+                                  letterSpacing: 0.5)),
+                        ),
+                        const SizedBox(width: 6),
+                        Icon(Icons.open_in_new, size: 14, color: context.textFaint),
+                      ],
+                    ),
+                  ),
+                ),
+                if (i < repoLinks.length - 1) const SizedBox(height: 8),
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+
+        // Stack Tecnológico
+        CardSection(
+          header: const CardHeaderLabel('Stack Tecnológico'),
+          child: LayoutBuilder(builder: (ctx, c) {
+            final cols = c.maxWidth > 540 ? 3 : c.maxWidth > 360 ? 2 : 1;
+            return GridView.count(
+              crossAxisCount: cols,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              mainAxisSpacing: 8,
+              crossAxisSpacing: 8,
+              childAspectRatio: 2.4,
+              children: [
+                for (final s in stack)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 9),
+                    decoration: BoxDecoration(
+                      color: context.surface2,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: context.border),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(s.$1.toUpperCase(),
+                            style: TextStyle(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 0.7,
+                                color: context.textFaint)),
+                        const SizedBox(height: 3),
+                        Text(s.$2,
+                            style: TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w700,
+                                color: context.text)),
+                        const SizedBox(height: 1),
+                        Text(s.$3,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(fontSize: 10.5, color: context.textMuted)),
+                      ],
+                    ),
+                  ),
+              ],
+            );
+          }),
+        ),
+        const SizedBox(height: 14),
+
+        // Instalação
+        CardSection(
+          header: const CardHeaderLabel('Instalação'),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'Scripts de instalação automática estão disponíveis no repositório para Linux, macOS, Windows e Android (Termux). Cada script instala dependências, configura o banco e inicia o sistema completo.',
+                style: TextStyle(fontSize: 12.5, color: context.textMuted, height: 1.6),
+              ),
+              const SizedBox(height: 12),
+              for (int i = 0; i < installs.length; i++) ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: context.surface2,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: context.border),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(installs[i].$2, size: 15, color: context.textMuted),
+                          const SizedBox(width: 7),
+                          Text(installs[i].$1,
+                              style: TextStyle(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: context.text)),
+                        ],
+                      ),
+                      const SizedBox(height: 7),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: context.bg,
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: context.border),
+                        ),
+                        child: SelectableText(
+                          installs[i].$3,
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            fontFamily: 'monospace',
+                            color: context.textMuted,
+                            height: 1.4,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (i < installs.length - 1) const SizedBox(height: 8),
+              ],
+              const SizedBox(height: 10),
+              RichText(
+                text: TextSpan(
+                  style: TextStyle(fontSize: 11, color: context.textFaint, height: 1.5),
+                  children: [
+                    const TextSpan(text: 'Pré-requisitos: '),
+                    TextSpan(
+                        text: 'Node.js 18+',
+                        style: TextStyle(fontWeight: FontWeight.w700, color: context.textMuted)),
+                    const TextSpan(text: ', '),
+                    TextSpan(
+                        text: 'pnpm',
+                        style: TextStyle(fontWeight: FontWeight.w700, color: context.textMuted)),
+                    const TextSpan(text: ' e '),
+                    TextSpan(
+                        text: 'PostgreSQL 14+',
+                        style: TextStyle(fontWeight: FontWeight.w700, color: context.textMuted)),
+                    const TextSpan(
+                        text:
+                            '. O script instala automaticamente o que estiver faltando (requer conexão com internet).'),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+
+        // Licença & Versão
+        CardSection(
+          header: const CardHeaderLabel('Licença & Versão'),
+          child: Wrap(
+            spacing: 22,
+            runSpacing: 14,
+            children: [
+              _aboutInfo('Licença', 'MIT License', 'Uso livre, comercial e pessoal'),
+              _aboutInfo('Versão Atual', 'v8.0 — estável', 'BrasilAPI v2 + Photon global',
+                  valueColor: context.accent),
+              _aboutInfo('Ambiente', 'Node.js 18+', 'pnpm · PostgreSQL 14+'),
+              _aboutInfoLink(
+                'Repositório',
+                'github.com/esmagafetos/Viax-Scout',
+                'Fork & contribua!',
+                'https://github.com/esmagafetos/Viax-Scout',
               ),
             ],
           ),
         ),
       ],
+    );
+  }
+
+  Widget _aboutInfo(String label, String value, String sub, {Color? valueColor}) {
+    return SizedBox(
+      width: 160,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(label.toUpperCase(),
+              style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.7,
+                  color: context.textFaint)),
+          const SizedBox(height: 4),
+          Text(value,
+              style: TextStyle(
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w600,
+                  color: valueColor ?? context.text)),
+          const SizedBox(height: 2),
+          Text(sub, style: TextStyle(fontSize: 10.5, color: context.textMuted)),
+        ],
+      ),
+    );
+  }
+
+  Widget _aboutInfoLink(String label, String value, String sub, String url) {
+    return SizedBox(
+      width: 200,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(label.toUpperCase(),
+              style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.7,
+                  color: context.textFaint)),
+          const SizedBox(height: 4),
+          GestureDetector(
+            onTap: () => _openUrl(url),
+            child: Text(value,
+                style: TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w600,
+                    color: context.accent)),
+          ),
+          const SizedBox(height: 2),
+          Text(sub, style: TextStyle(fontSize: 10.5, color: context.textMuted)),
+        ],
+      ),
     );
   }
 
