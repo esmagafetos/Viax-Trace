@@ -5,7 +5,9 @@
 Full SaaS application for validating delivery route XLSX/CSV files against GPS coordinates.
 pnpm workspace monorepo with React+Vite web frontend, Express 5 API backend, and Flutter Android app.
 
-**Production backend:** `https://viax-trace-api.onrender.com` (Render Web Service + managed Postgres 16, deployed from `render.yaml` blueprint with `Dockerfile.api`). The Flutter app ships with this URL hardcoded — no in-app server-config flow, no Termux backend story for end users. Termux/self-host paths still exist for developers (see `install-geocodebr-termux.sh` for the upcoming GeocodeR BR microservice).
+**Production backend:** `https://viax-trace-api.onrender.com` (Render Web Service + managed Postgres 16, deployed from `render.yaml` blueprint with `Dockerfile.api`). The Flutter app ships with this URL hardcoded — no in-app server-config flow, no Termux backend story for end users. Termux/self-host paths still exist for developers (see `install-geocodebr-termux.sh`).
+
+**GeocodeR BR microservice (April 2026):** `artifacts/geocodebr-service` is wired into the same `render.yaml` blueprint as a **private service** (`type: pserv`, plan `starter`) named `viax-trace-geocodebr`, listening on port 8002, reachable only inside the Render private network. The API service gets `GEOCODEBR_URL=http://viax-trace-geocodebr:8002` injected automatically — no manual env-var config required. `start.R` reads `$PORT` (Render-injected) before falling back to `GEOCODEBR_PORT`. Note: pserv requires a paid plan (no free tier), and the CNEFE cache at `/root/.cache` does not persist between deploys unless a persistent disk is added.
 
 **Replit dev:** Built-in Postgres provisioned (`DATABASE_URL` set automatically). API on port 8080, web on port 5000 (the only externally-visible dev port). Workflow `Start application` runs both in parallel.
 

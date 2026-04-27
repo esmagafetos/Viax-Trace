@@ -2,8 +2,12 @@
 #  ViaX:Trace — geocodebr Microservice
 #  Geocodificação via CNEFE/IBGE (pacote geocodebr do IPEA)
 #
-#  Build:  docker build -t viax-geocodebr .
-#  Run:    docker run -p 8002:8002 -v geocodebr-cache:/root/.cache viax-geocodebr
+#  Local:
+#    docker build -t viax-geocodebr .
+#    docker run -p 8002:8002 -v geocodebr-cache:/root/.cache viax-geocodebr
+#
+#  Render:
+#    Use o blueprint na raiz (render.yaml). O serviço lê $PORT em runtime.
 # =============================================================================
 FROM rocker/r-ver:4.4.1
 
@@ -35,7 +39,8 @@ VOLUME ["/root/.cache"]
 
 EXPOSE 8002
 
+# Healthcheck local (Render usa healthCheckPath do blueprint)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=3 \
-  CMD Rscript -e "tryCatch(readLines('http://localhost:8002/health'), error=function(e) quit(status=1))"
+  CMD Rscript -e "p <- Sys.getenv('PORT', Sys.getenv('GEOCODEBR_PORT', '8002')); tryCatch(readLines(sprintf('http://localhost:%s/health', p)), error=function(e) quit(status=1))"
 
 CMD ["Rscript", "start.R"]

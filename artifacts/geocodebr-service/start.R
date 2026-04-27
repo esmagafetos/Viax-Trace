@@ -7,7 +7,7 @@ library(future)
 # Habilita processamento assíncrono para múltiplas requisições simultâneas
 future::plan("multisession")
 
-port <- as.integer(Sys.getenv("GEOCODEBR_PORT", "8002"))
+port <- as.integer(Sys.getenv("PORT", Sys.getenv("GEOCODEBR_PORT", "8002")))
 
 cat("=============================================================\n")
 cat(" ViaX:Trace — geocodebr Microservice\n")
