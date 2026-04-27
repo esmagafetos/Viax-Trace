@@ -6,10 +6,11 @@ on:
     paths:
       - 'artifacts/viax-mobile/**'
       - '.github/workflows/mobile-release.yml'
+      - 'pubspec.yaml'
   workflow_dispatch:
     inputs:
       api_base:
-        description: 'API base URL baked into the APK (defaults to repo secret API_BASE or https://viax-scout.replit.app)'
+        description: 'API base URL baked into the APK (defaults to repo secret API_BASE or https://viax-trace-api.onrender.com)'
         required: false
         default: ''
         type: string
@@ -61,7 +62,7 @@ jobs:
           # Ensure release signing falls back to debug keystore so unsigned CI builds work.
           ls -la android/
 
-      - name: Apply Android overrides (cleartext for Termux LAN)
+      - name: Apply Android overrides (permissions + foreground service)
         run: bash scripts/apply-android-overrides.sh
 
       - name: Resolve API_BASE
@@ -74,7 +75,7 @@ jobs:
           elif [ -n "$SECRET_BASE" ]; then
             echo "value=$SECRET_BASE" >> "$GITHUB_OUTPUT"
           else
-            echo "value=https://viax-scout.replit.app" >> "$GITHUB_OUTPUT"
+            echo "value=https://viax-trace-api.onrender.com" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Flutter pub get
@@ -112,11 +113,11 @@ jobs:
         run: |
           mkdir -p ../../release-artifacts
           cp build/app/outputs/flutter-apk/app-release.apk \
-            "../../release-artifacts/viax-scout-${{ steps.meta.outputs.version }}-universal.apk"
+            "../../release-artifacts/viax-trace-${{ steps.meta.outputs.version }}-universal.apk"
           for abi in arm64-v8a armeabi-v7a x86_64; do
             f="build/app/outputs/flutter-apk/app-${abi}-release.apk"
             if [ -f "$f" ]; then
-              cp "$f" "../../release-artifacts/viax-scout-${{ steps.meta.outputs.version }}-${abi}.apk"
+              cp "$f" "../../release-artifacts/viax-trace-${{ steps.meta.outputs.version }}-${abi}.apk"
             fi
           done
           ls -lh ../../release-artifacts/
@@ -124,7 +125,7 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: viax-scout-android-${{ steps.meta.outputs.version }}-${{ steps.meta.outputs.sha }}
+          name: viax-trace-android-${{ steps.meta.outputs.version }}-${{ steps.meta.outputs.sha }}
           path: release-artifacts/*.apk
           retention-days: 30
 
@@ -133,7 +134,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.meta.outputs.tag }}
-          name: ViaX:Scout ${{ steps.meta.outputs.version }} (Android)
+          name: ViaX:Trace ${{ steps.meta.outputs.version }} (Android)
           body: |
             **Flutter Android build** — generated automatically from commit `${{ steps.meta.outputs.sha }}`.
 
@@ -142,7 +143,7 @@ jobs:
             ${{ github.event.inputs.release_notes }}
 
             ## Install
-            Download `viax-scout-${{ steps.meta.outputs.version }}-universal.apk` and install on your Android device.
+            Download `viax-trace-${{ steps.meta.outputs.version }}-universal.apk` and install on your Android device.
             (Enable "Install from unknown sources" if needed.)
           files: release-artifacts/*.apk
           draft: false

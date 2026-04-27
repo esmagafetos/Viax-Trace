@@ -1,7 +1,5 @@
 <div align="center">
 
-<img src="banner.png" alt="ViaX:Trace" width="100%" />
-
 # Comece aqui — Guia rápido (2 minutos)
 
 **Da instalação à sua primeira auditoria de rota, sem jargão técnico.**
@@ -15,7 +13,7 @@
 O ViaX:Trace tem dois componentes:
 
 - **Backend oficial** — já está rodando na nuvem em `https://viax-trace-api.onrender.com`. Você não precisa instalar nada.
-- **App Android** — você baixa, instala e abre. Já vem apontando pro backend oficial.
+- **App Android** — você baixa, instala e abre. Já vem apontando para o backend oficial.
 
 ---
 
@@ -23,7 +21,7 @@ O ViaX:Trace tem dois componentes:
 
 Acesse a página de Releases do projeto e baixe o APK mais recente:
 
-➡️ **[github.com/esmagafetos/Viax-Scout/releases](https://github.com/esmagafetos/Viax-Scout/releases)**
+**[github.com/esmagafetos/Viax-Scout/releases](https://github.com/esmagafetos/Viax-Scout/releases)**
 
 Procure pelo arquivo `viax-trace-vX.Y.Z.apk` (a versão mais recente fica no topo da lista).
 
@@ -35,7 +33,7 @@ Procure pelo arquivo `viax-trace-vX.Y.Z.apk` (a versão mais recente fica no top
 2. Se o Android pedir, autorize **"Instalar de fontes desconhecidas"** apenas para essa instalação.
 3. Toque em **Instalar**.
 
-> 💡 Em alguns aparelhos, o navegador onde você baixou o APK também precisa estar autorizado. Geralmente o sistema te leva direto pra essa tela quando necessário.
+> Em alguns aparelhos, o navegador onde você baixou o APK também precisa estar autorizado. Geralmente o sistema te leva direto para essa tela quando necessário.
 
 ---
 
@@ -78,21 +76,21 @@ Procure pelo arquivo `viax-trace-vX.Y.Z.apk` (a versão mais recente fica no top
 | Sintoma | O que fazer |
 |---|---|
 | **App não abre / trava na splash** | Desinstale e reinstale o APK pelo gerenciador de arquivos. |
-| **"Erro de conexão" ao logar** | Verifique sua internet. O backend pode levar até 30 s pra acordar se ficou ocioso (free tier do Render). |
+| **"Erro de conexão" ao logar** | Verifique sua internet. O backend pode levar até 30 s para acordar se ficou ocioso (free tier do Render). |
 | **"Credenciais inválidas"** | Confira se o e-mail está digitado certo (sem espaços) e se a senha tem ao menos 6 caracteres. |
 | **Não consigo subir planilha** | Confirme que o arquivo é `.xlsx` ou `.csv` e que tem ao menos a coluna de endereço. |
-| **Quero apontar pra outro backend** | Build local: `flutter run --dart-define=API_BASE=https://seu-backend`. Veja [Self-host](../README.md#-self-host-opcional). |
+| **Quero apontar para outro backend** | Build local: `flutter run --dart-define=API_BASE=https://seu-backend`. Veja [Self-host](../README.md#self-host-opcional). |
 
 ---
 
 ## E se eu quiser rodar minha própria instância?
 
-Você não precisa — o app oficial já vem configurado. Mas se quiser hospedar o backend na sua infraestrutura, veja a seção [**Self-host**](../README.md#-self-host-opcional) do README. Em resumo: `docker compose up -d` e pronto.
+Você não precisa — o app oficial já vem configurado. Mas se quiser hospedar o backend na sua infraestrutura, veja a seção [**Self-host**](../README.md#self-host-opcional) do README. Em resumo: `docker compose up -d` e pronto.
 
 ---
 
 <div align="center">
 
-**Tudo certo?** ➡️ [Voltar para o README](../README.md) · [Reportar problema](https://github.com/esmagafetos/Viax-Scout/issues/new)
+[Voltar para o README](../README.md) · [Reportar problema](https://github.com/esmagafetos/Viax-Scout/issues/new)
 
 </div>

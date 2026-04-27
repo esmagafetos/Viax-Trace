@@ -1,42 +1,49 @@
-# ViaX:Scout — Mobile (Flutter)
+# ViaX:Trace — Mobile (Flutter)
 
-Native Android/iOS mirror of the **viax-scout** web app.
+App nativo Android/iOS que espelha 1:1 a experiência da web do **ViaX:Trace**.
 
-Built with Flutter — every screen and API integration mirrors the web 1:1:
-Login · Register · Setup · Dashboard · Process · Tool · History · Settings · Docs.
+Construído em Flutter — todas as telas e integrações de API replicam a versão web:
+Login · Register · Dashboard · Process · Tool · History · Settings · Docs.
 
-## Architecture
+## Arquitetura
 
-- **Theme**: Poppins font, exact CSS variable mirror (light + dark, accent `#d4521a`).
-- **State**: `provider` for auth and settings.
-- **Routing**: `go_router` with public/protected guards.
-- **API**: `dio` + `cookie_jar` for cookie-based session auth (mirrors `credentials: include`).
-- **SSE**: raw `http` streaming for `/api/process/upload` and `/api/condominium/process`.
-- **Charts**: `fl_chart` for the financial cycle chart.
-- **File picking**: `file_picker` (xlsx/csv) and `image_picker` (avatar).
+- **Tema:** Poppins, espelho exato das CSS variables (light + dark, accent `#d4521a`).
+- **Estado:** `provider` para auth e settings.
+- **Roteamento:** `go_router` com guards públicos/protegidos.
+- **API:** `dio` + `cookie_jar` para auth de sessão por cookie (espelha o `credentials: include` da web).
+- **SSE:** streaming via `http` cru para `/api/process/upload` e `/api/condominium/process`.
+- **Charts:** `fl_chart` para o gráfico de ciclo financeiro.
+- **File picking:** `file_picker` (xlsx/csv) e `image_picker` (avatar).
+- **Background:** `flutter_foreground_task` mantém o processamento vivo com notificação persistente.
 
-## API base URL
+## Backend
 
-The API base is configurable at build time via `--dart-define`:
+A URL do backend é fixada no app — usuário final não configura nada. Padrão: o backend oficial em
+`https://viax-trace-api.onrender.com`.
+
+Para builds de desenvolvimento ou self-host, sobrescreva em build time:
 
 ```sh
-flutter build apk --release --dart-define=API_BASE=https://your-api.example.com
+flutter build apk --release --dart-define=API_BASE=https://sua-instancia.example.com
 ```
 
-If not provided, defaults to `https://viax-scout.replit.app` (your Replit deployment).
-
-## Local dev
+## Desenvolvimento local
 
 ```sh
 flutter pub get
+
+# Emulador Android apontando para a API local rodando no host:
 flutter run --dart-define=API_BASE=http://10.0.2.2:8080
+
+# Aparelho físico apontando para uma instância pública:
+flutter run --dart-define=API_BASE=https://viax-trace-api.onrender.com
 ```
 
-(`10.0.2.2` reaches your laptop's localhost from the Android emulator.)
+(`10.0.2.2` é o atalho do emulador Android para o `localhost` da máquina hospedeira.)
 
 ## CI
 
-- **Android APK**: `.github/workflows/mobile-release.yml` — Ubuntu runner, no EAS, no quotas.
-- **iOS unsigned IPA**: `.github/workflows/mobile-ios.yml` — macOS runner, `--no-codesign`.
+- **Android APK:** `.github/workflows/mobile-release.yml` — Ubuntu runner, sem EAS, sem cotas.
+- **iOS unsigned IPA:** `.github/workflows/mobile-ios.yml` — macOS runner, `--no-codesign`.
 
-Both regenerate platform scaffolding via `flutter create .` before building.
+Ambos os workflows regeneram o scaffolding de plataforma via `flutter create .` antes do build.

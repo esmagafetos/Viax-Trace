@@ -2,32 +2,28 @@
 <!--
   ViaX:Trace — Network security config
 
-  Este app conecta intencionalmente a um backend que o usuário roda no próprio
-  aparelho (Termux) ou em outro dispositivo da mesma Wi-Fi. O usuário digita a
-  URL manualmente em "Configurar servidor", então o consentimento é explícito.
+  O backend oficial é HTTPS (https://viax-trace-api.onrender.com), portanto
+  todo o tráfego de produção usa TLS por padrão. Esta policy:
 
-  Padrão usado por apps profissionais que falam com servidores em LAN
-  (ex.: apps de roteador, smart-home, automação local).
-
-  - base-config: cleartext PERMITIDO globalmente (necessário porque CIDR
-    não é suportado em <domain> e seria impossível enumerar todos os IPs
-    privados de Wi-Fi). O usuário consente ao digitar a URL.
-  - domain-config: enforça TLS para o domínio de produção (Replit) e
-    domínios públicos comuns, garantindo que mesmo que o app caia em
-    fallback HTTP por engano, ele rejeite a conexão pra esses hosts.
+  - base-config: BLOQUEIA cleartext globalmente (apps modernos não devem
+    aceitar HTTP em produção).
+  - domain-config (dev only): permite cleartext apenas para hosts usados
+    em desenvolvimento — loopback do aparelho, alias do emulador para o
+    host (10.0.2.2) e localhost. Útil para devs que rodam o backend
+    local com `flutter run --dart-define=API_BASE=http://10.0.2.2:8080`.
   - trust-anchors: apenas certificados do sistema (sem CAs do usuário,
-    pra evitar MITM via certificados instalados manualmente).
+    para evitar MITM via certificados instalados manualmente).
 -->
 <network-security-config>
-    <base-config cleartextTrafficPermitted="true">
+    <base-config cleartextTrafficPermitted="false">
         <trust-anchors>
             <certificates src="system" />
         </trust-anchors>
     </base-config>
 
-    <domain-config cleartextTrafficPermitted="false">
-        <domain includeSubdomains="true">replit.app</domain>
-        <domain includeSubdomains="true">replit.dev</domain>
-        <domain includeSubdomains="true">repl.co</domain>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">localhost</domain>
+        <domain includeSubdomains="false">127.0.0.1</domain>
+        <domain includeSubdomains="false">10.0.2.2</domain>
     </domain-config>
 </network-security-config>

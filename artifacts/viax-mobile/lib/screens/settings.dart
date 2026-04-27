@@ -818,7 +818,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                'Scripts de instalação automática estão disponíveis no repositório para Linux, macOS, Windows e Android (Termux). Cada script instala dependências, configura o banco e inicia o sistema completo.',
+                'Scripts de instalação automática estão disponíveis no repositório para Linux, macOS e Windows. Cada script instala dependências, configura o banco e inicia o sistema completo. Para uso normal do app, nada disso é necessário — o backend oficial já está hospedado.',
                 style: TextStyle(fontSize: 12.5, color: context.textMuted, height: 1.6),
               ),
               const SizedBox(height: 12),

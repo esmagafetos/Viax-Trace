@@ -5,7 +5,11 @@
 Full SaaS application for validating delivery route XLSX/CSV files against GPS coordinates.
 pnpm workspace monorepo with React+Vite web frontend, Express 5 API backend, and Flutter Android app.
 
-**Production backend:** `https://viax-trace-api.onrender.com` (Render Web Service + managed Postgres 16, deployed from `render.yaml` blueprint with `Dockerfile.api`). The Flutter app ships with this URL hardcoded — no in-app server-config flow.
+**Production backend:** `https://viax-trace-api.onrender.com` (Render Web Service + managed Postgres 16, deployed from `render.yaml` blueprint with `Dockerfile.api`). The Flutter app ships with this URL hardcoded — no in-app server-config flow, no Termux backend story for end users. Termux/self-host paths still exist for developers (see `install-geocodebr-termux.sh` for the upcoming GeocodeR BR microservice).
+
+**Replit dev:** Built-in Postgres provisioned (`DATABASE_URL` set automatically). API on port 8080, web on port 5000 (the only externally-visible dev port). Workflow `Start application` runs both in parallel.
+
+**April 2026 cleanup:** README/COMECE-AQUI rewritten with professional tone (no emojis, screenshots removed). Settings pages (web + mobile) no longer push the Termux self-host path; geocodebr instance card now says "instância oficial em breve". `.github/workflows/mobile-release.yml` defaults `API_BASE` to the Render URL (was `viax-scout.replit.app`) and renames release artifacts from `viax-scout-*` to `viax-trace-*`. Android `network_security_config.xml` tightened: cleartext denied globally, allowed only for `localhost` / `127.0.0.1` / `10.0.2.2` (Android emulator → host loopback) for local dev.
 
 ## Project
 

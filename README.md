@@ -1,9 +1,8 @@
 <div align="center">
 
-<!-- Banner: ViaX:Trace — docs/banner.png (947x245px) -->
-<img src="docs/banner.png" alt="ViaX:Trace — Auditoria Inteligente de Rotas Logísticas" width="100%" />
+# ViaX:Trace
 
-<br/>
+**Auditoria automatizada de rotas logísticas — XLSX/CSV vs. coordenadas GPS reais**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-orange.svg?style=flat-square)](https://opensource.org/licenses/MIT)
 [![Backend](https://img.shields.io/badge/Backend-Render-46E3B7?style=flat-square&logo=render&logoColor=white)](https://viax-trace-api.onrender.com)
@@ -14,9 +13,7 @@
 [![Flutter](https://img.shields.io/badge/Flutter-3.24-02569B?style=flat-square&logo=flutter&logoColor=white)](https://flutter.dev)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?style=flat-square&logo=postgresql&logoColor=white)](https://postgresql.org)
 
-**Valide planilhas XLSX/CSV de rotas contra coordenadas GPS reais — em tempo real**
-
-[Sobre](#-sobre) · [Comece em 2 minutos](#-comece-em-2-minutos) · [App Android](#-app-android) · [Funcionalidades](#-funcionalidades) · [Self-host](#-self-host-opcional) · [Arquitetura](#-arquitetura) · [Contribuindo](#-contribuindo)
+[Sobre](#sobre) · [Comece em 2 minutos](#comece-em-2-minutos) · [App Android](#app-android) · [Funcionalidades](#funcionalidades) · [Arquitetura](#arquitetura) · [Self-host](#self-host-opcional) · [Desenvolvimento](#desenvolvimento) · [Contribuindo](#contribuindo)
 
 </div>
 
@@ -24,9 +21,9 @@
 
 ## Sobre
 
-**ViaX:Trace** é uma plataforma SaaS de **auditoria logística** que valida automaticamente planilhas de rotas de entrega (XLSX/CSV) comparando os endereços registrados com as coordenadas GPS coletadas em campo.
+**ViaX:Trace** é uma plataforma SaaS de auditoria logística que valida automaticamente planilhas de rotas de entrega (XLSX/CSV) comparando os endereços registrados com as coordenadas GPS coletadas em campo.
 
-O sistema detecta **nuances** — divergências entre o endereço informado e o ponto GPS real — e gera relatórios detalhados, ajudando gestores a identificar fraudes, erros de digitação e pontos de entrega incorretos em segundos, com resultados transmitidos em tempo real via SSE.
+O sistema detecta **nuances** — divergências entre o endereço informado e o ponto GPS real — e gera relatórios detalhados, ajudando gestores a identificar fraudes, erros de digitação e pontos de entrega incorretos em segundos, com resultados transmitidos em tempo real via Server-Sent Events (SSE).
 
 ```
 Planilha XLSX/CSV  →  Parser de endereço  →  Geocodificação reversa  →  Comparação  →  Relatório
@@ -34,30 +31,47 @@ Planilha XLSX/CSV  →  Parser de endereço  →  Geocodificação reversa  → 
  Endereço + GPS          Rua extraída            Nome oficial da via     Similaridade + distância
 ```
 
-> **Backend oficial em produção:** `https://viax-trace-api.onrender.com` — o app Android se conecta automaticamente, sem nenhuma configuração.
+### Por que existe
+
+Operações logísticas urbanas frequentemente recebem planilhas de roteirização com endereços incorretos, GPS imprecisos ou pontos de entrega fora da quadra correta. Auditar manualmente uma rota de 200 paradas é inviável. O ViaX:Trace automatiza essa validação cruzada em segundos, com pipeline de geocodificação resiliente e métrica configurável de tolerância por conta.
+
+### Stack resumida
+
+- **Backend:** Express 5 + TypeScript + PostgreSQL 16 + Drizzle ORM, hospedado no Render
+- **Frontend web:** React 19 + Vite 7 + Tailwind CSS 4
+- **App Android:** Flutter 3.24 + Dart 3.4 (1:1 com a web)
+- **Geocodificação:** BrasilAPI (CEP) + Photon + Overpass + Nominatim (OSM); GeocodeR BR (CNEFE/IBGE) e Google Maps como opcionais
+
+### Status do projeto
+
+| Componente | Estado | Notas |
+|---|---|---|
+| Backend | **Em produção** | `https://viax-trace-api.onrender.com` (Render + Postgres 16 gerenciado) |
+| Frontend web | **Estável** | Self-host via Docker ou instaladores assistidos |
+| App Android | **Estável** | APKs publicados em [Releases](https://github.com/esmagafetos/Viax-Scout/releases) |
+| App iOS | **Beta** | Build não-assinado disponível em CI artifacts |
+| GeocodeR BR (microserviço) | **Em planejamento** | Próxima etapa: hospedagem dedicada conectada ao backend |
 
 ---
 
-## 🚀 Comece em 2 minutos
+## Comece em 2 minutos
 
-> Para usuários finais o caminho é direto: **baixar o app e fazer login**. Sem Termux, sem servidor local, sem configuração de IP.
+Para usuários finais o caminho é direto: **baixar o app e fazer login**. Nenhuma configuração de servidor, IP ou porta é necessária — o backend oficial já vem embutido.
 
 1. Acesse a página de [**Releases**](https://github.com/esmagafetos/Viax-Scout/releases) e baixe o `viax-trace-vX.Y.Z.apk` mais recente.
 2. No Android, autorize a instalação de **fontes desconhecidas** quando solicitado.
 3. Abra o app, toque em **Criar conta** ou **Entrar** — pronto.
 
-O app já vem apontando para o backend oficial. Se você é desenvolvedor e quer usar uma instância própria, veja [Self-host](#-self-host-opcional).
-
 | Quero… | Vá para |
 |---|---|
-| 📱 Usar agora pelo celular Android | [Releases](https://github.com/esmagafetos/Viax-Scout/releases) |
-| 🖥️ Usar pelo navegador (web) | [Self-host — Docker](#docker-recomendado) |
-| 🛠️ Subir minha própria instância | [Self-host opcional](#-self-host-opcional) |
-| 🧑‍💻 Contribuir com o código | [Contribuindo](#-contribuindo) |
+| Usar agora pelo celular Android | [Releases](https://github.com/esmagafetos/Viax-Scout/releases) |
+| Usar pelo navegador (web) | [Self-host — Docker](#docker-recomendado) |
+| Subir minha própria instância | [Self-host opcional](#self-host-opcional) |
+| Contribuir com o código | [Contribuindo](#contribuindo) |
 
 ---
 
-## 📱 App Android
+## App Android
 
 O app nativo (`artifacts/viax-mobile/`) é construído em **Flutter 3.24** e oferece a experiência completa do ViaX:Trace direto do celular: dashboard, processamento de planilhas com barra de progresso em primeiro plano, histórico, ferramenta de condomínios e configurações.
 
@@ -79,32 +93,32 @@ O app nativo (`artifacts/viax-mobile/`) é construído em **Flutter 3.24** e ofe
 | Tipografia | Poppins (`google_fonts`) |
 | Build & deploy | GitHub Actions + Flutter `apk --release` |
 
-> Build local de desenvolvimento: `cd artifacts/viax-mobile && flutter pub get && flutter run`. Para apontar para outro backend (ex.: localhost), use `flutter run --dart-define=API_BASE=http://10.0.2.2:8080`.
+> Build local: `cd artifacts/viax-mobile && flutter pub get && flutter run`. Para apontar para outro backend (ex.: instância local em emulador): `flutter run --dart-define=API_BASE=http://10.0.2.2:8080`.
 
 ---
 
-## ✨ Funcionalidades
+## Funcionalidades
 
 | Funcionalidade | Descrição |
 |---|---|
-| **Upload XLSX / CSV** | Planilhas com endereço, lat/lon, cidade, bairro e CEP — até 10 MB |
-| **Parser embutido** | Regex calibrado para português BR — extrai logradouro, número, POI, travessa e CEP |
-| **Parser via IA** | Alternativa com OpenAI, Anthropic ou Google Gemini para endereços complexos |
-| **Geocodificação BR** | BrasilAPI v2 (IBGE/Correios) + AwesomeAPI CEP como fontes primárias |
-| **Geocodificação global** | Photon (sem rate limit) → Overpass API → Nominatim (OSM) |
-| **GeocodeR BR (CNEFE/IBGE)** | Microserviço R opcional — precisão máxima via base CNEFE do IBGE |
-| **Google Maps premium** | Integração opcional para máxima precisão global |
-| **Detecção de nuances** | Similaridade bigram Jaccard + distância Haversine configuráveis por conta |
-| **Streaming em tempo real** | Progresso linha a linha via Server-Sent Events (SSE) |
-| **Dashboard** | Visão geral de análises, nuances, distâncias e controle financeiro |
-| **Histórico completo** | Listagem e download de relatórios CSV de todas as análises |
-| **Ferramenta de Condomínios** | Ordenação inteligente de rotas dentro de condomínios mapeados (Quadra/Lote) |
-| **Autenticação segura** | Sessões com bcrypt, avatar e perfil de usuário |
-| **Tema escuro / claro** | Preferência salva com alternância instantânea |
+| Upload XLSX / CSV | Planilhas com endereço, lat/lon, cidade, bairro e CEP — até 10 MB |
+| Parser embutido | Regex calibrado para português BR — extrai logradouro, número, POI, travessa e CEP |
+| Parser via IA | Alternativa com OpenAI, Anthropic ou Google Gemini para endereços complexos |
+| Geocodificação BR | BrasilAPI v2 (IBGE/Correios) + AwesomeAPI CEP como fontes primárias |
+| Geocodificação global | Photon (sem rate limit) → Overpass API → Nominatim (OSM) |
+| GeocodeR BR (CNEFE/IBGE) | Microserviço R opcional — precisão máxima via base CNEFE do IBGE |
+| Google Maps premium | Integração opcional para máxima precisão global |
+| Detecção de nuances | Similaridade bigram Jaccard + distância Haversine configuráveis por conta |
+| Streaming em tempo real | Progresso linha a linha via Server-Sent Events (SSE) |
+| Dashboard | Visão geral de análises, nuances, distâncias e controle financeiro |
+| Histórico completo | Listagem e download de relatórios CSV de todas as análises |
+| Ferramenta de Condomínios | Ordenação inteligente de rotas dentro de condomínios mapeados (Quadra/Lote) |
+| Autenticação segura | Sessões com bcrypt, avatar e perfil de usuário |
+| Tema escuro / claro | Preferência salva com alternância instantânea |
 
 ---
 
-## 🏛️ Arquitetura
+## Arquitetura
 
 ```
 viax-scout/                          ← raiz do monorepo (pnpm workspaces)
@@ -124,7 +138,7 @@ viax-scout/                          ← raiz do monorepo (pnpm workspaces)
 │   │           ├── condominium.ts   ← /api/condominium/*  (ordenação Quadra/Lote)
 │   │           └── users.ts         ← /api/users/*  (perfil, avatar)
 │   │
-│   ├── viax-scout/                  ← Frontend web — React 19 + Vite 7 · porta 5173
+│   ├── viax-scout/                  ← Frontend web — React 19 + Vite 7 · porta 5000
 │   │   └── src/
 │   │       ├── pages/               ← Login, Register, Setup, Dashboard, Process,
 │   │       │                           History, Tool, Settings, Docs
@@ -133,8 +147,8 @@ viax-scout/                          ← raiz do monorepo (pnpm workspaces)
 │   │
 │   └── viax-mobile/                 ← App Android — Flutter 3.24 (mesma UX da web)
 │       └── lib/
-│           ├── api/                 ← ApiClient (Dio + cookie jar)
-│           ├── screens/             ← Setup, Login, Register, Dashboard, Process,
+│           ├── api/                 ← ApiClient (Dio + cookie jar) — backend hardcoded
+│           ├── screens/             ← Login, Register, Dashboard, Process,
 │           │                           Tool, History, Settings, Docs
 │           ├── state/               ← AuthProvider, SettingsProvider, ThemeProvider
 │           └── widgets/             ← Layout, BrandMark, Toast
@@ -183,7 +197,7 @@ O backend roda no **Render** via blueprint declarativo (`render.yaml`):
 
 ---
 
-## 🛠️ Self-host (opcional)
+## Self-host (opcional)
 
 A maioria dos usuários **não precisa** instalar nada além do app. Esta seção é para quem quer rodar a própria instância (frontend web + backend) na infraestrutura local.
 
@@ -275,36 +289,7 @@ GOOGLE_AI_API_KEY=
 
 ---
 
-## 🖼️ Screenshots
-
-### Login
-| Claro | Escuro |
-|:---:|:---:|
-| ![Login claro](docs/screenshots/login.jpg) | ![Login escuro](docs/screenshots/login-dark.jpg) |
-
-### Dashboard
-| Claro | Escuro |
-|:---:|:---:|
-| ![Dashboard claro](docs/screenshots/dashboard.jpg) | ![Dashboard escuro](docs/screenshots/dashboard-dark.jpg) |
-
-### Processar Rota
-| Claro | Escuro |
-|:---:|:---:|
-| ![Processar claro](docs/screenshots/processing.jpg) | ![Processar escuro](docs/screenshots/processing-dark.jpg) |
-
-### Histórico de Análises
-| Claro | Escuro |
-|:---:|:---:|
-| ![Histórico claro](docs/screenshots/history.jpg) | ![Histórico escuro](docs/screenshots/history-dark.jpg) |
-
-### Configurações
-| Claro | Escuro |
-|:---:|:---:|
-| ![Config claro](docs/screenshots/settings.jpg) | ![Config escuro](docs/screenshots/settings-dark.jpg) |
-
----
-
-## 💻 Desenvolvimento
+## Desenvolvimento
 
 ```bash
 # Todos os serviços em paralelo
@@ -338,7 +323,7 @@ pnpm --filter @workspace/db run push
 
 ---
 
-## 📦 Stack tecnológico
+## Stack tecnológico
 
 | Camada | Tecnologia | Versão |
 |---|---|---|
@@ -369,9 +354,17 @@ pnpm --filter @workspace/db run push
 
 ---
 
-## 🤝 Contribuindo
+## Roadmap
 
-Contribuições são bem-vindas! Leia o [guia de contribuição](.github/CONTRIBUTING.md) antes de começar.
+- **GeocodeR BR hospedado** — subir o microserviço R (`artifacts/geocodebr-service`) em hosting dedicado e conectá-lo ao backend de produção via `GEOCODEBR_URL`.
+- **App iOS assinado** — distribuir IPA assinado via TestFlight quando uma conta Apple Developer estiver disponível.
+- **Exportação avançada** — relatórios em PDF e integração com webhooks externos.
+
+---
+
+## Contribuindo
+
+Contribuições são bem-vindas. Leia o [guia de contribuição](.github/CONTRIBUTING.md) antes de começar.
 
 ```bash
 # Fork → clone → branch
@@ -389,13 +382,18 @@ git commit -m "feat: descrição curta da mudança"
 ### Reportar bugs
 
 Abra uma [issue](https://github.com/esmagafetos/Viax-Scout/issues/new?template=bug_report.md) descrevendo:
+
 - Passos para reproduzir
 - Comportamento esperado vs. observado
 - Versão do app (Android) ou Node.js + sistema operacional (self-host)
 
+### Código de Conduta
+
+Ao participar deste projeto você concorda com o nosso [Código de Conduta](CODE_OF_CONDUCT.md). Vulnerabilidades de segurança devem ser reportadas conforme a [Política de Segurança](SECURITY.md).
+
 ---
 
-## 📄 Licença
+## Licença
 
 Distribuído sob a licença **MIT**. Veja [LICENSE](LICENSE) para detalhes.
 

@@ -456,11 +456,7 @@ export default function Settings() {
                           docker run -p 8002:8002 -v geocodebr-cache:/root/.cache viax-geocodebr
                         </code>
                         <br />
-                        <strong>Via Termux (Android):</strong>
-                        <br />
-                        <code style={{ background: "var(--surface-2)", padding: "0.2rem 0.5rem", borderRadius: 4, fontSize: "0.68rem", display: "block", marginTop: "0.3rem" }}>
-                          bash ~/viax-system/start-geocodebr.sh
-                        </code>
+                        Em breve: instância oficial do GeocodeR BR conectada diretamente ao backend de produção.
                       </div>
                     </div>
                   )}
@@ -689,7 +685,7 @@ export default function Settings() {
             <div style={cardHead}><span style={cardHeadLabel}>Instalação</span></div>
             <div style={cardBody}>
               <p style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginBottom: "1rem", lineHeight: 1.6 }}>
-                Scripts de instalação automática estão disponíveis no repositório para Linux, macOS, Windows e Android (Termux). Cada script instala dependências, configura o banco e inicia o sistema completo.
+                Scripts de instalação automática estão disponíveis no repositório para Linux, macOS e Windows. Cada script instala dependências, configura o banco e inicia o sistema completo. Para uso normal do app, nada disso é necessário — o backend oficial já está hospedado.
               </p>
               <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
                 {[

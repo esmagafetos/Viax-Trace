@@ -8,11 +8,16 @@
 #      adiciona INTERNET apenas nos manifests de debug/profile, NÃO no main —
 #      então builds release sairiam sem permissão de rede e qualquer socket
 #      (inclusive loopback 127.0.0.1) falharia silenciosamente.
-#   2. Copiar res/xml/network_security_config.xml (libera HTTP em IPs locais
-#      para o backend rodando no Termux do usuário).
+#   2. Copiar res/xml/network_security_config.xml. O app conecta ao backend
+#      oficial em HTTPS, mas mantemos cleartext apenas para hosts de dev
+#      (localhost, 127.0.0.1, 10.0.2.2 — Android emulator → host loopback).
 #   3. Patchar AndroidManifest.xml para apontar android:networkSecurityConfig
-#      e android:usesCleartextTraffic="true".
-#   4. Definir o nome visível do app como "ViaX:Trace".
+#      e android:usesCleartextTraffic="true" (necessário enquanto qualquer
+#      cleartext for permitido — nossa policy restringe os hosts).
+#   4. Declarar as permissões de foreground service e o serviço usado pelo
+#      flutter_foreground_task (mantém o processamento ativo com notificação
+#      persistente em Android 14+).
+#   5. Definir o nome visível do app como "ViaX:Trace".
 # =============================================================================
 set -euo pipefail
 
