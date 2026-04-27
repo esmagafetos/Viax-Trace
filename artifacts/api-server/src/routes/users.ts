@@ -1,4 +1,4 @@
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
 import bcrypt from "bcryptjs";
 import multer from "multer";
 import { eq } from "drizzle-orm";
@@ -8,6 +8,25 @@ import { UpdateProfileBody, UpdatePasswordBody, UpdateSettingsBody } from "@work
 
 const router: IRouter = Router();
 const avatarUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 2 * 1024 * 1024 } });
+
+// Wraps multer.single() so multer errors (notably LIMIT_FILE_SIZE) return a
+// JSON 4xx response instead of bubbling up as an HTML 500. Mobile/web clients
+// can then show a meaningful message to the user.
+function avatarSingle(field: string) {
+  const handler = avatarUpload.single(field);
+  return (req: Request, res: Response, next: NextFunction) => {
+    handler(req, res, (err: unknown) => {
+      if (!err) return next();
+      const e = err as { code?: string; message?: string };
+      if (e.code === "LIMIT_FILE_SIZE") {
+        res.status(413).json({ error: "Imagem muito grande. Máximo 2MB." });
+        return;
+      }
+      logger.warn({ err: String(err) }, "Avatar upload rejected by multer");
+      res.status(400).json({ error: e.message ?? "Falha ao processar upload." });
+    });
+  };
+}
 
 function requireAuth(req: any, res: any): number | null {
   const userId = req.session?.userId;
@@ -64,7 +83,7 @@ router.patch("/users/profile", async (req, res): Promise<void> => {
   res.json(formatUser(user));
 });
 
-router.post("/users/avatar", avatarUpload.single("avatar"), async (req, res): Promise<void> => {
+router.post("/users/avatar", avatarSingle("avatar"), async (req, res): Promise<void> => {
   const userId = requireAuth(req, res);
   if (!userId) return;
 

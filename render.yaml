@@ -18,9 +18,10 @@
 #       no app mobile em "Configurar servidor".
 #
 #  Notas:
-#    - geocodebr no plano "free" perde o cache CNEFE entre deploys e dorme
-#      após inatividade (cold start lento). Para uso em produção, suba para
-#      um plano pago e adicione um disco persistente em /root/.cache.
+#    - geocodebr roda em plano "starter" com disco persistente de 5GB
+#      montado em /root/.cache para o cache do CNEFE persistir entre
+#      deploys (sem disco, o índice CNEFE precisaria ser baixado a cada
+#      restart, levando ~10 min).
 #
 #  Variáveis opcionais (configure no painel após o primeiro deploy):
 #    - GOOGLE_MAPS_API_KEY  → habilita modo "googlemaps"
@@ -82,3 +83,10 @@ services:
     envVars:
       - key: PORT
         value: "8002"
+    # Disco persistente para o cache do CNEFE (~500MB-1GB de dados do IBGE).
+    # Sem isso, o pacote R `geocodebr` precisa baixar todo o índice a cada
+    # deploy/restart, o que leva vários minutos.
+    disk:
+      name: geocodebr-cache
+      mountPath: /root/.cache
+      sizeGB: 5

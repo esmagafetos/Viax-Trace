@@ -95,8 +95,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
           .updateProfile(name: _name.text.trim(), birthDate: _birthDate);
       context.read<AuthProvider>().setUser(AppUser.fromJson(res));
       if (mounted) showToast(context, 'Perfil atualizado!', success: true);
-    } catch (_) {
-      if (mounted) showToast(context, 'Erro ao atualizar perfil.');
+    } on ApiError catch (e) {
+      if (mounted) showToast(context, 'Erro ao atualizar perfil: ${e.message}');
+    } catch (e) {
+      if (mounted) showToast(context, 'Erro ao atualizar perfil: $e');
     } finally {
       if (mounted) setState(() => _savingProfile = false);
     }
@@ -165,8 +167,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
       final res = await context.read<ApiClient>().uploadAvatar(f);
       context.read<AuthProvider>().setUser(AppUser.fromJson(res));
       if (mounted) showToast(context, 'Foto atualizada!', success: true);
-    } catch (_) {
-      if (mounted) showToast(context, 'Erro ao enviar foto.');
+    } on ApiError catch (e) {
+      if (mounted) showToast(context, 'Erro ao enviar foto: ${e.message}');
+    } catch (e) {
+      if (mounted) showToast(context, 'Erro ao enviar foto: $e');
     } finally {
       if (mounted) setState(() => _avatarUploading = false);
     }

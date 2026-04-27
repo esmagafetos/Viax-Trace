@@ -7,6 +7,11 @@ import { logger } from "./lib/logger";
 
 const app: Express = express();
 
+// Trust the first proxy in front of us (Render terminates TLS at its load
+// balancer and forwards via HTTP). Without this, `req.secure` is false and
+// express-session refuses to set the `Secure` cookie in production.
+app.set("trust proxy", 1);
+
 app.use(
   pinoHttp({
     logger,

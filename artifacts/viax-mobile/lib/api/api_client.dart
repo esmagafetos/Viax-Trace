@@ -113,9 +113,13 @@ class ApiClient {
     final form = FormData.fromMap({
       'avatar': await MultipartFile.fromFile(file.path, filename: file.path.split('/').last),
     });
-    final r = await dio.post('/users/avatar', data: form);
-    if (r.statusCode == 200) return Map<String, dynamic>.from(r.data as Map);
-    throw ApiError(r.statusCode ?? 0, _err(r.data));
+    try {
+      final r = await dio.post('/users/avatar', data: form);
+      if (r.statusCode == 200) return Map<String, dynamic>.from(r.data as Map);
+      throw ApiError(r.statusCode ?? 0, _err(r.data));
+    } on DioException catch (e) {
+      throw ApiError(e.response?.statusCode ?? 0, _dioErr(e));
+    }
   }
 
   // ── Dashboard ───────────────────────────────────────────────────────
@@ -162,8 +166,24 @@ class ApiClient {
 
   String _err(dynamic data) {
     if (data is Map && data['error'] is String) return data['error'];
-    if (data is String) return data;
+    if (data is String && data.isNotEmpty) return data;
     return 'Erro desconhecido';
+  }
+
+  String _dioErr(DioException e) {
+    if (e.response != null) return _err(e.response!.data);
+    switch (e.type) {
+      case DioExceptionType.connectionTimeout:
+        return 'Tempo de conexão esgotado. Verifique sua internet.';
+      case DioExceptionType.sendTimeout:
+        return 'Envio demorou demais. Tente novamente.';
+      case DioExceptionType.receiveTimeout:
+        return 'Servidor demorou para responder. Tente novamente.';
+      case DioExceptionType.connectionError:
+        return 'Falha de conexão. Verifique sua internet.';
+      default:
+        return e.message ?? 'Erro de rede.';
+    }
   }
 }
 
