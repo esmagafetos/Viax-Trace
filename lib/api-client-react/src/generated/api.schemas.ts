@@ -71,13 +71,14 @@ export const UserSettingsParserMode = {
 } as const;
 
 /**
- * Geocoding instance: builtin=Nominatim/OSM, googlemaps=Google Maps API
+ * Geocoding instance: builtin=Photon/Overpass/Nominatim, geocodebr=self-hosted CNEFE/IBGE microservice, googlemaps=Google Maps API
  */
 export type UserSettingsInstanceMode =
   (typeof UserSettingsInstanceMode)[keyof typeof UserSettingsInstanceMode];
 
 export const UserSettingsInstanceMode = {
   builtin: "builtin",
+  geocodebr: "geocodebr",
   googlemaps: "googlemaps",
 } as const;
 
@@ -89,10 +90,15 @@ export interface UserSettings {
   /** @nullable */
   aiApiKey?: string | null;
   toleranceMeters: number;
-  /** Geocoding instance: builtin=Nominatim/OSM, googlemaps=Google Maps API */
+  /** Geocoding instance: builtin=Photon/Overpass/Nominatim, geocodebr=self-hosted CNEFE/IBGE microservice, googlemaps=Google Maps API */
   instanceMode: UserSettingsInstanceMode;
   /** @nullable */
   googleMapsApiKey?: string | null;
+  /**
+   * Self-hosted geocodebr microservice URL (e.g. http://localhost:8002). User must run their own instance — see artifacts/geocodebr-service/README.md.
+   * @nullable
+   */
+  geocodebrUrl?: string | null;
   /**
    * Earnings per route (BRL)
    * @nullable
@@ -125,6 +131,7 @@ export type UpdateSettingsBodyInstanceMode =
 
 export const UpdateSettingsBodyInstanceMode = {
   builtin: "builtin",
+  geocodebr: "geocodebr",
   googlemaps: "googlemaps",
 } as const;
 
@@ -138,6 +145,8 @@ export interface UpdateSettingsBody {
   instanceMode?: UpdateSettingsBodyInstanceMode;
   /** @nullable */
   googleMapsApiKey?: string | null;
+  /** @nullable */
+  geocodebrUrl?: string | null;
   /** @nullable */
   valorPorRota?: number | null;
   cicloPagamentoDias?: number;

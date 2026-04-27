@@ -56,6 +56,7 @@ function formatSettings(s: any) {
     toleranceMeters: s.toleranceMeters,
     instanceMode: s.instanceMode ?? "builtin",
     googleMapsApiKey: s.googleMapsApiKey ?? null,
+    geocodebrUrl: s.geocodebrUrl ?? null,
     valorPorRota: s.valorPorRota ?? null,
     cicloPagamentoDias: s.cicloPagamentoDias ?? 30,
     metaMensalRotas: s.metaMensalRotas ?? null,
@@ -166,6 +167,10 @@ router.patch("/users/settings", async (req, res): Promise<void> => {
   if (d.toleranceMeters !== undefined) updateData.toleranceMeters = d.toleranceMeters;
   if (d.instanceMode !== undefined) updateData.instanceMode = d.instanceMode;
   if (d.googleMapsApiKey !== undefined) updateData.googleMapsApiKey = d.googleMapsApiKey;
+  if (d.geocodebrUrl !== undefined) {
+    const v = typeof d.geocodebrUrl === "string" ? d.geocodebrUrl.trim() : d.geocodebrUrl;
+    updateData.geocodebrUrl = v ? v.replace(/\/+$/, "") : null;
+  }
   if (d.valorPorRota !== undefined) updateData.valorPorRota = d.valorPorRota;
   if (d.cicloPagamentoDias !== undefined) updateData.cicloPagamentoDias = d.cicloPagamentoDias;
   if (d.metaMensalRotas !== undefined) updateData.metaMensalRotas = d.metaMensalRotas;

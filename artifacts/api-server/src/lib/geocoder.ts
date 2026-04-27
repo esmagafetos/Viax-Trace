@@ -3,8 +3,9 @@ import { logger } from "./logger.js";
 const USER_AGENT = "ViaX-Scout/8.0 (viax-system-br)";
 
 // geocodebr microservice — CNEFE/IBGE (opcional; usado como fallback final)
-// Configure via variável de ambiente GEOCODEBR_URL (ex: http://localhost:8002)
-const GEOCODEBR_URL = process.env.GEOCODEBR_URL ?? "";
+// URL é configurada per-user em "Configurações → Instâncias" (campo geocodebrUrl).
+// Como fallback global, ainda respeita a variável de ambiente GEOCODEBR_URL
+// (útil para deploys self-hosted onde o operador roda o serviço internamente).
 
 const NOMINATIM_INSTANCES = [
   "https://nominatim.openstreetmap.org",
@@ -578,12 +579,14 @@ export async function geocodeForwardPOI(
 export async function geocodeGeocobeBR(
   logradouro: string,
   municipio: string,
-  numero: string = ""
+  numero: string = "",
+  url: string | null = null
 ): Promise<GeoResult | null> {
-  if (!GEOCODEBR_URL) return null;
+  const baseUrl = (url || process.env.GEOCODEBR_URL || "").trim().replace(/\/+$/, "");
+  if (!baseUrl) return null;
   try {
     const params = new URLSearchParams({ logradouro, numero, municipio });
-    const data = await httpGet(`${GEOCODEBR_URL}/geocode?${params.toString()}`);
+    const data = await httpGet(`${baseUrl}/geocode?${params.toString()}`);
     if (data && data.encontrado === true && typeof data.lat === "number" && typeof data.lon === "number") {
       const precisao = typeof data.precisao === "number" ? data.precisao : 6;
       logger.debug(
@@ -1069,7 +1072,8 @@ export async function processarEndereco(
   toleranceMeters: number = 300,
   parserMode: string = "builtin",
   aiProvider: string | null = null,
-  aiApiKey: string | null = null
+  aiApiKey: string | null = null,
+  geocodebrUrl: string | null = null
 ): Promise<{ resultado: ResultRow; ultimaReq: number }> {
   logger.info({ linha: item.linha, endereco: item.endereco, instanceMode, parserMode }, "Processando endereço");
 
@@ -1226,7 +1230,7 @@ export async function processarEndereco(
         // 3. geocodebr (CNEFE/IBGE) — fallback para interior e municípios pouco mapeados no OSM
         // Ativado apenas quando Photon + Nominatim falharam em confirmar a rua.
         if (!geoResult && parsed.rua_principal && item.cidade) {
-          const geocobrResult = await geocodeGeocobeBR(parsed.rua_principal, item.cidade, parsed.numero);
+          const geocobrResult = await geocodeGeocobeBR(parsed.rua_principal, item.cidade, parsed.numero, geocodebrUrl);
           if (geocobrResult) {
             forwardGeoResult = geocobrResult;
             geoResult = geocobrResult;

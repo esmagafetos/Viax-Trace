@@ -5,26 +5,33 @@
 #  Provisiona:
 #    - PostgreSQL gerenciado (free)
 #    - Web Service (Docker) rodando o api-server
-#    - Web Service (Docker) rodando o microserviço geocodebr (R/CNEFE)
-#      → GEOCODEBR_URL é injetado automaticamente no api-server
 #
 #  Como subir:
 #    1. Faça push deste repo para o GitHub.
 #    2. No Render: New + → Blueprint → selecione este repositório.
-#    3. Render lê este arquivo, cria o banco e os serviços web.
-#    4. Aguarde o deploy concluir (~5-10 min para a API; o geocodebr
-#       leva ~10-15 min na primeira build por causa dos pacotes R espaciais).
+#    3. Render lê este arquivo, cria o banco e o serviço web.
+#    4. Aguarde o deploy concluir (~5-10 min).
 #    5. Cole a URL pública da API (ex: https://viax-trace-api.onrender.com)
 #       no app mobile em "Configurar servidor".
 #
-#  Notas:
-#    - geocodebr roda em plano "starter" com disco persistente de 5GB
-#      montado em /root/.cache para o cache do CNEFE persistir entre
-#      deploys (sem disco, o índice CNEFE precisaria ser baixado a cada
-#      restart, levando ~10 min).
+#  Sobre o geocodebr (CNEFE/IBGE):
+#    O microserviço NÃO é provisionado pelo blueprint para manter o stack
+#    100% no plano free do Render. Ele é completamente opcional — Photon,
+#    Overpass e Nominatim já cobrem a maioria dos endereços brasileiros.
+#
+#    Se você quiser ativar o geocodebr (precisão extra para interior):
+#      a) Suba o microserviço por conta própria (Docker, VPS, Cloudflare
+#         Tunnel, ngrok, ou qualquer host capaz de rodar a imagem em
+#         artifacts/geocodebr-service/).
+#      b) Cole a URL pública dele em "Configurações → Instâncias →
+#         GeocodeR BR" no app web ou mobile (per-user).
+#
+#    Como fallback global, a API ainda respeita a variável GEOCODEBR_URL
+#    se você quiser definir uma URL padrão para todos os usuários.
 #
 #  Variáveis opcionais (configure no painel após o primeiro deploy):
 #    - GOOGLE_MAPS_API_KEY  → habilita modo "googlemaps"
+#    - GEOCODEBR_URL        → URL global do geocodebr (sobrescrita por per-user)
 #    - OPENAI_API_KEY       → parser via IA
 #    - ANTHROPIC_API_KEY    → parser via IA
 #    - GOOGLE_AI_API_KEY    → parser via IA
@@ -59,34 +66,10 @@ services:
       - key: GOOGLE_MAPS_API_KEY
         sync: false
       - key: GEOCODEBR_URL
-        value: http://viax-trace-geocodebr:8002
+        sync: false
       - key: OPENAI_API_KEY
         sync: false
       - key: ANTHROPIC_API_KEY
         sync: false
       - key: GOOGLE_AI_API_KEY
         sync: false
-
-  # ---------------------------------------------------------------------------
-  # geocodebr — serviço privado (não exposto publicamente)
-  # Acessível apenas por outros serviços do blueprint via DNS interno do Render
-  # em http://viax-trace-geocodebr:8002.
-  # ---------------------------------------------------------------------------
-  - type: pserv
-    name: viax-trace-geocodebr
-    runtime: docker
-    plan: starter
-    region: oregon
-    dockerfilePath: ./artifacts/geocodebr-service/Dockerfile
-    dockerContext: ./artifacts/geocodebr-service
-    autoDeploy: true
-    envVars:
-      - key: PORT
-        value: "8002"
-    # Disco persistente para o cache do CNEFE (~500MB-1GB de dados do IBGE).
-    # Sem isso, o pacote R `geocodebr` precisa baixar todo o índice a cada
-    # deploy/restart, o que leva vários minutos.
-    disk:
-      name: geocodebr-cache
-      mountPath: /root/.cache
-      sizeGB: 5

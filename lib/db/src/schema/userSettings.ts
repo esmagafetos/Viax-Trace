@@ -12,6 +12,7 @@ export const userSettingsTable = pgTable("user_settings", {
   toleranceMeters: integer("tolerance_meters").notNull().default(300),
   instanceMode: text("instance_mode").notNull().default("builtin"),
   googleMapsApiKey: text("google_maps_api_key"),
+  geocodebrUrl: text("geocodebr_url"),
   valorPorRota: real("valor_por_rota"),
   cicloPagamentoDias: integer("ciclo_pagamento_dias").notNull().default(30),
   metaMensalRotas: integer("meta_mensal_rotas"),

@@ -35,6 +35,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   double _toleranceMeters = 300;
   String _instanceMode = 'builtin';
   final _googleMapsKey = TextEditingController();
+  final _geocodebrUrl = TextEditingController();
   final _valorPorRota = TextEditingController();
   int _cicloPagamentoDias = 30;
   final _metaMensalRotas = TextEditingController();
@@ -66,6 +67,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _toleranceMeters = ((s['toleranceMeters'] as num?) ?? 300).toDouble();
     _instanceMode = (s['instanceMode'] as String?) ?? 'builtin';
     _googleMapsKey.text = (s['googleMapsApiKey'] as String?) ?? '';
+    _geocodebrUrl.text = (s['geocodebrUrl'] as String?) ?? '';
     _valorPorRota.text = s['valorPorRota'] != null ? '${s['valorPorRota']}' : '';
     _cicloPagamentoDias = ((s['cicloPagamentoDias'] as num?) ?? 30).toInt();
     _metaMensalRotas.text = s['metaMensalRotas'] != null ? '${s['metaMensalRotas']}' : '';
@@ -139,6 +141,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         'toleranceMeters': _toleranceMeters.round(),
         'instanceMode': _instanceMode,
         'googleMapsApiKey': _googleMapsKey.text.isEmpty ? null : _googleMapsKey.text,
+        'geocodebrUrl': _geocodebrUrl.text.trim().isEmpty ? null : _geocodebrUrl.text.trim(),
         'valorPorRota': _valorPorRota.text.isEmpty ? null : double.tryParse(_valorPorRota.text),
         'cicloPagamentoDias': _cicloPagamentoDias,
         'metaMensalRotas': _metaMensalRotas.text.isEmpty ? null : int.tryParse(_metaMensalRotas.text),
@@ -445,6 +448,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 controller: _googleMapsKey,
                 obscureText: true,
                 decoration: const InputDecoration(hintText: 'AIzaSy...')),
+          ],
+          if (_instanceMode == 'geocodebr') ...[
+            const SizedBox(height: 8),
+            _label('URL DO SEU MICROSERVIÇO GEOCODEBR'),
+            TextField(
+                controller: _geocodebrUrl,
+                keyboardType: TextInputType.url,
+                autocorrect: false,
+                decoration: const InputDecoration(hintText: 'https://meu-geocodebr.exemplo.com')),
+            const SizedBox(height: 8),
+            Text(
+              'Você precisa rodar o microserviço por conta própria (Docker, Cloudflare Tunnel, etc.). Veja artifacts/geocodebr-service/README.md.',
+              style: TextStyle(fontSize: 11, color: context.textFaint, height: 1.5),
+            ),
           ],
           const SizedBox(height: 16),
           _saveButton('Salvar Instância', _savingSettings, _saveSettings),

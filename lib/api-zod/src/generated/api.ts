@@ -121,11 +121,17 @@ export const GetSettingsResponse = zod.object({
   aiApiKey: zod.string().nullish(),
   toleranceMeters: zod.number(),
   instanceMode: zod
-    .enum(["builtin", "googlemaps"])
+    .enum(["builtin", "geocodebr", "googlemaps"])
     .describe(
-      "Geocoding instance: builtin=Nominatim\/OSM, googlemaps=Google Maps API",
+      "Geocoding instance: builtin=Photon\/Overpass\/Nominatim, geocodebr=self-hosted CNEFE\/IBGE microservice, googlemaps=Google Maps API",
     ),
   googleMapsApiKey: zod.string().nullish(),
+  geocodebrUrl: zod
+    .string()
+    .nullish()
+    .describe(
+      "Self-hosted geocodebr microservice URL (e.g. http:\/\/localhost:8002). User must run their own instance — see artifacts\/geocodebr-service\/README.md.",
+    ),
   valorPorRota: zod.number().nullish().describe("Earnings per route (BRL)"),
   cicloPagamentoDias: zod
     .number()
@@ -145,8 +151,9 @@ export const UpdateSettingsBody = zod.object({
   aiProvider: zod.string().nullish(),
   aiApiKey: zod.string().nullish(),
   toleranceMeters: zod.number().optional(),
-  instanceMode: zod.enum(["builtin", "googlemaps"]).optional(),
+  instanceMode: zod.enum(["builtin", "geocodebr", "googlemaps"]).optional(),
   googleMapsApiKey: zod.string().nullish(),
+  geocodebrUrl: zod.string().nullish(),
   valorPorRota: zod.number().nullish(),
   cicloPagamentoDias: zod.number().optional(),
   metaMensalRotas: zod.number().nullish(),
@@ -161,11 +168,17 @@ export const UpdateSettingsResponse = zod.object({
   aiApiKey: zod.string().nullish(),
   toleranceMeters: zod.number(),
   instanceMode: zod
-    .enum(["builtin", "googlemaps"])
+    .enum(["builtin", "geocodebr", "googlemaps"])
     .describe(
-      "Geocoding instance: builtin=Nominatim\/OSM, googlemaps=Google Maps API",
+      "Geocoding instance: builtin=Photon\/Overpass\/Nominatim, geocodebr=self-hosted CNEFE\/IBGE microservice, googlemaps=Google Maps API",
     ),
   googleMapsApiKey: zod.string().nullish(),
+  geocodebrUrl: zod
+    .string()
+    .nullish()
+    .describe(
+      "Self-hosted geocodebr microservice URL (e.g. http:\/\/localhost:8002). User must run their own instance — see artifacts\/geocodebr-service\/README.md.",
+    ),
   valorPorRota: zod.number().nullish().describe("Earnings per route (BRL)"),
   cicloPagamentoDias: zod
     .number()

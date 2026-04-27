@@ -500,10 +500,13 @@ components:
           type: integer
         instanceMode:
           type: string
-          enum: [builtin, googlemaps]
-          description: "Geocoding instance: builtin=Nominatim/OSM, googlemaps=Google Maps API"
+          enum: [builtin, geocodebr, googlemaps]
+          description: "Geocoding instance: builtin=Photon/Overpass/Nominatim, geocodebr=self-hosted CNEFE/IBGE microservice, googlemaps=Google Maps API"
         googleMapsApiKey:
           type: ["string", "null"]
+        geocodebrUrl:
+          type: ["string", "null"]
+          description: "Self-hosted geocodebr microservice URL (e.g. http://localhost:8002). User must run their own instance — see artifacts/geocodebr-service/README.md."
         valorPorRota:
           type: ["number", "null"]
           description: "Earnings per route (BRL)"
@@ -536,8 +539,10 @@ components:
           type: integer
         instanceMode:
           type: string
-          enum: [builtin, googlemaps]
+          enum: [builtin, geocodebr, googlemaps]
         googleMapsApiKey:
+          type: ["string", "null"]
+        geocodebrUrl:
           type: ["string", "null"]
         valorPorRota:
           type: ["number", "null"]

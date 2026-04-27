@@ -126,6 +126,7 @@ router.post("/process/upload", upload.single("arquivo"), async (req, res): Promi
 
     const instanceMode = (settings as any).instanceMode ?? "builtin";
     const googleMapsApiKey = (settings as any).googleMapsApiKey ?? null;
+    const geocodebrUrl = (settings as any).geocodebrUrl ?? null;
     const toleranceMeters = (settings as any).toleranceMeters ?? 300;
     const parserMode = (settings as any).parserMode ?? "builtin";
     const aiProvider = (settings as any).aiProvider ?? null;
@@ -183,7 +184,8 @@ router.post("/process/upload", upload.single("arquivo"), async (req, res): Promi
         toleranceMeters,
         parserMode,
         aiProvider,
-        aiApiKey
+        aiApiKey,
+        geocodebrUrl
       );
       ultimaReq = novaUltimaReq;
 
