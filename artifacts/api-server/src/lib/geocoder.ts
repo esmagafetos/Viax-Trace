@@ -53,9 +53,12 @@ export interface ParsedAddress {
   numero: string;
   km_rodovia: number | null;
   via_secundaria: string | null;
+  via_intersecao: string | null;
   poi: string;
+  poi_estruturado?: string | null;
   cidade: string;
   bairro: string;
+  bairro_limpo: string;
   cep: string | null;
   is_comercio: boolean;
   is_avenida_extensa: boolean;
@@ -144,14 +147,28 @@ function temTipoLogradouro(texto: string): boolean {
 }
 
 function limparNomeLogradouro(candidato: string): string {
-  return candidato
+  let s = candidato
     .replace(/\b(s\/?n|sn)\b.*$/iu, "")
     .replace(/\bkm\s*\d+(?:[.,]\d+)?.*$/iu, "")
-    .replace(/\b(?:lote|quadra|qd|lt|casa|loja|lj|bloco|apto|apartamento|cond\.?|condom[ií]nio|residencial)\b.*$/iu, "")
-    .replace(/\s+\d+[A-Za-z]?\b.*$/u, "")
-    .replace(/\s+/g, " ")
-    .replace(/[,\s]+$/u, "")
-    .trim();
+    .replace(/\b(?:lote|quadra|qd|lt|casa|loja|lj|bloco|apto|apartamento|cond\.?|condom[ií]nio|residencial|loteamento|conjunto|setor)\b.*$/iu, "")
+    // Strip " - <loteamento ref>" suffix (e.g. "Avenida 1 - vivamar"); keep
+    // street + initial qualifier intact.
+    .replace(/\s+-\s+[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9\s]{0,30}$/u, "");
+  // Smart trailing-digit strip: only treat the last token as a house-number
+  // when there are at least TWO alphabetic tokens following the logradouro
+  // keyword. This preserves numeric streets like "Avenida 1", "R Apolo 21".
+  const m = s.match(/^(\s*(?:Rua|R\.?|Av\.?|Avenida|Alameda|Praça|Pça\.?|Travessa|Trav\.?|Tv\.?|Estrada|Rod\.?|Rodovia|Rovia|Viela|Beco|Passagem|Largo)\s+)(.+)$/iu);
+  if (m) {
+    const tipo = m[1];
+    const tokens = m[2].split(/\s+/).filter(Boolean);
+    const last = tokens[tokens.length - 1];
+    const alphaTokens = tokens.slice(0, -1).filter((t) => /[A-Za-zÀ-ÿ]/.test(t));
+    if (tokens.length >= 3 && alphaTokens.length >= 2 && /^\d{1,4}[A-Za-z]?$/.test(last)) {
+      tokens.pop();
+      s = tipo + tokens.join(" ");
+    }
+  }
+  return s.replace(/\s+/g, " ").replace(/[,\s\-]+$/u, "").trim();
 }
 
 /**
@@ -184,7 +201,7 @@ function calcularSimilaridadeVia(via: string, oficial: string): number {
   return calcularSimilaridade(via, oficial);
 }
 
-function calcularSimilaridade(str1: string, str2: string): number {
+export function calcularSimilaridade(str1: string, str2: string): number {
   const a = normalizarNomeRua(str1);
   const b = normalizarNomeRua(str2);
   if (!a || !b) return 0;
@@ -232,9 +249,15 @@ function extrairCEP(texto: string): string | null {
 }
 
 function extrairNumero(endereco: string): string {
-  const semKm = endereco.replace(/\bkm\s*\d+(?:[.,]\d+)?/gi, "");
-  const m = semKm.match(/[,\s]+(\d+[A-Za-z]?|s\/?n|sn)\b/i);
+  // Strip km, casa/lote/quadra/bloco/apto markers so their digits are not
+  // mistakenly captured as the house number.
+  let semRefs = endereco.replace(/\bkm\s*\d+(?:[.,]\d+)?/gi, "");
+  semRefs = semRefs.replace(/\b(?:casa|cs|lote|lt|quadra|qd|bloco|bl|apto|apt|apartamento|loja|lj)\s*\.?\s*[A-Za-z0-9]+/gi, "");
+  const m = semRefs.match(/[,\s]+(\d+[A-Za-z]?|s\/?n|sn)\b/i);
   if (m && !["0"].includes(m[1])) return m[1].toUpperCase();
+  // Fallback: pattern "Rua X N" without comma — but only after street keyword.
+  const m2 = semRefs.match(/\b(?:Rua|R\.?|Av\.?|Avenida|Alameda|Travessa|Tv\.?|Estrada|Rod\.?|Rodovia|Largo|Praça|Pça\.?)\s+\S+(?:\s+\S+){0,4}?\s+(\d{1,5}[A-Za-z]?)\b/i);
+  if (m2 && !["0"].includes(m2[1])) return m2[1].toUpperCase();
   return "";
 }
 
@@ -250,12 +273,15 @@ function removerAnotacoesMotorista(s: string): string {
   if (dashIdx !== -1) {
     const sufixo = s.substring(dashIdx + 3).toLowerCase().trim();
     const ehLogradouro = /^(rua|r\.|av\.|avenida|alameda|estrada|rod\.|rodovia|travessa|trav\.|tv\.|viela|beco|passagem|largo|praça|pça\.)\b/i.test(sufixo);
-    const ehAnotacao = !ehLogradouro && /^(próximo|proximo|perto|referência|referencia|maps|google|waze|placas|portão|portao|buzina|frente|fundos|esquina|atrás|atras|entre|deixar|não\s+entregar|nao\s+entregar|obs\b|atenção|atencao)\b/i.test(sufixo);
+    const ehAnotacao = !ehLogradouro && /^(próximo|proximo|perto|referência|referencia|maps|google|waze|placas|portão|portao|buzina|fundos|atrás|atras|entre|deixar|não\s+entregar|nao\s+entregar|obs\b|atenção|atencao)\b/i.test(sufixo);
     if (ehAnotacao) s = s.substring(0, dashIdx);
   }
   s = s.replace(/\s+\d+[°ªº].*$/u, "");
+  // NOTE: removed "frente" / "fundos" / "esquina" from truncation triggers —
+  // motoristas frequentemente colocam estabelecimentos comerciais logo depois
+  // ("frente à oficina X", "esquina com Av Y"). Truncar lá perde sinal.
   const gatilhos = ["proximo", "próximo", "perto", "referencia", "referência", "maps", "google",
-    "waze", "placas", "portao", "portão", "buzina", "frente", "fundos", "esquina", "atrás", "atras", "entre", "deixar", "nao entregar", "não entregar"];
+    "waze", "placas", "portao", "portão", "buzina", "atrás", "atras", "deixar", "nao entregar", "não entregar"];
   const lower = s.toLowerCase();
   for (const g of gatilhos) {
     const pos = lower.indexOf(g);
@@ -267,12 +293,23 @@ function removerAnotacoesMotorista(s: string): string {
   return s;
 }
 
+// Constante reutilizada para começar com qualquer prefixo de logradouro
+// (incluindo as variantes sem ponto: "R", "Av", "Tv", "Rod" etc).
+const LOGRADOURO_PREFIX_RE = /\b(?:Rua|R\.?|Av\.?|Avenida|Alameda|Al\.?|Praça|Praca|Pça\.?|Pca\.?|Travessa|Trav\.?|Tv\.?|Estrada|Est\.?|Rod\.?|Rodovia|Rovia|Via|Viela|Beco|Passagem|Psg\.?|Largo)\s+/iu;
+
 function extrairLogradouroPrincipal(endereco: string): string {
   const limpo = endereco.replace(/\bRovia\b/gi, "Rodovia");
-  const m = limpo.match(/\b(?:Rua|R\.?|Av\.?|Avenida|Alameda|Praça|Pça\.?|Travessa|Trav\.?|Tv\.?|Estrada|Rod\.?|Rodovia|Viela|Beco|Passagem|Largo)\s+[^\s,.\d][^,.;\n\r]*/iu);
+  // 1) Tenta padrão clássico (1ª letra do nome NÃO é dígito) — preserva o
+  //    comportamento histórico para evitar regressões.
+  let m = limpo.match(/\b(?:Rua|R\.?|Av\.?|Avenida|Alameda|Al\.?|Praça|Praca|Pça\.?|Pca\.?|Travessa|Trav\.?|Tv\.?|Estrada|Est\.?|Rod\.?|Rodovia|Rovia|Via|Viela|Beco|Passagem|Psg\.?|Largo)\s+[^\s,.\d][^,.;\n\r]*/iu);
+  // 2) Fallback: aceita 1ª letra do nome COMO dígito (ruas numeradas
+  //    "Avenida 1", "Rua 9 de Julho", "R Apolo 21").
+  if (!m) {
+    m = limpo.match(/\b(?:Rua|R\.?|Av\.?|Avenida|Alameda|Al\.?|Praça|Praca|Pça\.?|Pca\.?|Travessa|Trav\.?|Tv\.?|Estrada|Est\.?|Rod\.?|Rodovia|Rovia|Via|Viela|Beco|Passagem|Psg\.?|Largo)\s+[^\s,.][^,.;\n\r]*/iu);
+  }
   if (m) {
     return limparNomeLogradouro(m[0]
-      .replace(/\s+\b(?:proximo|próximo|perto|refer[eê]ncia|maps|google|waze|placas|port[aã]o|buzina|frente|fundos|esquina|entre|deixar)\b.*$/iu, "")
+      .replace(/\s+\b(?:proximo|próximo|perto|refer[eê]ncia|maps|google|waze|placas|port[aã]o|buzina|entre|deixar)\b.*$/iu, "")
       .trim());
   }
   const semLoteamento = limpo.replace(/^\s*(Loteamento|Condomínio|Residencial|Conjunto|Núcleo)\s+[^,]+?[,]?\s*/i, "");
@@ -288,15 +325,23 @@ function extrairLogradouroPrincipal(endereco: string): string {
 
 function extrairViaSecundaria(endereco: string): string | null {
   // Formatos: "Travessa B", "Tv B", "Passagem 3", "Viela X"
-  // Para em vírgula, parêntese ou colchete — evita capturar complementos como "( Apt 1)"
-  const m = endereco.match(/[,\s]+((?:travessa|trav\.?|tv\.?|passagem|psg\.?|viela|beco)\s*\.?\s*[A-Za-z0-9][^,([]{0,25})/i);
+  // Aceita separador antes: vírgula, espaço, parêntese ou colchete.
+  // Para em vírgula ou parêntese de fechamento — evita capturar complementos como "( Apt 1)"
+  const m = endereco.match(/[,\s([]+((?:travessa|trav\.?|tv\.?|passagem|psg\.?|viela|beco)\s*\.?\s*[A-Za-z0-9][^,()\]]{0,25})/i);
+  if (m) return m[1].trim().replace(/[)\]\s]+$/u, "");
+  return null;
+}
+
+function extrairIntersecao(endereco: string): string | null {
+  // "Rua X esquina com Rua Y" / "Rua X esq. com Av Y"
+  const m = endereco.match(/\besquina\s+(?:com|c\/|c\.?)\s+((?:rua|r\.?|av\.?|avenida|travessa|tv\.?|alameda|estrada)\s+[A-Za-zÀ-ÿ0-9][^,;.()]{0,40})/i);
   if (m) return m[1].trim();
   return null;
 }
 
 function extrairPOI(endereco: string): string {
   // Caso 1: POI antes do logradouro — ex: "Mercearia João, Rua X, 123" ou "Borracharia Silva - Av. Y"
-  const idxTipoRua = endereco.search(/\b(?:Rua|R\.|Av\.|Avenida|Alameda|Praça|Pça\.|Travessa|Trav\.|Tv\.|Estrada|Rod\.|Rodovia|Viela|Beco|Passagem|Largo)\s+\S/iu);
+  const idxTipoRua = endereco.search(LOGRADOURO_PREFIX_RE);
   if (idxTipoRua > 5) {
     const poiCandidate = endereco.substring(0, idxTipoRua).replace(/[\s,\-]+$/g, "").trim();
     if (poiCandidate.length >= 3 && !/^\d+$/.test(poiCandidate) && !/^[A-Z]\d*$/i.test(poiCandidate)) {
@@ -304,13 +349,40 @@ function extrairPOI(endereco: string): string {
     }
   }
   // Caso 2: POI após o logradouro — ex: "Rua X, 123, Mercado João"
-  let sem = endereco.replace(/^\s*(?:Rua|Av\.?|Avenida|Alameda|Praça|Pça\.?|Travessa|Tv\.?|Estrada|Rod\.?|Rodovia|Viela|Beco|Passagem|Largo)\s+[^,]+/iu, "");
+  // Só faz sentido aplicar se houver de fato um logradouro keyword no início.
+  if (!LOGRADOURO_PREFIX_RE.test(endereco.slice(0, 6))) return "";
+  let sem = endereco.replace(LOGRADOURO_PREFIX_RE, "").replace(/^[^,]+/u, "");
   sem = sem.replace(/^[,\s]+\d*[,\s]*/u, "");
   sem = sem.replace(/^\s*(loja|apt\.?|apto\.?)\s+/iu, "");
   sem = sem.replace(/\b(travessa|trav\.?|tv\.?|passagem)\s*\.?\s*\d*[A-Za-z]*/iu, "");
+  // Remove tail com cidade/UF/CEP redundantes (heurística: 3+ vírgulas seguidas
+  // contendo bairro, cidade, UF e CEP). Cortamos no penúltimo segmento útil.
+  const partes = sem.split(",").map((p) => p.trim()).filter(Boolean);
+  if (partes.length >= 3) {
+    // remove últimos itens se forem CEP / UF / cidade conhecidas
+    while (partes.length > 0) {
+      const last = partes[partes.length - 1];
+      if (/^\d{5}-?\d{3}$/.test(last) || /^[A-Z]{2}$/.test(last) || /^(rio de janeiro|são paulo|sao paulo|minas gerais|espírito santo|espirito santo|brasil)$/i.test(last)) {
+        partes.pop();
+      } else break;
+    }
+    sem = partes.join(", ");
+  }
   sem = sem.replace(/^[\s\t\n\r,()]+|[\s\t\n\r,()]+$/g, "");
   if (sem.length >= 3 && !/^\d+$/.test(sem) && !/^[A-Z]\d*$/i.test(sem)) return sem;
   return "";
+}
+
+function limparBairro(bairro: string): string {
+  if (!bairro) return "";
+  return bairro
+    // Remove parênteses e o conteúdo interno: "Verão Vermelho (Tamoios)" → "Verão Vermelho"
+    .replace(/\s*\([^)]*\)\s*/g, " ")
+    .replace(/\s*\[[^\]]*\]\s*/g, " ")
+    // Remove prefixos administrativos comuns
+    .replace(/^\s*(?:bairro|cond\.?|condom[ií]nio|loteamento|residencial)\s+/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function extrairCidadeDoEndereco(endereco: string): string {
@@ -320,12 +392,18 @@ function extrairCidadeDoEndereco(endereco: string): string {
 }
 
 function normalizarAcronimos(texto: string): string {
-  texto = texto.replace(/\b(Lot|LT|L)[\s:]*(\d+[A-Z]?)\b/gi, "Lote $2");
-  texto = texto.replace(/\b(Qua?|QD|Quad)[\s:]*(\d+)\b/gi, "Quadra $2");
-  texto = texto.replace(/\b(Cs\.?|C)[\s:]*(\d+[A-Z]?)\b/gi, "Casa $2");
-  texto = texto.replace(/\b(Lj\.?|Lj)[\s:]*(\d+[A-Z]?)\b/gi, "Loja $2");
-  texto = texto.replace(/\b(Bl\.?|BL)\s+([A-Z])\b/gi, "Bloco $2");
-  texto = texto.replace(/\b(Apt\.?|Apto\.?)\s+(\d+[A-Z]?)\b/gi, "Apto. $2");
+  // IMPORTANTE: usar `\d+[A-Za-z]*` (e não `\d+[A-Za-z]?\b`) porque `\b`
+  // entre dígito e letra NÃO é um word boundary (ambos são word-chars),
+  // e `[A-Za-z]?` falharia para "18PD" (2 letras).
+  texto = texto.replace(/\b(Lot|LT|L)\.?[\s:]*(\d+[A-Za-z]*)/gi, "Lote $2");
+  // Quadra: aceita Q, Qu, Qua, Quad, Quadra, QD — listadas explicitamente
+  // porque `Qua?` matches "Qu"/"Qua" mas a alternância com `\b` final tinha
+  // bug em sequências como "Qu 18PD".
+  texto = texto.replace(/\b(Quadra|Quad|Qua|Qu|QD|Q)\.?[\s:]*(\d+[A-Za-z]*)/gi, "Quadra $2");
+  texto = texto.replace(/\b(Cs|C)\.?[\s:]*(\d+[A-Za-z]*)/gi, "Casa $2");
+  texto = texto.replace(/\b(Lj)\.?[\s:]*(\d+[A-Za-z]*)/gi, "Loja $2");
+  texto = texto.replace(/\b(Bl|BL)\.?\s+([A-Z])\b/gi, "Bloco $2");
+  texto = texto.replace(/\b(Apt|Apto)\.?[\s:]*(\d+[A-Za-z]*)/gi, "Apto. $2");
   texto = texto.replace(/\bRovia\b/gi, "Rodovia");
   return texto;
 }
@@ -343,23 +421,44 @@ export function parsearEndereco(endereco: string, cidade = "", bairro = "", cepL
   let end = endereco.replace(/\s+/g, " ").trim();
   end = removerAnotacoesMotorista(end);
   end = normalizarAcronimos(end);
-  const rua = extrairLogradouroPrincipal(end);
+  let rua = extrairLogradouroPrincipal(end);
+
+  // Split inline travessa: "Rua Sinagoga travessa E" → rua = "Rua Sinagoga",
+  // via = "travessa E". Sem isso, o forward-geocoding falha porque Nominatim
+  // não tem "Rua Sinagoga travessa E" como uma única via.
+  let viaSecundaria = extrairViaSecundaria(end);
+  if (rua) {
+    const inlineTrav = rua.match(/^(.+?)\s+((?:travessa|trav\.?|tv\.?|passagem)\s+[A-Za-z0-9].{0,40})$/i);
+    if (inlineTrav) {
+      rua = inlineTrav[1].trim().replace(/[,\s\-]+$/u, "");
+      if (!viaSecundaria) viaSecundaria = inlineTrav[2].trim();
+    }
+  }
+
   const poi = extrairPOI(end);
   const cep = extrairCEP(end) ?? (cepLinha ? cepLinha.replace(/\D/g, "") : null);
+  const km = extrairKmRodovia(end);
+  const viaIntersecao = extrairIntersecao(end);
+  const bairroLimpo = limparBairro(bairro);
+
   return {
     rua_principal: rua,
     numero: extrairNumero(end),
-    km_rodovia: extrairKmRodovia(end),
-    via_secundaria: extrairViaSecundaria(end),
+    km_rodovia: km,
+    via_secundaria: viaSecundaria,
+    via_intersecao: viaIntersecao,
     poi,
     poi_estruturado: extrairRefsEstruturadas(end),
     cidade: cidade || extrairCidadeDoEndereco(end),
     bairro,
+    bairro_limpo: bairroLimpo,
     cep,
     is_comercio: PALAVRAS_COMERCIO_REGEX.test(poi) || PALAVRAS_COMERCIO_REGEX.test(end) || NEGOCIO_INFORMAL_REGEX.test(poi),
     is_avenida_extensa: AVENIDAS_EXTENSAS_REGEX.test(rua) || AVENIDAS_EXTENSAS_REGEX.test(end),
-    is_rodovia: RODOVIA_PREFIXO_REGEX.test(rua) || RODOVIA_QUALQUER_REGEX.test(end),
-  } as any;
+    // Quilometragem detectada (km!=null) também marca como rodovia, mesmo que
+    // o nome local da via ("Rua Dez", "Rua Itaperuna") esconda esse fato.
+    is_rodovia: RODOVIA_PREFIXO_REGEX.test(rua) || RODOVIA_QUALQUER_REGEX.test(end) || km !== null,
+  };
 }
 
 async function httpGet(url: string, timeout = 10000): Promise<any> {
@@ -904,7 +1003,11 @@ function montarQueryBusca(parsed: ParsedAddress): string {
   if (parsed.rua_principal) partes.push(parsed.rua_principal);
   const num = parsed.numero.toUpperCase();
   if (num && !["", "0", "SN", "S/N", "S-N"].includes(num)) partes.push(num);
-  if (parsed.bairro) partes.push(parsed.bairro);
+  // Prefere a versão limpa do bairro (sem parênteses tipo "(Tamoios)" e
+  // sem prefixo "Cond./Bairro"), para que provedores como Photon/Nominatim
+  // não tentem interpretar o texto entre parênteses como tag literal.
+  const bairroParaQuery = parsed.bairro_limpo || parsed.bairro;
+  if (bairroParaQuery) partes.push(bairroParaQuery);
   if (parsed.cidade) partes.push(parsed.cidade);
   partes.push("Brasil");
   return [...new Set(partes)].join(", ");
@@ -993,6 +1096,20 @@ export function verificarNuance(
           is_nuance: true,
           similaridade: Math.round(simVia * 1000) / 1000,
           motivo: `Possível referência de área: "${ruaExtraida}" pode indicar bairro/localidade. Via secundária "${parsed.via_secundaria}" corresponde parcialmente ao oficial "${ruaOficial}" (${Math.round(simVia * 100)}%). Confirmar antes de roteirizar.`,
+          distancia_metros: distanciaMetros,
+        };
+      }
+    }
+
+    // ── Endereço de esquina: a via cruzada pode ser a oficial ──
+    // "Rua A esquina com Rua B" → se o oficial é Rua B, está correto (entrega na esquina).
+    if (parsed.via_intersecao) {
+      const simInter = calcularSimilaridadeVia(parsed.via_intersecao, ruaOficial);
+      if (simInter >= 0.75) {
+        return {
+          is_nuance: false,
+          similaridade: Math.round(simInter * 1000) / 1000,
+          motivo: "",
           distancia_metros: distanciaMetros,
         };
       }
