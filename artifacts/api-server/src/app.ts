@@ -2,6 +2,8 @@ import express, { type Express } from "express";
 import cors from "cors";
 import pinoHttp from "pino-http";
 import session from "express-session";
+import connectPgSimple from "connect-pg-simple";
+import { pool } from "@workspace/db";
 import router from "./routes";
 import { logger } from "./lib/logger";
 
@@ -43,8 +45,42 @@ app.use(express.urlencoded({ extended: true }));
 
 const sessionSecret = process.env.SESSION_SECRET ?? "viax-scout-secret-change-in-production";
 
+// Persist sessions in PostgreSQL so users stay logged in across API restarts
+// (Render redeploys, free-tier cold starts, etc). Reuses the same pg Pool as
+// Drizzle to avoid a second connection pool.
+//
+// We create the `session` table inline instead of using
+// `createTableIfMissing: true`, because that option reads `table.sql` from the
+// connect-pg-simple package directory at runtime — and our esbuild bundle
+// doesn't ship that file. Inlining the DDL keeps the build self-contained.
+pool
+  .query(
+    `CREATE TABLE IF NOT EXISTS "session" (
+      "sid" varchar NOT NULL COLLATE "default",
+      "sess" json NOT NULL,
+      "expire" timestamp(6) NOT NULL,
+      CONSTRAINT "session_pkey" PRIMARY KEY ("sid") NOT DEFERRABLE INITIALLY IMMEDIATE
+    );
+    CREATE INDEX IF NOT EXISTS "IDX_session_expire" ON "session" ("expire");`,
+  )
+  .catch((err: Error) => {
+    logger.error({ err: err.message }, "failed to ensure session table");
+  });
+
+const PgSession = connectPgSimple(session);
+const sessionStore = new PgSession({
+  pool,
+  tableName: "session",
+  createTableIfMissing: false,
+  pruneSessionInterval: 60 * 60, // prune expired sessions every hour
+});
+sessionStore.on("error", (err: Error) => {
+  logger.error({ err: err.message }, "session store error");
+});
+
 app.use(
   session({
+    store: sessionStore,
     secret: sessionSecret,
     resave: false,
     saveUninitialized: false,
