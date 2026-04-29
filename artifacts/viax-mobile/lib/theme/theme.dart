@@ -88,7 +88,8 @@ ThemeData buildTheme(Brightness b) {
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
       fillColor: isDark ? AppColors.surface2Dark : AppColors.surface2,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+      isDense: true,
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(AppRadii.sm),
         borderSide: BorderSide(color: isDark ? AppColors.borderStrongDark : AppColors.borderStrong),
@@ -101,16 +102,53 @@ ThemeData buildTheme(Brightness b) {
         borderRadius: BorderRadius.circular(AppRadii.sm),
         borderSide: BorderSide(color: isDark ? AppColors.accentDark : AppColors.accent, width: 1.5),
       ),
-      hintStyle: TextStyle(color: isDark ? AppColors.textFaintDark : AppColors.textFaint),
+      hintStyle: TextStyle(
+        color: isDark ? AppColors.textFaintDark : AppColors.textFaint,
+        fontSize: 13.5,
+      ),
+      labelStyle: TextStyle(fontSize: 13.5),
     ),
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
         elevation: 0,
         backgroundColor: isDark ? AppColors.accentDark : AppColors.accent,
         foregroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.pill)),
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-        textStyle: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.lg)),
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+        minimumSize: const Size(0, 42),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        textStyle: GoogleFonts.poppins(
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          letterSpacing: -0.1,
+        ),
+      ),
+    ),
+    outlinedButtonTheme: OutlinedButtonThemeData(
+      style: OutlinedButton.styleFrom(
+        foregroundColor: isDark ? AppColors.textDark : AppColors.text,
+        side: BorderSide(color: isDark ? AppColors.borderStrongDark : AppColors.borderStrong),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.lg)),
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+        minimumSize: const Size(0, 42),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        textStyle: GoogleFonts.poppins(
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          letterSpacing: -0.1,
+        ),
+      ),
+    ),
+    textButtonTheme: TextButtonThemeData(
+      style: TextButton.styleFrom(
+        foregroundColor: isDark ? AppColors.accentDark : AppColors.accent,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        textStyle: GoogleFonts.poppins(
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          letterSpacing: -0.1,
+        ),
       ),
     ),
     snackBarTheme: SnackBarThemeData(

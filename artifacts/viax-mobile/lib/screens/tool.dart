@@ -166,7 +166,7 @@ class _ToolScreenState extends State<ToolScreen> {
                 const SizedBox(height: 12),
                 SizedBox(
                   width: double.infinity,
-                  height: 48,
+                  height: 42,
                   child: ElevatedButton(
                     style: ElevatedButton.styleFrom(
                       backgroundColor: context.text,
@@ -270,11 +270,10 @@ class _ToolScreenState extends State<ToolScreen> {
                 foregroundColor: Colors.white,
                 elevation: 0,
                 padding: const EdgeInsets.symmetric(
-                    horizontal: 20, vertical: 10),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(AppRadii.pill)),
+                    horizontal: 16, vertical: 8),
+                minimumSize: const Size(0, 36),
                 textStyle: const TextStyle(
-                    fontSize: 12, fontWeight: FontWeight.w700),
+                    fontSize: 12, fontWeight: FontWeight.w600, letterSpacing: -0.1),
               ),
               child: Text(_filePath == null
                   ? 'Selecionar arquivo'

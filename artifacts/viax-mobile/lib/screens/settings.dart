@@ -297,14 +297,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         const SizedBox(height: 8),
                         OutlinedButton.icon(
                           onPressed: _avatarUploading ? null : _pickAvatar,
-                          icon: const Icon(Icons.image_outlined, size: 16),
+                          icon: const Icon(Icons.image_outlined, size: 14),
                           label: Text(_avatarUploading ? 'Enviando...' : 'Escolher da galeria'),
-                          style: OutlinedButton.styleFrom(
-                            side: BorderSide(color: context.borderStrong),
-                            foregroundColor: context.textMuted,
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.pill)),
-                          ),
                         ),
                       ],
                     ),
@@ -1005,7 +999,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget _saveButton(String label, bool loading, VoidCallback onPressed, {bool dark = false}) {
     return SizedBox(
       width: double.infinity,
-      height: 46,
+      height: 42,
       child: ElevatedButton(
         style: dark
             ? ElevatedButton.styleFrom(
@@ -1016,7 +1010,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         onPressed: loading ? null : onPressed,
         child: loading
             ? const SizedBox(
-                width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white))
+                width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2.2, color: Colors.white))
             : Text(label),
       ),
     );

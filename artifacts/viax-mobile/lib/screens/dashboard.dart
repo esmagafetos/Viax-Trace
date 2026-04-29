@@ -187,8 +187,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             const SizedBox(height: 14),
             ElevatedButton(
               onPressed: () => context.go('/settings'),
-              style: ElevatedButton.styleFrom(shape: const StadiumBorder(), backgroundColor: context.accent),
-              child: const Text('Configurar agora', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600)),
+              child: const Text('Configurar agora'),
             ),
           ],
         ),
@@ -218,8 +217,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             const SizedBox(height: 14),
             ElevatedButton(
               onPressed: () => context.go('/settings'),
-              style: ElevatedButton.styleFrom(shape: const StadiumBorder(), backgroundColor: context.accent),
-              child: const Text('Configurar agora', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600)),
+              child: const Text('Configurar agora'),
             ),
           ],
         ),
@@ -506,24 +504,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ElevatedButton.icon(
             onPressed: () => context.go('/process'),
             icon: const Icon(Icons.upload_file_outlined, size: 16),
-            label: const Text('Nova Análise', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-            style: ElevatedButton.styleFrom(
-              shape: const StadiumBorder(),
-              backgroundColor: context.accent,
-              foregroundColor: Colors.white,
-              elevation: 0,
-            ),
+            label: const Text('Nova Análise'),
           ),
           OutlinedButton(
             onPressed: () => context.go('/history'),
-            style: OutlinedButton.styleFrom(
-              shape: const StadiumBorder(),
-              side: BorderSide(color: context.borderStrong),
-              foregroundColor: context.textMuted,
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-            ),
-            child: const Text('Ver Histórico',
-                style: TextStyle(fontWeight: FontWeight.w500, fontSize: 13)),
+            child: const Text('Ver Histórico'),
           ),
         ],
       );
@@ -770,14 +755,7 @@ class _HeroBanner extends StatelessWidget {
                   child: ElevatedButton.icon(
                     onPressed: onPrimary,
                     icon: const Icon(Icons.upload_file, size: 15),
-                    label: const Text('Nova Análise',
-                        style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                    style: ElevatedButton.styleFrom(
-                      shape: const StadiumBorder(),
-                      backgroundColor: const Color(0xFFD4521A),
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                    ),
+                    label: const Text('Nova Análise'),
                   ),
                 ),
               ],

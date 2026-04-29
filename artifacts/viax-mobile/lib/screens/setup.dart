@@ -53,6 +53,7 @@ class SetupScreen extends StatelessWidget {
                       const SizedBox(height: 24),
                       SizedBox(
                         width: double.infinity,
+                        height: 42,
                         child: ElevatedButton(
                           onPressed: () => context.go('/login'),
                           child: const Text('Entrar'),
@@ -61,13 +62,8 @@ class SetupScreen extends StatelessWidget {
                       const SizedBox(height: 10),
                       SizedBox(
                         width: double.infinity,
+                        height: 42,
                         child: OutlinedButton(
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            side: BorderSide(color: context.borderStrong),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.pill)),
-                            foregroundColor: context.text,
-                          ),
                           onPressed: () => context.go('/register'),
                           child: const Text('Criar conta'),
                         ),

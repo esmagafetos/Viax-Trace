@@ -132,16 +132,10 @@ class _LoginScreenState extends State<LoginScreen> {
                                   ),
                                   const SizedBox(height: 22),
                                   SizedBox(
-                                    height: 46,
+                                    height: 42,
+                                    width: double.infinity,
                                     child: ElevatedButton(
                                       onPressed: _loading ? null : _submit,
-                                      style: ElevatedButton.styleFrom(
-                                        shape: const StadiumBorder(),
-                                        backgroundColor: context.accent,
-                                        foregroundColor: Colors.white,
-                                        elevation: 0,
-                                        shadowColor: context.accent.withValues(alpha: 0.3),
-                                      ),
                                       child: _loading
                                           ? Row(
                                               mainAxisSize: MainAxisSize.min,

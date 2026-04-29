@@ -149,16 +149,7 @@ class _AnalysisDetailScreenState extends State<AnalysisDetailScreen> {
                       ElevatedButton.icon(
                         onPressed: () => context.go('/process'),
                         icon: const Icon(Icons.upload_file_outlined, size: 16),
-                        label: const Text('Ir para Processar',
-                            style: TextStyle(
-                                fontSize: 12.5,
-                                fontWeight: FontWeight.w600)),
-                        style: ElevatedButton.styleFrom(
-                          shape: const StadiumBorder(),
-                          backgroundColor: context.accent,
-                          foregroundColor: Colors.white,
-                          elevation: 0,
-                        ),
+                        label: const Text('Ir para Processar'),
                       ),
                     ],
                   ),

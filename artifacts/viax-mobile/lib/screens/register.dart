@@ -229,19 +229,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               ),
                               const SizedBox(height: 22),
                               SizedBox(
-                                height: 46,
+                                height: 42,
+                                width: double.infinity,
                                 child: ElevatedButton(
                                   onPressed: _loading ? null : _submit,
-                                  style: ElevatedButton.styleFrom(
-                                    shape: const StadiumBorder(),
-                                    backgroundColor: context.accent,
-                                    foregroundColor: Colors.white,
-                                    elevation: 0,
-                                  ),
                                   child: Text(
                                     _loading ? 'Criando conta...' : 'Criar conta',
-                                    style: const TextStyle(
-                                        fontWeight: FontWeight.w600, fontSize: 13.5),
                                   ),
                                 ),
                               ),
