@@ -588,14 +588,14 @@ export default function Settings() {
               <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
                 <div>
                   <div style={{ display: "flex", alignItems: "baseline", gap: "0.6rem" }}>
-                    <span style={{ fontSize: "1.4rem", fontWeight: 800, letterSpacing: "-0.03em" }}>ViaX<span style={{ opacity: 0.4, fontWeight: 300 }}>:</span> System</span>
+                    <span style={{ fontSize: "1.4rem", fontWeight: 800, letterSpacing: "-0.03em" }}>ViaX<span style={{ opacity: 0.4, fontWeight: 300 }}>:</span>Trace</span>
                     <span style={{ fontSize: "0.62rem", fontWeight: 700, padding: "0.15rem 0.55rem", borderRadius: 5, background: "var(--accent-dim)", color: "var(--accent)", letterSpacing: "0.06em" }}>v8.0</span>
                   </div>
-                  <div style={{ fontSize: "0.78rem", color: "var(--text-muted)", marginTop: "0.15rem" }}>Validação inteligente de rotas de entrega</div>
+                  <div style={{ fontSize: "0.78rem", color: "var(--text-muted)", marginTop: "0.15rem" }}>Auditoria inteligente de rotas de entrega</div>
                 </div>
               </div>
               <p style={{ fontSize: "0.82rem", color: "var(--text-muted)", lineHeight: 1.7, maxWidth: 620, margin: 0 }}>
-                Sistema de auditoria de rotas logísticas que valida endereços de planilhas de entrega contra coordenadas GPS reais via geocodificação reversa. Detecta automaticamente divergências entre o endereço informado e o local de coleta, gerando relatórios de nuances para análise operacional.
+                O ViaX:Trace nasceu para ajudar motoristas a entenderem com clareza as nuances do trajeto — termo que usamos para endereços cujas coordenadas da rota não batem com o local correto. O sistema valida cada coordenada GPS e confere se o nome da rua informado condiz com o nome da rua no mapa. Com o tempo, fomos aprimorando o motor e somando novas funções, dando origem à plataforma de auditoria que você usa hoje.
               </p>
             </div>
           </div>

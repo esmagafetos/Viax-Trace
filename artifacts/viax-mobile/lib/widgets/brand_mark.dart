@@ -139,6 +139,18 @@ class BrandLockup extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // When [dark] is true, force the cream/light foreground regardless of the
+    // active theme — used inside the dashboard hero gradient where the
+    // background is always dark even in light mode.
+    final wordmarkColor = dark ? const Color(0xFFF0EDE8) : context.text;
+    final separatorColor = dark
+        ? const Color(0xFFF0EDE8).withValues(alpha: 0.45)
+        : context.textFaint;
+    final taglineColor = dark
+        ? const Color(0xFFF0EDE8).withValues(alpha: 0.55)
+        : context.textFaint;
+    final glyphColor = dark ? const Color(0xFFF0EDE8) : context.text;
+
     final wordmark = RichText(
       textAlign: horizontal ? TextAlign.left : TextAlign.center,
       text: TextSpan(
@@ -146,14 +158,14 @@ class BrandLockup extends StatelessWidget {
           fontSize: wordmarkSize,
           fontWeight: FontWeight.w800,
           letterSpacing: -0.5,
-          color: context.text,
+          color: wordmarkColor,
           height: 1.05,
         ),
         children: [
           const TextSpan(text: 'ViaX'),
           TextSpan(
             text: ':',
-            style: TextStyle(color: context.textFaint, fontWeight: FontWeight.w300),
+            style: TextStyle(color: separatorColor, fontWeight: FontWeight.w300),
           ),
           const TextSpan(text: 'Trace'),
         ],
@@ -166,7 +178,7 @@ class BrandLockup extends StatelessWidget {
         fontSize: 9,
         fontWeight: FontWeight.w600,
         letterSpacing: 1.4,
-        color: context.textFaint,
+        color: taglineColor,
       ),
     );
 
@@ -175,7 +187,7 @@ class BrandLockup extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          BrandMark(size: markSize, withBackground: false),
+          BrandMark(size: markSize, withBackground: false, glyphColor: glyphColor),
           const SizedBox(width: 10),
           Column(
             mainAxisSize: MainAxisSize.min,

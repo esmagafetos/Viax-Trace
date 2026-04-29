@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 
 import 'api/api_client.dart';
 import 'router.dart';
+import 'screens/splash.dart';
 import 'services/haptics.dart';
 import 'state/auth_provider.dart';
 import 'state/foreground_processing.dart';
@@ -64,11 +65,25 @@ class ViaXApp extends StatelessWidget {
             themeMode: theme.mode,
             routerConfig: router,
             builder: (ctx, child) {
+              // While the auth bootstrap is in flight (cold start can take
+              // 30-60s on Render free tier), hold a branded splash so the
+              // app opens linearly instead of flashing login → dashboard.
+              final body = auth.loading
+                  ? const SplashScreen()
+                  : (child ?? const SizedBox.shrink());
               return MediaQuery(
                 data: MediaQuery.of(ctx).copyWith(textScaler: const TextScaler.linear(1.0)),
                 child: DefaultTextStyle.merge(
                   style: GoogleFonts.poppins(),
-                  child: child ?? const SizedBox.shrink(),
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 280),
+                    switchInCurve: Curves.easeOutCubic,
+                    switchOutCurve: Curves.easeInCubic,
+                    child: KeyedSubtree(
+                      key: ValueKey<bool>(auth.loading),
+                      child: body,
+                    ),
+                  ),
                 ),
               );
             },

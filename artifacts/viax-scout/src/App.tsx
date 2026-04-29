@@ -10,6 +10,7 @@ import Tool from "@/pages/Tool";
 import History from "@/pages/History";
 import Settings from "@/pages/Settings";
 import Docs from "@/pages/Docs";
+import SplashScreen from "@/components/SplashScreen";
 import { useEffect, useRef, useState } from "react";
 
 const queryClient = new QueryClient({
@@ -56,12 +57,6 @@ function PageTransition({ children }: { children: React.ReactNode }) {
   );
 }
 
-const LoadingSpinner = () => (
-  <div style={{ minHeight: "100vh", background: "var(--bg)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-    <div style={{ width: 40, height: 40, border: "2px solid var(--border-strong)", borderTopColor: "var(--accent)", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
-  </div>
-);
-
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
   const { isAuthenticated, isLoading } = useAuth();
   const [, navigate] = useLocation();
@@ -70,7 +65,7 @@ function ProtectedRoute({ component: Component }: { component: React.ComponentTy
     if (!isLoading && !isAuthenticated) navigate("/login");
   }, [isLoading, isAuthenticated, navigate]);
 
-  if (isLoading) return <LoadingSpinner />;
+  if (isLoading) return <SplashScreen />;
   if (!isAuthenticated) return null;
   return <Component />;
 }
@@ -83,12 +78,18 @@ function PublicRoute({ component: Component }: { component: React.ComponentType 
     if (!isLoading && isAuthenticated) navigate("/dashboard");
   }, [isLoading, isAuthenticated, navigate]);
 
-  if (isLoading) return <LoadingSpinner />;
+  if (isLoading) return <SplashScreen />;
   return <Component />;
 }
 
 function AppRoutes() {
+  const { isLoading } = useAuth();
   const [location] = useLocation();
+
+  // Hold the splash for the entire bootstrap so we don't briefly flash the
+  // login or any public page before redirecting authenticated users.
+  if (isLoading) return <SplashScreen />;
+
   return (
     <PageTransition key={location}>
       <Switch>
