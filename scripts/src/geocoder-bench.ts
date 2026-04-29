@@ -182,7 +182,6 @@ async function runLivePipeline(rows: RowIn[]) {
       );
       out.push({
         source: r.source,
-        linha: r.linha,
         endereco: r.endereco,
         lat: r.lat,
         lon: r.lon,
