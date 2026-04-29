@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 
 import 'api/api_client.dart';
 import 'router.dart';
+import 'services/haptics.dart';
 import 'state/auth_provider.dart';
 import 'state/foreground_processing.dart';
 import 'state/processing_service.dart';
@@ -27,6 +28,8 @@ Future<void> main() async {
 
   final themeProv = ThemeProvider();
   await themeProv.load();
+
+  await AppHaptics.load();
 
   runApp(ViaXApp(api: api, themeProv: themeProv));
 }

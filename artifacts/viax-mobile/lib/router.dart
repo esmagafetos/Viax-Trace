@@ -8,11 +8,32 @@ import 'screens/history.dart';
 import 'screens/login.dart';
 import 'screens/process.dart';
 import 'screens/register.dart';
+import 'screens/server_status.dart';
 import 'screens/settings.dart';
 import 'screens/setup.dart';
 import 'screens/tool.dart';
 import 'state/auth_provider.dart';
 import 'theme/theme.dart';
+
+/// Soft fade-only page transition used across the entire app — gives the
+/// "Replit-like" smoothness the user requested. No slide, no scale, no zoom:
+/// just opacity 0→1 over 220ms with an easeOutCubic curve so it feels native
+/// and unobtrusive.
+CustomTransitionPage<T> _fadePage<T>({
+  required LocalKey key,
+  required Widget child,
+}) {
+  return CustomTransitionPage<T>(
+    key: key,
+    child: child,
+    transitionDuration: const Duration(milliseconds: 220),
+    reverseTransitionDuration: const Duration(milliseconds: 180),
+    transitionsBuilder: (_, animation, __, c) {
+      final curved = CurvedAnimation(parent: animation, curve: Curves.easeOutCubic);
+      return FadeTransition(opacity: curved, child: c);
+    },
+  );
+}
 
 GoRouter createRouter(AuthProvider auth) {
   return GoRouter(
@@ -28,22 +49,53 @@ GoRouter createRouter(AuthProvider auth) {
       return null;
     },
     routes: [
-      GoRoute(path: '/setup', builder: (_, __) => const SetupScreen()),
-      GoRoute(path: '/login', builder: (_, __) => const LoginScreen()),
-      GoRoute(path: '/register', builder: (_, __) => const RegisterScreen()),
-      GoRoute(path: '/dashboard', builder: (_, __) => const DashboardScreen()),
-      GoRoute(path: '/process', builder: (_, __) => const ProcessScreen()),
-      GoRoute(path: '/tool', builder: (_, __) => const ToolScreen()),
-      GoRoute(path: '/history', builder: (_, __) => const HistoryScreen()),
+      GoRoute(
+        path: '/setup',
+        pageBuilder: (_, st) => _fadePage(key: st.pageKey, child: const SetupScreen()),
+      ),
+      GoRoute(
+        path: '/login',
+        pageBuilder: (_, st) => _fadePage(key: st.pageKey, child: const LoginScreen()),
+      ),
+      GoRoute(
+        path: '/register',
+        pageBuilder: (_, st) => _fadePage(key: st.pageKey, child: const RegisterScreen()),
+      ),
+      GoRoute(
+        path: '/dashboard',
+        pageBuilder: (_, st) => _fadePage(key: st.pageKey, child: const DashboardScreen()),
+      ),
+      GoRoute(
+        path: '/process',
+        pageBuilder: (_, st) => _fadePage(key: st.pageKey, child: const ProcessScreen()),
+      ),
+      GoRoute(
+        path: '/tool',
+        pageBuilder: (_, st) => _fadePage(key: st.pageKey, child: const ToolScreen()),
+      ),
+      GoRoute(
+        path: '/history',
+        pageBuilder: (_, st) => _fadePage(key: st.pageKey, child: const HistoryScreen()),
+      ),
       GoRoute(
         path: '/history/:id',
-        builder: (_, st) {
+        pageBuilder: (_, st) {
           final id = int.tryParse(st.pathParameters['id'] ?? '') ?? 0;
-          return AnalysisDetailScreen(id: id);
+          return _fadePage(key: st.pageKey, child: AnalysisDetailScreen(id: id));
         },
       ),
-      GoRoute(path: '/settings', builder: (_, __) => const SettingsScreen()),
-      GoRoute(path: '/docs', builder: (_, __) => const DocsScreen()),
+      GoRoute(
+        path: '/settings',
+        pageBuilder: (_, st) => _fadePage(key: st.pageKey, child: const SettingsScreen()),
+      ),
+      GoRoute(
+        path: '/server-status',
+        pageBuilder: (_, st) => _fadePage(key: st.pageKey, child: const ServerStatusScreen()),
+      ),
+      GoRoute(
+        path: '/docs',
+        pageBuilder: (_, st) => _fadePage(key: st.pageKey, child: const DocsScreen()),
+      ),
     ],
     errorBuilder: (ctx, st) => Scaffold(
       backgroundColor: ctx.bg,

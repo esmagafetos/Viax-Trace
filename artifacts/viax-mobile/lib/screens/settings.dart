@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -6,6 +7,7 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../api/api_client.dart';
+import '../services/haptics.dart';
 import '../state/auth_provider.dart';
 import '../state/settings_provider.dart';
 import '../theme/theme.dart';
@@ -46,6 +48,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _savingPwd = false;
   bool _savingSettings = false;
 
+  // Haptics toggle (mirrors AppHaptics.enabled, persisted device-locally)
+  bool _hapticsEnabled = AppHaptics.enabled;
+
+  // AI parser key live validation (debounced 1.5s)
+  Timer? _aiKeyDebounce;
+  bool _aiKeyTesting = false;
+  Map<String, dynamic>? _aiKeyStatus;
+
+  // Geocoding providers live status (auto-refreshes while Instâncias is open)
+  Map<String, dynamic>? _providerStatuses;
+  bool _providersLoading = false;
+  Timer? _providersTimer;
+
   @override
   void initState() {
     super.initState();
@@ -57,6 +72,93 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _birthDate = u?.birthDate ?? '';
       if (mounted) setState(() {});
     });
+    // Debounced AI key validation while user types.
+    _aiApiKey.addListener(_scheduleAiKeyTest);
+  }
+
+  @override
+  void dispose() {
+    _aiKeyDebounce?.cancel();
+    _providersTimer?.cancel();
+    _aiApiKey.removeListener(_scheduleAiKeyTest);
+    super.dispose();
+  }
+
+  // ── AI key live validation ────────────────────────────────────────
+  void _scheduleAiKeyTest() {
+    _aiKeyDebounce?.cancel();
+    final key = _aiApiKey.text.trim();
+    final provider = _aiProvider.trim();
+    if (key.isEmpty || provider.isEmpty) {
+      if (_aiKeyStatus != null && mounted) {
+        setState(() => _aiKeyStatus = null);
+      }
+      return;
+    }
+    _aiKeyDebounce = Timer(const Duration(milliseconds: 1500), _runAiKeyTest);
+  }
+
+  Future<void> _runAiKeyTest() async {
+    final key = _aiApiKey.text.trim();
+    final provider = _aiProvider.trim();
+    if (key.isEmpty || provider.isEmpty) return;
+    if (!mounted) return;
+    setState(() => _aiKeyTesting = true);
+    try {
+      final res = await context.read<ApiClient>().testAiKey(provider, key);
+      if (!mounted) return;
+      // Make sure the field hasn't changed since we started — discard stale.
+      if (_aiApiKey.text.trim() != key || _aiProvider.trim() != provider) return;
+      setState(() {
+        _aiKeyStatus = res;
+        _aiKeyTesting = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _aiKeyStatus = {'ok': false, 'message': 'Sem conexão.'};
+        _aiKeyTesting = false;
+      });
+    }
+  }
+
+  // ── Provider status periodic refresh (every 30s on Instâncias tab) ─
+  Future<void> _loadProvidersNow() async {
+    if (_providersLoading) return;
+    if (mounted) setState(() => _providersLoading = true);
+    try {
+      final res = await context.read<ApiClient>().getProvidersStatus();
+      if (!mounted) return;
+      setState(() {
+        _providerStatuses = res;
+        _providersLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _providersLoading = false);
+    }
+  }
+
+  void _startProvidersTimer() {
+    _providersTimer?.cancel();
+    _loadProvidersNow();
+    _providersTimer = Timer.periodic(const Duration(seconds: 30), (_) => _loadProvidersNow());
+  }
+
+  void _stopProvidersTimer() {
+    _providersTimer?.cancel();
+    _providersTimer = null;
+  }
+
+  void _switchTab(String tab) {
+    if (_activeTab == tab) return;
+    AppHaptics.selection();
+    setState(() => _activeTab = tab);
+    if (tab == 'instancias') {
+      _startProvidersTimer();
+    } else {
+      _stopProvidersTimer();
+    }
   }
 
   void _hydrate() {
@@ -132,6 +234,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _saveSettings() async {
+    AppHaptics.tap();
     setState(() => _savingSettings = true);
     try {
       await context.read<SettingsProvider>().save({
@@ -148,9 +251,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
         'despesasFixasMensais':
             _despesasFixasMensais.text.isEmpty ? null : double.tryParse(_despesasFixasMensais.text),
       });
-      if (mounted) showToast(context, 'Configurações salvas!', success: true);
+      if (mounted) {
+        AppHaptics.success();
+        showToast(context, 'Configurações salvas!', success: true);
+      }
     } catch (_) {
-      if (mounted) showToast(context, 'Erro ao salvar configurações.');
+      if (mounted) {
+        AppHaptics.error();
+        showToast(context, 'Erro ao salvar configurações.');
+      }
     } finally {
       if (mounted) setState(() => _savingSettings = false);
     }
@@ -195,12 +304,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const SizedBox(height: 16),
           _tabs(),
           const SizedBox(height: 16),
-          if (_activeTab == 'perfil') _perfilTab(user),
-          if (_activeTab == 'financeiro') _financeiroTab(),
-          if (_activeTab == 'instancias') _instanciasTab(),
-          if (_activeTab == 'parser') _parserTab(),
-          if (_activeTab == 'tolerancia') _toleranciaTab(),
-          if (_activeTab == 'sobre') _sobreTab(),
+          // Soft fade between sub-tabs to match the global page-transition
+          // language (no slide, just opacity, easeOutCubic 220ms).
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 220),
+            switchInCurve: Curves.easeOutCubic,
+            switchOutCurve: Curves.easeInCubic,
+            transitionBuilder: (child, anim) => FadeTransition(opacity: anim, child: child),
+            child: KeyedSubtree(
+              key: ValueKey(_activeTab),
+              child: _activeTab == 'perfil'
+                  ? _perfilTab(user)
+                  : _activeTab == 'financeiro'
+                      ? _financeiroTab()
+                      : _activeTab == 'instancias'
+                          ? _instanciasTab()
+                          : _activeTab == 'parser'
+                              ? _parserTab()
+                              : _activeTab == 'tolerancia'
+                                  ? _toleranciaTab()
+                                  : _sobreTab(),
+            ),
+          ),
         ],
       ),
     );
@@ -223,7 +348,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             Padding(
               padding: const EdgeInsets.only(right: 6),
               child: GestureDetector(
-                onTap: () => setState(() => _activeTab = t.$1),
+                onTap: () => _switchTab(t.$1),
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                   decoration: BoxDecoration(
@@ -323,6 +448,38 @@ class _SettingsScreenState extends State<SettingsScreen> {
               TextField(controller: TextEditingController(text: user?.email ?? ''), enabled: false),
               const SizedBox(height: 16),
               _saveButton('Salvar Perfil', _savingProfile, _saveProfile),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+        CardSection(
+          header: const CardHeaderLabel('Preferências do Dispositivo'),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Vibração tátil',
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: context.text)),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Resposta sutil ao tocar em botões e abas. Salva apenas neste dispositivo.',
+                      style: TextStyle(fontSize: 11, color: context.textFaint, height: 1.4),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Switch.adaptive(
+                value: _hapticsEnabled,
+                activeThumbColor: context.accent,
+                onChanged: (v) async {
+                  await AppHaptics.setEnabled(v);
+                  if (v) AppHaptics.tap();
+                  if (mounted) setState(() => _hapticsEnabled = v);
+                },
+              ),
             ],
           ),
         ),
@@ -459,6 +616,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ],
           const SizedBox(height: 16),
           _saveButton('Salvar Instância', _savingSettings, _saveSettings),
+          const SizedBox(height: 14),
+          _providerStatusCard(),
         ],
       ),
     );
@@ -517,9 +676,156 @@ class _SettingsScreenState extends State<SettingsScreen> {
             const SizedBox(height: 10),
             _label('CHAVE DE API'),
             TextField(controller: _aiApiKey, obscureText: true, decoration: const InputDecoration(hintText: 'sk-... ou AIza...')),
+            const SizedBox(height: 8),
+            _aiKeyStatusBadge(),
           ],
           const SizedBox(height: 16),
           _saveButton('Salvar Parser', _savingSettings, _saveSettings),
+        ],
+      ),
+    );
+  }
+
+  /// Live status indicator under the AI key field. Shows verifying state
+  /// while debounce/test is running and a green/red badge with the provider's
+  /// response message after.
+  Widget _aiKeyStatusBadge() {
+    if (_aiKeyTesting) {
+      return Row(
+        children: [
+          const AppSpinner(size: 12),
+          const SizedBox(width: 8),
+          Text('Verificando chave...',
+              style: TextStyle(fontSize: 11.5, color: context.textFaint, fontWeight: FontWeight.w500)),
+        ],
+      );
+    }
+    final status = _aiKeyStatus;
+    if (status == null) {
+      if (_aiApiKey.text.trim().isEmpty || _aiProvider.isEmpty) return const SizedBox.shrink();
+      return Text('Aguardando validação...',
+          style: TextStyle(fontSize: 11.5, color: context.textFaint));
+    }
+    final ok = status['ok'] == true;
+    final color = ok ? const Color(0xFF10B981) : const Color(0xFFEF4444);
+    final msg = (status['message'] as String?) ?? '';
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.10),
+        border: Border.all(color: color.withValues(alpha: 0.45)),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          Icon(ok ? Icons.check_circle : Icons.error_outline, size: 14, color: color),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              ok ? 'Online · $msg' : msg,
+              style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: color),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Compact provider-status card injected at the bottom of the Instâncias
+  /// tab. Auto-refreshes every 30s while this tab is visible.
+  Widget _providerStatusCard() {
+    final providers = _providerStatuses?['providers'] as Map<String, dynamic>?;
+    return CardSection(
+      header: Row(
+        children: [
+          const Expanded(child: CardHeaderLabel('Status dos Provedores')),
+          if (_providersLoading)
+            const AppSpinner(size: 12)
+          else
+            InkWell(
+              onTap: () {
+                AppHaptics.tap();
+                _loadProvidersNow();
+              },
+              borderRadius: BorderRadius.circular(6),
+              child: Padding(
+                padding: const EdgeInsets.all(4),
+                child: Icon(Icons.refresh, size: 16, color: context.textMuted),
+              ),
+            ),
+        ],
+      ),
+      child: providers == null
+          ? Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: Text(
+                _providersLoading ? 'Verificando...' : 'Nenhuma medição ainda.',
+                style: TextStyle(fontSize: 12, color: context.textFaint),
+              ),
+            )
+          : Column(
+              children: [
+                for (final entry in const [
+                  'photon',
+                  'nominatim',
+                  'brasilApi',
+                  'overpass',
+                  'geocodebr',
+                  'googlemaps',
+                ])
+                  if (providers[entry] != null)
+                    _providerRow(providers[entry] as Map<String, dynamic>),
+              ],
+            ),
+    );
+  }
+
+  Widget _providerRow(Map<String, dynamic> p) {
+    final configured = p['configured'] != false;
+    final ok = configured && (p['ok'] == true);
+    final latency = p['latencyMs'] as int?;
+    final name = (p['name'] as String?) ?? '?';
+    final color = !configured
+        ? context.textFaint
+        : ok
+            ? const Color(0xFF10B981)
+            : const Color(0xFFEF4444);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        children: [
+          Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              name,
+              style: TextStyle(
+                fontSize: 12.5,
+                color: !configured ? context.textFaint : context.text,
+                fontWeight: FontWeight.w500,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          if (!configured)
+            Text('Não configurado',
+                style: TextStyle(fontSize: 11, color: context.textFaint))
+          else if (latency != null)
+            Text('${latency}ms',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: context.textMuted,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ))
+          else
+            Text(ok ? 'OK' : 'Off', style: TextStyle(fontSize: 11, color: color)),
         ],
       ),
     );

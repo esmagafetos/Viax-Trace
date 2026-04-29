@@ -9,6 +9,7 @@ import '../state/processing_service.dart';
 import '../state/theme_provider.dart';
 import '../theme/theme.dart';
 import 'brand_mark.dart';
+import '../services/haptics.dart';
 import 'user_avatar.dart';
 
 /// Shared scaffold espelhando 1:1 o `Layout.tsx` do web:
@@ -284,7 +285,10 @@ class _ThemeToggle extends StatelessWidget {
         shape: CircleBorder(side: BorderSide(color: context.border)),
         child: InkWell(
           customBorder: const CircleBorder(),
-          onTap: theme.toggle,
+          onTap: () {
+            AppHaptics.selection();
+            theme.toggle();
+          },
           child: SizedBox(
             width: 34,
             height: 34,
@@ -372,6 +376,17 @@ class _ProfileMenu extends StatelessWidget {
           ),
         ),
         PopupMenuItem<String>(
+          value: '/server-status',
+          height: 40,
+          child: Row(
+            children: [
+              Icon(Icons.dns_outlined, size: 16, color: context.textMuted),
+              const SizedBox(width: 10),
+              Text('Status do servidor', style: TextStyle(color: context.text, fontSize: 13)),
+            ],
+          ),
+        ),
+        PopupMenuItem<String>(
           value: '/docs',
           height: 40,
           child: Row(
@@ -401,6 +416,7 @@ class _ProfileMenu extends StatelessWidget {
         ),
       ],
       onSelected: (v) async {
+        AppHaptics.selection();
         if (v == 'logout') {
           await context.read<AuthProvider>().logout();
           if (context.mounted) context.go('/login');

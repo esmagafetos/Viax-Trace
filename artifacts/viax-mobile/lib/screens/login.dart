@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../api/api_client.dart';
+import '../services/haptics.dart';
 import '../state/auth_provider.dart';
 import '../state/theme_provider.dart';
 import '../theme/theme.dart';
@@ -29,18 +30,29 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _submit() async {
+    AppHaptics.tap();
     if (_email.text.trim().isEmpty || _password.text.isEmpty) {
+      AppHaptics.error();
       showToast(context, 'Credenciais inválidas.');
       return;
     }
     setState(() => _loading = true);
     try {
       await context.read<AuthProvider>().login(_email.text.trim(), _password.text);
-      if (mounted) context.go('/dashboard');
+      if (mounted) {
+        AppHaptics.success();
+        context.go('/dashboard');
+      }
     } on ApiError catch (e) {
-      if (mounted) showToast(context, e.message);
+      if (mounted) {
+        AppHaptics.error();
+        showToast(context, e.message);
+      }
     } catch (_) {
-      if (mounted) showToast(context, 'Credenciais inválidas.');
+      if (mounted) {
+        AppHaptics.error();
+        showToast(context, 'Credenciais inválidas.');
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }

@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../api/api_client.dart';
+import '../services/haptics.dart';
 import '../state/auth_provider.dart';
 import '../state/theme_provider.dart';
 import '../theme/theme.dart';
@@ -70,6 +71,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   Future<void> _submit() async {
+    AppHaptics.tap();
     setState(() {
       _touched['name'] = true;
       _touched['email'] = true;

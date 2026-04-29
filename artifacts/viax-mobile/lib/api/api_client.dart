@@ -97,6 +97,30 @@ class ApiClient {
     if (r.statusCode != 200) throw ApiError(r.statusCode ?? 0, _err(r.data));
   }
 
+  // ── Diagnostics ────────────────────────────────────────────────────
+  /// Public endpoint — returns operator-defined maintenance message (or null).
+  Future<Map<String, dynamic>> getMaintenance() async {
+    final r = await dio.get('/diag/maintenance');
+    return Map<String, dynamic>.from(r.data as Map);
+  }
+
+  /// Authenticated — pings every geocoding provider and returns each one's
+  /// reachability + latency.
+  Future<Map<String, dynamic>> getProvidersStatus() async {
+    final r = await dio.get('/diag/providers');
+    return Map<String, dynamic>.from(r.data as Map);
+  }
+
+  /// Authenticated — validates an AI provider key against the provider's
+  /// model-list endpoint. Returns { ok, status, latencyMs, message }.
+  Future<Map<String, dynamic>> testAiKey(String provider, String apiKey) async {
+    final r = await dio.post('/diag/ai-key', data: {
+      'provider': provider,
+      'apiKey': apiKey,
+    });
+    return Map<String, dynamic>.from(r.data as Map);
+  }
+
   Future<Map<String, dynamic>> getSettings() async {
     final r = await dio.get('/users/settings');
     if (r.statusCode == 200) return Map<String, dynamic>.from(r.data as Map);
