@@ -6,7 +6,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-orange.svg?style=flat-square)](https://opensource.org/licenses/MIT)
 [![Backend](https://img.shields.io/badge/Backend-Render-46E3B7?style=flat-square&logo=render&logoColor=white)](https://viax-trace-api.onrender.com)
-[![Mobile](https://img.shields.io/badge/Mobile-Android-3DDC84?style=flat-square&logo=android&logoColor=white)](https://github.com/esmagafetos/Viax-Scout/releases)
+[![Mobile](https://img.shields.io/badge/Mobile-Android-3DDC84?style=flat-square&logo=android&logoColor=white)](https://github.com/esmagafetos/Viax-Trace/releases)
 [![Node.js](https://img.shields.io/badge/Node.js-20%2B-339933?style=flat-square&logo=node.js&logoColor=white)](https://nodejs.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org)
 [![React](https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=black)](https://react.dev)
@@ -48,7 +48,7 @@ Operações logísticas urbanas frequentemente recebem planilhas de roteirizaç�
 |---|---|---|
 | Backend | **Em produção** | `https://viax-trace-api.onrender.com` (Render + Postgres 16 gerenciado) |
 | Frontend web | **Estável** | Self-host via Docker ou instaladores assistidos |
-| App Android | **Estável** | APKs publicados em [Releases](https://github.com/esmagafetos/Viax-Scout/releases) |
+| App Android | **Estável** | APKs publicados em [Releases](https://github.com/esmagafetos/Viax-Trace/releases) |
 | App iOS | **Beta** | Build não-assinado disponível em CI artifacts |
 | GeocodeR BR (microserviço) | **Em planejamento** | Próxima etapa: hospedagem dedicada conectada ao backend |
 
@@ -58,13 +58,13 @@ Operações logísticas urbanas frequentemente recebem planilhas de roteirizaç�
 
 Para usuários finais o caminho é direto: **baixar o app e fazer login**. Nenhuma configuração de servidor, IP ou porta é necessária — o backend oficial já vem embutido.
 
-1. Acesse a página de [**Releases**](https://github.com/esmagafetos/Viax-Scout/releases) e baixe o `viax-trace-vX.Y.Z.apk` mais recente.
+1. Acesse a página de [**Releases**](https://github.com/esmagafetos/Viax-Trace/releases) e baixe o `viax-trace-vX.Y.Z.apk` mais recente.
 2. No Android, autorize a instalação de **fontes desconhecidas** quando solicitado.
 3. Abra o app, toque em **Criar conta** ou **Entrar** — pronto.
 
 | Quero… | Vá para |
 |---|---|
-| Usar agora pelo celular Android | [Releases](https://github.com/esmagafetos/Viax-Scout/releases) |
+| Usar agora pelo celular Android | [Releases](https://github.com/esmagafetos/Viax-Trace/releases) |
 | Usar pelo navegador (web) | [Self-host — Docker](#docker-recomendado) |
 | Subir minha própria instância | [Self-host opcional](#self-host-opcional) |
 | Contribuir com o código | [Contribuindo](#contribuindo) |
@@ -77,7 +77,7 @@ O app nativo (`artifacts/viax-mobile/`) é construído em **Flutter 3.24** e ofe
 
 **Como instalar (usuário final):**
 
-1. Baixe o APK mais recente em [Releases](https://github.com/esmagafetos/Viax-Scout/releases).
+1. Baixe o APK mais recente em [Releases](https://github.com/esmagafetos/Viax-Trace/releases).
 2. Instale e abra — o backend oficial já vem configurado.
 3. Faça login com a mesma conta usada na web (ou crie uma na hora).
 
@@ -115,6 +115,7 @@ O app nativo (`artifacts/viax-mobile/`) é construído em **Flutter 3.24** e ofe
 | Ferramenta de Condomínios | Ordenação inteligente de rotas dentro de condomínios mapeados (Quadra/Lote) |
 | Autenticação segura | Sessões com bcrypt, avatar e perfil de usuário |
 | Tema escuro / claro | Preferência salva com alternância instantânea |
+| Splash de boot resiliente | Tela inicial com indicador de "acordando o servidor" para cold start no Render |
 
 ---
 
@@ -223,8 +224,8 @@ docker compose logs -f api
 
 ```bash
 # 1. Clone
-git clone https://github.com/esmagafetos/Viax-Scout.git
-cd Viax-Scout
+git clone https://github.com/esmagafetos/Viax-Trace.git
+cd Viax-Trace
 
 # 2. Instale as dependências
 pnpm install
@@ -244,8 +245,8 @@ pnpm run dev
 
 | Plataforma | Comando |
 |---|---|
-| Linux / macOS | `curl -fsSL https://raw.githubusercontent.com/esmagafetos/Viax-Scout/main/install.sh \| bash` |
-| Windows (PowerShell admin) | `iwr -useb https://raw.githubusercontent.com/esmagafetos/Viax-Scout/main/install.ps1 \| iex` |
+| Linux / macOS | `curl -fsSL https://raw.githubusercontent.com/esmagafetos/Viax-Trace/main/install.sh \| bash` |
+| Windows (PowerShell admin) | `iwr -useb https://raw.githubusercontent.com/esmagafetos/Viax-Trace/main/install.ps1 \| iex` |
 
 ### Configuração
 
@@ -381,7 +382,7 @@ git commit -m "feat: descrição curta da mudança"
 
 ### Reportar bugs
 
-Abra uma [issue](https://github.com/esmagafetos/Viax-Scout/issues/new?template=bug_report.md) descrevendo:
+Abra uma [issue](https://github.com/esmagafetos/Viax-Trace/issues/new?template=bug_report.md) descrevendo:
 
 - Passos para reproduzir
 - Comportamento esperado vs. observado
@@ -401,6 +402,6 @@ Distribuído sob a licença **MIT**. Veja [LICENSE](LICENSE) para detalhes.
 
 <div align="center">
 
-Desenvolvido por [esmagafetos](https://github.com/esmagafetos) · [Releases](https://github.com/esmagafetos/Viax-Scout/releases) · [Issues](https://github.com/esmagafetos/Viax-Scout/issues) · [Backend ao vivo](https://viax-trace-api.onrender.com)
+Desenvolvido por [esmagafetos](https://github.com/esmagafetos) · [Releases](https://github.com/esmagafetos/Viax-Trace/releases) · [Issues](https://github.com/esmagafetos/Viax-Trace/issues) · [Backend ao vivo](https://viax-trace-api.onrender.com)
 
 </div>
