@@ -8,25 +8,36 @@ library(geocodebr)
 # Marcador de versão deste arquivo — facilita confirmar "o servidor recarregou
 # o plumber.R novo" sem precisar grep do disco. Aparece no log de startup
 # (start.R) e numa resposta HTTP do /version.
-.PLUMBER_VERSION <- "2026-04-30.enderecobr-explicit"
+.PLUMBER_VERSION <- "2026-04-30.enderecobr-named-args"
 cat(sprintf("[plumber.R] carregado (versao=%s)\n", .PLUMBER_VERSION))
 
-# Chamar enderecobr explicitamente (em vez de delegar para o
-# `padronizar_enderecos = TRUE` interno do geocodebr) evita um bug de
-# pareamento de versões: geocodebr 0.6.2 espera um marker/atributo que o
-# enderecobr 0.5.0 (única versão pré-compilada para arm64) não produz da
-# forma esperada. Padronizando aqui antes da chamada, o `geocode()`
-# detecta que os dados já vieram padronizados e segue direto.
+# Loga a assinatura real da enderecobr::padronizar_enderecos no startup, para
+# que qualquer mudança futura de API fique imediatamente visível.
+if (requireNamespace("enderecobr", quietly = TRUE)) {
+  .args_padroniza <- names(formals(enderecobr::padronizar_enderecos))
+  cat(sprintf("[plumber.R] enderecobr::padronizar_enderecos args = %s\n",
+              paste(.args_padroniza, collapse = ", ")))
+}
+
+# Chamar enderecobr explicitamente em vez de delegar para o `padronizar_enderecos
+# = TRUE` interno do geocodebr: assim contornamos qualquer mismatch de versão
+# entre geocodebr 0.6.2 e enderecobr 0.5.0 (única versão pré-compilada arm64).
+#
+# enderecobr 0.5.0 NÃO recebe `campos_endereco`; cada coluna é passada como
+# argumento próprio cujo VALOR é o nome da coluna no data.frame. O argumento
+# de coluna ausente deve ser NULL.
 .padronizar <- function(df, tem_estado) {
   if (!requireNamespace("enderecobr", quietly = TRUE)) {
     stop("Pacote 'enderecobr' nao instalado. Rode bash install-geocodebr-termux.sh")
   }
   enderecobr::padronizar_enderecos(
-    enderecos        = df,
-    campos_endereco  = if (tem_estado) c("logradouro","numero","municipio","estado")
-                       else            c("logradouro","numero","municipio"),
-    formato_estados  = "sigla",
-    formato_numeros  = "integer"
+    enderecos       = df,
+    logradouro      = "logradouro",
+    numero          = "numero",
+    municipio       = "municipio",
+    estado          = if (tem_estado) "estado" else NULL,
+    formato_estados = "sigla",
+    formato_numeros = "integer"
   )
 }
 
