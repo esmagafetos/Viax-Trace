@@ -5,7 +5,7 @@
 # =============================================================================
 library(geocodebr)
 
-.PLUMBER_VERSION <- "2026-04-30.cep-bairro-na"
+.PLUMBER_VERSION <- "2026-04-30.apikey"
 cat(sprintf("[plumber.R] carregado (versao=%s)\n", .PLUMBER_VERSION))
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -45,8 +45,27 @@ cat(sprintf("[plumber.R] carregado (versao=%s)\n", .PLUMBER_VERSION))
 function(req, res) {
   res$setHeader("Access-Control-Allow-Origin",  "*")
   res$setHeader("Access-Control-Allow-Methods", "GET, OPTIONS")
-  res$setHeader("Access-Control-Allow-Headers", "Content-Type")
+  res$setHeader("Access-Control-Allow-Headers", "Content-Type, X-API-Key")
   if (req$REQUEST_METHOD == "OPTIONS") { res$status <- 200; return(list()) }
+  plumber::forward()
+}
+
+# Filtro de autenticação por chave de API. Roda APÓS o cors (filtros plumber
+# rodam em ordem de declaração no arquivo) para que preflight OPTIONS sempre
+# responda sem 401. Endpoints públicos /health e /version são liberados pra
+# permitir keep-alive (UptimeRobot etc.) e diagnóstico anônimo.
+#* @filter apikey
+function(req, res) {
+  expected <- Sys.getenv("VIAX_API_KEY", "")
+  # Sem VIAX_API_KEY definida = modo dev (sem auth). Não usar publico.
+  if (!nzchar(expected)) return(plumber::forward())
+  if (req$PATH_INFO %in% c("/health", "/version")) return(plumber::forward())
+
+  provided <- req$HTTP_X_API_KEY
+  if (is.null(provided) || !identical(provided, expected)) {
+    res$status <- 401
+    return(list(erro = "API key invalida ou ausente. Forneca header X-API-Key."))
+  }
   plumber::forward()
 }
 
