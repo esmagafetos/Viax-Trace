@@ -55,13 +55,14 @@ cat(">>> Chamando geocodebr::geocode() com verboso=TRUE ...\n\n")
 
 res <- tryCatch(
   geocode(
-    enderecos          = df,
-    campos_endereco    = campos,
-    resultado_completo = FALSE,
-    resolver_empates   = TRUE,
-    resultado_sf       = FALSE,
-    verboso            = TRUE,
-    cache              = TRUE
+    enderecos            = df,
+    campos_endereco      = campos,
+    resultado_completo   = FALSE,
+    resolver_empates     = TRUE,
+    resultado_sf         = FALSE,
+    verboso              = TRUE,
+    cache                = TRUE,
+    padronizar_enderecos = TRUE
   ),
   error = function(e) {
     cat("\n========= ERRO TOPO =========\n")
