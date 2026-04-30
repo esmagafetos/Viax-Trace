@@ -154,30 +154,58 @@ class _ProcessScreenState extends State<ProcessScreen> {
                         : const Text('Iniciar'),
                   ),
                 ),
-                if (processing && steps.isNotEmpty) ...[
+                if (processing) ...[
                   const SizedBox(height: 16),
-                  for (final s in steps)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 2),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Container(
-                              margin: const EdgeInsets.only(top: 5),
-                              width: 6,
-                              height: 6,
-                              decoration: BoxDecoration(
-                                  color: context.accent,
-                                  shape: BoxShape.circle)),
-                          const SizedBox(width: 8),
-                          Expanded(
-                              child: Text(s,
-                                  style: TextStyle(
-                                      fontSize: 12,
-                                      color: context.textFaint))),
-                        ],
+                  // Barra de progresso — aparece assim que job_id é recebido
+                  if (svc.hasProgress) ...[
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('Endereços processados',
+                            style: TextStyle(
+                                fontSize: 11, color: context.textFaint, fontWeight: FontWeight.w500)),
+                        Text('${svc.processed} / ${svc.total}',
+                            style: TextStyle(
+                                fontSize: 11,
+                                color: context.textMuted,
+                                fontWeight: FontWeight.w600)),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(99),
+                      child: LinearProgressIndicator(
+                        value: svc.progressFraction,
+                        backgroundColor: context.borderStrong,
+                        valueColor: AlwaysStoppedAnimation<Color>(context.accent),
+                        minHeight: 5,
                       ),
                     ),
+                    const SizedBox(height: 10),
+                  ],
+                  if (steps.isNotEmpty)
+                    for (final s in steps)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 2),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                                margin: const EdgeInsets.only(top: 5),
+                                width: 6,
+                                height: 6,
+                                decoration: BoxDecoration(
+                                    color: context.accent,
+                                    shape: BoxShape.circle)),
+                            const SizedBox(width: 8),
+                            Expanded(
+                                child: Text(s,
+                                    style: TextStyle(
+                                        fontSize: 12,
+                                        color: context.textFaint))),
+                          ],
+                        ),
+                      ),
                 ],
               ],
             ),

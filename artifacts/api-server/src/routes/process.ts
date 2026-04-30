@@ -10,6 +10,7 @@ import {
   type AddressRow,
   type ResultRow,
 } from "../lib/geocoder.js";
+import { createJob, updateJob, getJob, deleteJobLater } from "../lib/job-store.js";
 
 const router: IRouter = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
@@ -99,6 +100,7 @@ router.post("/process/upload", upload.single("arquivo"), async (req, res): Promi
   res.flushHeaders();
 
   const tInicio = Date.now();
+  let jobId: string | null = null;
 
   try {
     if (!req.file) {
@@ -164,6 +166,10 @@ router.post("/process/upload", upload.single("arquivo"), async (req, res): Promi
       sendSSE(res, "step", { step: `⚠️ Arquivo tem ${totalOriginal} endereços. Processando os primeiros ${MAX_ENDERECOS}.` });
     }
 
+    // Registra o job no store e informa ao cliente para que possa fazer polling
+    jobId = createJob(userId, enderecos.length);
+    sendSSE(res, "job_id", { job_id: jobId, total: enderecos.length });
+
     const instanceLabel =
       instanceMode === "googlemaps"
         ? "Google Maps API"
@@ -207,7 +213,9 @@ router.post("/process/upload", upload.single("arquivo"), async (req, res): Promi
     for (let i = 0; i < enderecos.length; i++) {
       const item = enderecos[i];
       const label = item.endereco.length > 45 ? item.endereco.substring(0, 45) + "..." : item.endereco;
-      sendSSE(res, "step", { step: `[${i + 1}/${enderecos.length}] ${label}` });
+      const stepMsg = `[${i + 1}/${enderecos.length}] ${label}`;
+      sendSSE(res, "step", { step: stepMsg });
+      updateJob(jobId, { currentStep: stepMsg });
 
       // M9 — duplicata de coordenada: clona o resultado da fonte sem geocodar
       const fonteIdx = fonteDuplicata[i];
@@ -226,6 +234,7 @@ router.post("/process/upload", upload.single("arquivo"), async (req, res): Promi
         detalhes.push(clone);
         if (clone.is_nuance) totalNuances++;
         if (clone.nome_rua_oficial) geocodeSucesso++;
+        updateJob(jobId, { processed: i + 1 });
         continue;
       }
 
@@ -246,6 +255,7 @@ router.post("/process/upload", upload.single("arquivo"), async (req, res): Promi
       detalhes.push(resultado);
       if (resultado.is_nuance) totalNuances++;
       if (resultado.nome_rua_oficial) geocodeSucesso++;
+      updateJob(jobId, { processed: i + 1 });
     }
 
     // ── M10 — pós-passagem: detectar homônimos intra-rota ──
@@ -326,6 +336,11 @@ router.post("/process/upload", upload.single("arquivo"), async (req, res): Promi
     }).returning({ id: analysesTable.id });
     const analysisId = inserted?.id ?? null;
 
+    if (jobId) {
+      updateJob(jobId, { status: "done", analysisId: analysisId ?? null });
+      deleteJobLater(jobId);
+    }
+
     const percentualProblema = total > 0 ? Math.round((totalNuances / total) * 100 * 10) / 10 : 0;
 
     logger.info({
@@ -352,7 +367,12 @@ router.post("/process/upload", upload.single("arquivo"), async (req, res): Promi
     });
   } catch (e: any) {
     logger.error({ error: e?.message, stack: e?.stack }, "Erro interno no processamento");
-    sendSSE(res, "error", { error: "Erro interno: " + (e.message ?? String(e)) });
+    const errMsg = "Erro interno: " + (e.message ?? String(e));
+    if (jobId) {
+      updateJob(jobId, { status: "error", errorMsg: errMsg });
+      deleteJobLater(jobId);
+    }
+    sendSSE(res, "error", { error: errMsg });
   } finally {
     res.end();
   }
@@ -362,7 +382,33 @@ router.get("/process/status/:id", async (req, res): Promise<void> => {
   const userId = requireAuth(req, res);
   if (!userId) return;
 
-  const id = parseInt(req.params.id, 10);
+  const raw = req.params.id;
+
+  // UUID → job em andamento no store
+  const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (uuidRe.test(raw)) {
+    const job = getJob(raw);
+    if (!job) {
+      res.status(404).json({ error: "Job não encontrado ou já expirou." });
+      return;
+    }
+    if (job.userId !== userId) {
+      res.status(403).json({ error: "Acesso negado." });
+      return;
+    }
+    res.json({
+      id: job.jobId,
+      status: job.status,
+      processed: job.processed,
+      total: job.total,
+      current_step: job.currentStep,
+      analysis_id: job.analysisId,
+      error: job.errorMsg,
+    });
+    return;
+  }
+
+  const id = parseInt(raw, 10);
   if (isNaN(id) || id <= 0) {
     res.status(400).json({ error: "ID de análise inválido." });
     return;
