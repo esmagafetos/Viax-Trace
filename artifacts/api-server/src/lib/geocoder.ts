@@ -335,8 +335,15 @@ function limiarAdaptativo(extraida: string, isAvenidaExtensa: boolean, isComerci
  */
 export function toleranciaAdaptativa(parsed: ParsedAddress, baseTolerance: number): number {
   if (parsed.is_condominio) return 50;
-  if (parsed.is_comercio) return Math.min(baseTolerance, 80);
+  // Comércio em rodovia (ex: loja à beira da Rodovia Amaral Peixoto):
+  // GPS pode estar no acesso lateral ou estacionamento — 300-600 m é razoável.
+  // Verificar ANTES do is_rodovia puro (1200 m) para não exagerar,
+  // e ANTES do is_comercio puro (80 m) para não ser restritivo demais.
+  if (parsed.is_rodovia && parsed.is_comercio) return Math.min(Math.max(baseTolerance, 300), 600);
+  // Rodovia pura: quilometragem pode ter offset grande — tolerância ampla.
   if (parsed.is_rodovia) return Math.max(baseTolerance, 1200);
+  // Comércio em rua normal: GPS do estabelecimento costuma ser preciso.
+  if (parsed.is_comercio) return Math.min(baseTolerance, 80);
   if (parsed.is_composto) return baseTolerance + 50;
   return baseTolerance;
 }
@@ -368,13 +375,21 @@ export function precisaoCoordenadaPorDecimais(lat: number | null, lon: number | 
  * M5 — Extrai quadra/lote de texto livre quando presentes.
  * Retorna { quadra: "4", lote: "12" } a partir de "Qd 4 Lt 12" ou "Quadra C Lote 15".
  */
+// Regex standalone para lote — independente do QUADRA_LOTE_REGEX.
+// Necessário porque QUADRA_LOTE_REGEX captura lote apenas quando adjacente
+// à quadra. Endereços como "QD16 LT.7" ou "Quadra 24, Lote 01" (separados
+// por vírgula) perdem o lote no grupo opcional do QUADRA_LOTE_REGEX.
+const LOTE_STANDALONE_REGEX = /\b(?:lt\.?|lote|l:)\s*([a-z0-9]+)/i;
+
 function extrairQuadraLote(end: string): { quadra: string | null; lote: string | null } {
   const m = end.match(QUADRA_LOTE_REGEX);
-  if (!m) return { quadra: null, lote: null };
-  return {
-    quadra: m[1] ? m[1].toUpperCase() : null,
-    lote: m[2] ? m[2].toUpperCase() : null,
-  };
+  const quadra = m && m[1] ? m[1].toUpperCase() : null;
+  // Tentar lote do grupo 2 do QUADRA_LOTE_REGEX primeiro; se falhar,
+  // usar LOTE_STANDALONE_REGEX para pegar "lote X" em qualquer posição.
+  const loteFromPair = m && m[2] ? m[2].toUpperCase() : null;
+  const mlStandalone = end.match(LOTE_STANDALONE_REGEX);
+  const lote = loteFromPair ?? (mlStandalone ? mlStandalone[1].toUpperCase() : null);
+  return { quadra, lote };
 }
 
 function extrairCEP(texto: string): string | null {
@@ -527,6 +542,15 @@ function extrairCidadeDoEndereco(endereco: string): string {
 }
 
 function normalizarAcronimos(texto: string): string {
+  // Pré-passo: inserir espaço entre dígito e palavra-chave colada.
+  // "3quadra", "4quadra29lote", "01quadra" → `\b` não existe entre dígito e
+  // letra (ambos são \w), então a regex de Quadra/Lote abaixo falharia.
+  // Solução: separar com espaço ANTES de normalizar.
+  texto = texto.replace(/(\d)(quadra|lote|casa|bloco|andar|apto|apartamento)/gi, "$1 $2");
+  // Sequências coladas como "L5Q5" (Lote 5 Quadra 5) — inserir espaço entre
+  // dígito e letra de abreviação seguida imediatamente de outro dígito.
+  texto = texto.replace(/(\d)([QLCB])(\d)/g, "$1 $2$3");
+
   // IMPORTANTE: usar `\d+[A-Za-z]*` (e não `\d+[A-Za-z]?\b`) porque `\b`
   // entre dígito e letra NÃO é um word boundary (ambos são word-chars),
   // e `[A-Za-z]?` falharia para "18PD" (2 letras).
@@ -595,8 +619,11 @@ export function parsearEndereco(endereco: string, cidade = "", bairro = "", cepL
     // Quilometragem detectada (km!=null) também marca como rodovia, mesmo que
     // o nome local da via ("Rua Dez", "Rua Itaperuna") esconda esse fato.
     is_rodovia: RODOVIA_PREFIXO_REGEX.test(rua) || RODOVIA_QUALQUER_REGEX.test(end) || km !== null,
-    // M5 — condomínio/loteamento se a regex casa OU se quadra/lote foram extraídos
-    is_condominio: CONDOMINIO_REGEX.test(end) || quadra !== null || lote !== null,
+    // M5 — condomínio/loteamento se a regex casa OU se quadra/lote foram extraídos.
+    // Também verifica o campo bairro: "Cond. Verão Vermelho (Tamoios)" ou
+    // "Condomínio Orla 500 (Tamoios)" no bairro são sinais fortes de loteamento,
+    // mesmo quando o próprio endereço não contém a palavra "condomínio".
+    is_condominio: CONDOMINIO_REGEX.test(end) || CONDOMINIO_REGEX.test(bairro) || quadra !== null || lote !== null,
     // M8 — endereço composto se via secundária ou keyword interna estão presentes
     is_composto: viaSecundaria !== null || ENDERECO_COMPOSTO_REGEX.test(end),
     quadra,
@@ -1194,6 +1221,20 @@ function montarQueryBusca(parsed: ParsedAddress): string {
   // não tentem interpretar o texto entre parênteses como tag literal.
   const bairroParaQuery = parsed.bairro_limpo || parsed.bairro;
   if (bairroParaQuery) partes.push(bairroParaQuery);
+  // Extrair o distrito entre parênteses do campo bairro original e adicioná-lo
+  // separadamente à query. Padrão muito comum em Cabo Frio/Tamoios:
+  // "Terramar (Tamoios)", "Verão Vermelho (Tamoios)", "Orla 500 (Tamoios)".
+  // Sem "Tamoios" na query, Photon/Nominatim pode retornar uma rua homônima
+  // em outro bairro ou cidade — causando falsos positivos de nuance.
+  if (parsed.bairro) {
+    const matchDistrito = parsed.bairro.match(/\(([^)]{3,40})\)/);
+    if (matchDistrito) {
+      const distrito = matchDistrito[1].trim();
+      if (distrito && distrito !== bairroParaQuery && !partes.includes(distrito)) {
+        partes.push(distrito);
+      }
+    }
+  }
   if (parsed.cidade) partes.push(parsed.cidade);
   partes.push("Brasil");
   return [...new Set(partes)].join(", ");
@@ -1215,6 +1256,27 @@ export function verificarNuance(
 ): NuanceResult & { distancia_metros: number | null } {
   // Sem resultado do geocoding
   if (!geoResult) {
+    // Para condomínios/loteamentos com GPS válido: a rua interna muitas vezes
+    // não existe no OSM — é um comportamento ESPERADO, não uma nuance real.
+    // O GPS do roteirizador é a fonte de verdade; validar pela precisão da coord.
+    if (parsed.is_condominio && gpsLat !== null && gpsLon !== null) {
+      const precisaoGPS = precisaoCoordenadaPorDecimais(gpsLat, gpsLon);
+      const gpsConfiavel = precisaoGPS === null || precisaoGPS <= 111; // ≥ 3 casas decimais
+      if (gpsConfiavel) {
+        return {
+          is_nuance: false,
+          similaridade: null,
+          motivo: "",
+          distancia_metros: null,
+        };
+      }
+      return {
+        is_nuance: true,
+        similaridade: null,
+        motivo: `Rua interna de loteamento não encontrada no mapa (normal para ruas privadas), mas GPS com precisão baixa (±${precisaoGPS}m). Confirme a localização antes de roteirizar.`,
+        distancia_metros: null,
+      };
+    }
     return {
       is_nuance: true,
       similaridade: null,
@@ -1224,6 +1286,20 @@ export function verificarNuance(
   }
   const ruaOficial = geoResult.rua;
   if (!ruaOficial) {
+    // Para condomínios com GPS: via principal pode não ter nome mapeado (área
+    // de loteamento interno). GPS preciso é suficiente para validar a entrega.
+    if (parsed.is_condominio && gpsLat !== null && gpsLon !== null) {
+      const precisaoGPS = precisaoCoordenadaPorDecimais(gpsLat, gpsLon);
+      const gpsConfiavel = precisaoGPS === null || precisaoGPS <= 111;
+      if (gpsConfiavel) {
+        return {
+          is_nuance: false,
+          similaridade: null,
+          motivo: "",
+          distancia_metros: null,
+        };
+      }
+    }
     const localidade = geoResult.localidade ? ` (${geoResult.localidade})` : "";
     return {
       is_nuance: true,
@@ -1333,13 +1409,41 @@ export function verificarNuance(
       };
     }
 
-    // ── Condomínio horizontal: nome da via pública pode divergir, GPS é rei ──
-    // Quando is_condominio=true e o GPS está dentro da tolerância restrita
-    // (50 m), o endereço é válido — o "número da rua" é nominal. Mesma
-    // guarda do comércio: se a divergência for total (0 % de tokens em
-    // comum), exigimos pelo menos marcadores fortes de condomínio
-    // (Quadra E Lote ambos presentes), senão é provável que o geocoder
-    // tenha pego a via principal próxima em vez da rua interna correta.
+    // ── Condomínio/loteamento: GPS é a fonte de verdade ──
+    // Em loteamentos, a rua interna muitas vezes não existe no OSM; o geocoder
+    // retorna a via principal pública (ex.: "Avenida Sideral"), que pode estar
+    // 200-500m do interior do loteamento. Essa divergência é ESPERADA e NORMAL
+    // — não é um erro de endereço. Não penalizar pela distância GPS↔via-pública.
+    // Guarda mínima: precisão do GPS (≥3 casas decimais = ±111m) ou marcadores
+    // estruturais de Quadra/Lote confirmam que é um endereço de loteamento.
+    if (parsed.is_condominio && gpsLat !== null && gpsLon !== null) {
+      const temMarcadoresFortes = parsed.quadra !== null && parsed.lote !== null;
+      const precisaoGPS = precisaoCoordenadaPorDecimais(gpsLat, gpsLon);
+      const gpsConfiavel = precisaoGPS === null || precisaoGPS <= 111;
+      if (gpsConfiavel && (similaridade >= MIN_SIMILARIDADE_PASS_GPS || temMarcadoresFortes)) {
+        return {
+          is_nuance: false,
+          similaridade: Math.round(similaridade * 1000) / 1000,
+          motivo: "",
+          distancia_metros: distanciaMetros,
+        };
+      }
+      if (!gpsConfiavel) {
+        return {
+          is_nuance: true,
+          similaridade: Math.round(similaridade * 1000) / 1000,
+          motivo: `Loteamento/condomínio: GPS com precisão baixa (±${precisaoGPS}m). A rua "${ruaExtraida}" diverge do mapeado ("${ruaOficial}"). Confirme a localização exata no mapa.`,
+          distancia_metros: distanciaMetros,
+        };
+      }
+      return {
+        is_nuance: true,
+        similaridade: Math.round(similaridade * 1000) / 1000,
+        motivo: `Loteamento/condomínio: "${ruaExtraida}" não tem palavra em comum com a via mapeada "${ruaOficial}" e não foram encontrados marcadores de Quadra/Lote para ancoragem. Confirme as coordenadas GPS.`,
+        distancia_metros: distanciaMetros,
+      };
+    }
+    // Fallback para condomínio sem GPS: usa distância como antes
     if (parsed.is_condominio && distanciaMetros !== null && distanciaMetros <= adjTolerance) {
       const temMarcadoresFortes = parsed.quadra !== null && parsed.lote !== null;
       if (similaridade >= MIN_SIMILARIDADE_PASS_GPS || temMarcadoresFortes) {
@@ -1353,7 +1457,7 @@ export function verificarNuance(
       return {
         is_nuance: true,
         similaridade: Math.round(similaridade * 1000) / 1000,
-        motivo: `GPS está a ${distanciaMetros}m, mas "${ruaExtraida}" não tem palavra em comum com a via oficial "${ruaOficial}" e os marcadores de condomínio (Quadra/Lote) não foram identificados de forma completa. Pode ser uma rua de loteamento não mapeada — confirme.`,
+        motivo: `"${ruaExtraida}" não tem palavra em comum com a via oficial "${ruaOficial}" e os marcadores de Quadra/Lote não foram identificados. Pode ser rua de loteamento privado — confirme.`,
         distancia_metros: distanciaMetros,
       };
     }
@@ -1367,12 +1471,28 @@ export function verificarNuance(
   }
 
   if (distanciaMetros !== null && distanciaMetros > adjTolerance) {
+    // Para condomínios/loteamentos com GPS e rua confirmada (similarity >= limiar):
+    // o geocoder posiciona na rua correta, mas em ponto diferente do GPS.
+    // Em loteamentos, o GPS (da entrega) é mais preciso que a posição interpolada
+    // pelo geocoder. Não penalizar pela distância quando a rua está confirmada.
+    if (parsed.is_condominio && gpsLat !== null && gpsLon !== null) {
+      const precisaoGPS = precisaoCoordenadaPorDecimais(gpsLat, gpsLon);
+      const gpsConfiavel = precisaoGPS === null || precisaoGPS <= 111;
+      if (gpsConfiavel) {
+        return {
+          is_nuance: false,
+          similaridade: Math.round(similaridade * 1000) / 1000,
+          motivo: "",
+          distancia_metros: distanciaMetros,
+        };
+      }
+    }
     const contexto = parsed.is_comercio
       ? ". Comércio/POI não confirmado."
       : parsed.is_avenida_extensa
       ? ". Avenida extensa: exige alta precisão."
       : parsed.is_condominio
-      ? ". Condomínio/loteamento: o GPS deveria estar no portão (≤50 m)."
+      ? ". Condomínio/loteamento: GPS pode estar no interior — verifique se o ponto está correto no mapa."
       : parsed.is_composto
       ? ". Endereço composto: servidão/beco interno detectado."
       : "";
@@ -1449,7 +1569,7 @@ export async function processarEndereco(
       parsed.is_avenida_extensa = AVENIDAS_EXTENSAS_REGEX.test(parsed.rua_principal);
       parsed.is_rodovia = RODOVIA_PREFIXO_REGEX.test(parsed.rua_principal) || RODOVIA_QUALQUER_REGEX.test(item.endereco);
       // M5/M8 — recompute também flags estruturais quando IA reescreve campos
-      parsed.is_condominio = CONDOMINIO_REGEX.test(item.endereco) || parsed.quadra !== null || parsed.lote !== null;
+      parsed.is_condominio = CONDOMINIO_REGEX.test(item.endereco) || CONDOMINIO_REGEX.test(item.bairro ?? "") || parsed.quadra !== null || parsed.lote !== null;
       parsed.is_composto = parsed.via_secundaria !== null || ENDERECO_COMPOSTO_REGEX.test(item.endereco);
     }
   }
