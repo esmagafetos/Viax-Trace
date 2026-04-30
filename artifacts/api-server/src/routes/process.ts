@@ -170,10 +170,55 @@ router.post("/process/upload", upload.single("arquivo"), async (req, res): Promi
     let ultimaReq = 0;
     const geoCache = new Map<string, { data: any; ts: number }>();
 
+    // ── M9 — pré-passagem: detectar paradas com coordenada GPS idêntica ──
+    // Quando duas linhas vêm da mesma coordenada (ex.: roteirizador agrupou
+    // múltiplas notas no mesmo ponto), reusar a decisão da primeira evita
+    // chamadas redundantes ao geocoder e mantém o veredicto consistente.
+    const dedupKeyDe = (lat: number | null, lon: number | null): string | null => {
+      if (lat === null || lon === null) return null;
+      return `${lat.toFixed(5)}:${lon.toFixed(5)}`;
+    };
+    const primeiroIndicePorCoord = new Map<string, number>();
+    const fonteDuplicata = new Array<number | null>(enderecos.length).fill(null);
+    for (let i = 0; i < enderecos.length; i++) {
+      const k = dedupKeyDe(enderecos[i].lat, enderecos[i].lon);
+      if (!k) continue;
+      const prev = primeiroIndicePorCoord.get(k);
+      if (prev === undefined) {
+        primeiroIndicePorCoord.set(k, i);
+      } else {
+        fonteDuplicata[i] = prev;
+      }
+    }
+    const duplicatasDetectadas = fonteDuplicata.filter((v) => v !== null).length;
+    if (duplicatasDetectadas > 0) {
+      sendSSE(res, "step", { step: `M9: ${duplicatasDetectadas} parada(s) com GPS idêntico detectada(s) — auditoria reaproveitada.` });
+    }
+
     for (let i = 0; i < enderecos.length; i++) {
       const item = enderecos[i];
       const label = item.endereco.length > 45 ? item.endereco.substring(0, 45) + "..." : item.endereco;
       sendSSE(res, "step", { step: `[${i + 1}/${enderecos.length}] ${label}` });
+
+      // M9 — duplicata de coordenada: clona o resultado da fonte sem geocodar
+      const fonteIdx = fonteDuplicata[i];
+      if (fonteIdx !== null) {
+        const fonte = detalhes[fonteIdx];
+        const motivoBase = fonte.motivo
+          ? `${fonte.motivo} (mesmo GPS da linha ${fonte.linha})`
+          : `Coordenada GPS idêntica à linha ${fonte.linha}: auditoria reaproveitada.`;
+        const clone: ResultRow = {
+          ...fonte,
+          linha: item.linha,
+          endereco_original: item.endereco,
+          motivo: motivoBase,
+          duplicata_de_linha: fonte.linha,
+        };
+        detalhes.push(clone);
+        if (clone.is_nuance) totalNuances++;
+        if (clone.nome_rua_oficial) geocodeSucesso++;
+        continue;
+      }
 
       const { resultado, ultimaReq: novaUltimaReq } = await processarEndereco(
         item,
@@ -192,6 +237,64 @@ router.post("/process/upload", upload.single("arquivo"), async (req, res): Promi
       detalhes.push(resultado);
       if (resultado.is_nuance) totalNuances++;
       if (resultado.nome_rua_oficial) geocodeSucesso++;
+    }
+
+    // ── M10 — pós-passagem: detectar homônimos intra-rota ──
+    // Mesma rua extraída em linhas distintas com GPS distantes ≥ 800 m sugere
+    // vias homônimas (ex.: 4 ocorrências de "Rua das Pacas" em loteamentos
+    // vizinhos). Marcamos a flag e enriquecemos o motivo pra alertar a auditoria.
+    const haversineMetrosLocal = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+      const R = 6371000;
+      const toRad = (g: number) => (g * Math.PI) / 180;
+      const dLat = toRad(lat2 - lat1);
+      const dLon = toRad(lon2 - lon1);
+      const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+      return 2 * R * Math.asin(Math.sqrt(a));
+    };
+    const normalizarChave = (s: string | null) =>
+      (s || "")
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-z0-9 ]/g, " ")
+        .replace(/\b(rua|r|av|avenida|alameda|estrada|rodovia|travessa|tv|trav|viela|beco|largo|praca|passagem)\b/g, "")
+        .replace(/\s+/g, " ")
+        .trim();
+    const grupos = new Map<string, number[]>();
+    for (let i = 0; i < detalhes.length; i++) {
+      const chave = normalizarChave(detalhes[i].nome_rua_extraido);
+      if (chave.length < 3) continue;
+      if (!grupos.has(chave)) grupos.set(chave, []);
+      grupos.get(chave)!.push(i);
+    }
+    let homonimosMarcados = 0;
+    for (const [, indices] of grupos) {
+      if (indices.length < 2) continue;
+      let maxDist = 0;
+      for (let a = 0; a < indices.length; a++) {
+        for (let b = a + 1; b < indices.length; b++) {
+          const ea = enderecos[indices[a]];
+          const eb = enderecos[indices[b]];
+          if (ea.lat === null || ea.lon === null || eb.lat === null || eb.lon === null) continue;
+          const d = haversineMetrosLocal(ea.lat, ea.lon, eb.lat, eb.lon);
+          if (d > maxDist) maxDist = d;
+        }
+      }
+      if (maxDist >= 800) {
+        for (const idx of indices) {
+          detalhes[idx].is_homonimo_intra_rota = true;
+          const aviso = `Homônimo intra-rota: "${detalhes[idx].nome_rua_extraido}" aparece em ${indices.length} parada(s) com GPS distantes até ${Math.round(maxDist)} m. Risco de roteirização cruzada.`;
+          detalhes[idx].motivo = detalhes[idx].motivo ? `${detalhes[idx].motivo} | ${aviso}` : aviso;
+          if (!detalhes[idx].is_nuance) {
+            detalhes[idx].is_nuance = true;
+            totalNuances++;
+          }
+          homonimosMarcados++;
+        }
+      }
+    }
+    if (homonimosMarcados > 0) {
+      sendSSE(res, "step", { step: `M10: ${homonimosMarcados} parada(s) marcada(s) como homônimo intra-rota.` });
     }
 
     sendSSE(res, "step", { step: "✓ Geocodificação concluída. Gerando relatório..." });

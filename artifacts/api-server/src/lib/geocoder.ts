@@ -39,6 +39,18 @@ const RODOVIA_QUALQUER_REGEX = /\b(rodovia|rod\.?|br[-\s]?\d{2,3}|rj[-\s]?\d{2,3
 // Usados para detectar negócios em rodovias: ex. "Ruby designer", "Auto Center X", "Depósito Z"
 const NEGOCIO_INFORMAL_REGEX = /\b(designer|studio|store|shop|modas?|salon|salão|auto\s*center|moto|tech|center|açougue|mercearia|depósito|deposito|distribuidora|indústria|industria|fábrica|fabrica|oficina|atacado|varejo|express|delivery|market|mart|grill|burger|pizza|churrascaria|borracharia|mecânica|mecanica|elétrica|eletrica|madeireira|cerâmica|ceramica|ferragem|tintas|ótica|otica|imobiliária|imobiliaria|imóveis|imoveis|seguros|consultório|consultorio|empresa|ltda|eireli|s\.a\.?|cia\.?)\b/i;
 
+// M5 — Condomínios horizontais e loteamentos com Quadra/Lote em texto livre
+// Detecta padrões como "Cond. Bouganville Qd 4 Lt 12", "Loteamento X Quadra C Lote 15".
+// Em rotas reais (ex.: Tamoios), 25–30 % das paradas podem cair nesse formato e o
+// número da via pública não é o real ponto de entrega — o GPS é o sinal mais confiável.
+const CONDOMINIO_REGEX = /\b(condom[íi]nio|cond\.?|residencial|loteamento|conjunto\s+habitacional|vila\s+do|portal\s+do|jardim\s+das?\s+|recanto\s+do|alphaville)\b|\b(qd|quadra)\s*[a-z0-9]+\s*(?:,?\s*(?:lt|lote)\s*[a-z0-9]+)?\b/i;
+const QUADRA_LOTE_REGEX = /\b(?:qd\.?|quadra)\s*([a-z0-9]+)(?:\s*[,;-]?\s*(?:lt\.?|lote)\s*([a-z0-9]+))?/i;
+
+// M8 — Endereço composto: via principal + via secundária interna (servidão, beco,
+// vila, conjunto, casa N°). Sinaliza que o GPS legítimo pode estar a +50 m do
+// número predial da via principal (entregador entrou na servidão).
+const ENDERECO_COMPOSTO_REGEX = /\b(servid[ãa]o|beco|viela|passagem|travessa|vila\s+\w|conjunto\s+\w|cj\.?\s+\w|casa\s+n[ºo°]?\s*\d+\b)/i;
+
 export interface GeoResult {
   rua: string;
   lat?: number;
@@ -63,6 +75,17 @@ export interface ParsedAddress {
   is_comercio: boolean;
   is_avenida_extensa: boolean;
   is_rodovia: boolean;
+  // M5 — endereço cai num condomínio horizontal / loteamento com quadra+lote
+  // (texto livre). Quando true, o número da via pública é nominal e a confiança
+  // recai sobre o GPS; tolerância adaptativa fica mais agressiva (50 m).
+  is_condominio: boolean;
+  // M8 — endereço composto: via principal + servidão/beco interno. O número da
+  // via principal e o GPS legítimo podem divergir +50 m (entregador entrou na
+  // servidão); tolerância recebe acréscimo dessa ordem.
+  is_composto: boolean;
+  // Quadra/lote estruturado (quando detectado em texto livre)
+  quadra: string | null;
+  lote: string | null;
 }
 
 export interface NuanceResult {
@@ -92,6 +115,17 @@ export interface ResultRow {
   poi_estruturado: string | null;
   distancia_metros: number | null;
   tipo_endereco: string;
+  // M11 — precisão estimada da coordenada GPS, derivada do número de casas
+  // decimais. Coordenadas com 3 dec ≈ 110 m, 4 dec ≈ 11 m, 5 dec ≈ 1 m.
+  precisao_coord_m?: number | null;
+  // M2 — tolerância efetivamente aplicada após ajuste por contexto
+  tolerancia_aplicada_m?: number | null;
+  // M9 — esta linha é cópia de outra com a mesma coordenada GPS (índice 1-based
+  // da linha-fonte). Quando preenchido, a auditoria reaproveita a decisão.
+  duplicata_de_linha?: number | null;
+  // M10 — a mesma rua extraída aparece em outras linhas com coordenadas GPS
+  // distantes ≥ 800 m, indicando provável homonímia interna na rota.
+  is_homonimo_intra_rota?: boolean;
 }
 
 function normalizarTexto(texto: string): string {
@@ -240,6 +274,63 @@ function limiarAdaptativo(extraida: string, isAvenidaExtensa: boolean, isComerci
   if (len < 5) return 0.85;
   if (len < 10) return 0.78;
   return SIMILARITY_THRESHOLD_DEFAULT;
+}
+
+/**
+ * M2 — Tolerância adaptativa por contexto.
+ *
+ * A tolerância base (default 300 m) vem da configuração do usuário e cobre o
+ * caso médio. Mas a dispersão real do GPS depende do tipo de endereço:
+ *   • rodovia: pontos quilométricos podem ficar a 1 km da via paralela     ⇒ 4×
+ *   • condomínio horizontal: GPS é o único sinal confiável (entrega no portão) ⇒ 50 m
+ *   • POI/comércio: cliente espera estar dentro do estabelecimento         ⇒ ≤80 m
+ *   • endereço composto (servidão/beco): legítima divergência da via principal ⇒ +50 m
+ *   • avenida extensa: mantém base (alta densidade de números repetidos)
+ *
+ * Valor é arredondado pra múltiplos de 5 m pra manter mensagens legíveis.
+ */
+export function toleranciaAdaptativa(parsed: ParsedAddress, baseTolerance: number): number {
+  if (parsed.is_condominio) return 50;
+  if (parsed.is_comercio) return Math.min(baseTolerance, 80);
+  if (parsed.is_rodovia) return Math.max(baseTolerance, 1200);
+  if (parsed.is_composto) return baseTolerance + 50;
+  return baseTolerance;
+}
+
+/**
+ * M11 — Precisão estimada da coordenada GPS por número de casas decimais.
+ *
+ * Cada decimal a menos multiplica o erro horizontal por ~10. A função usa o
+ * decimal de pior precisão (lat ou lon) e devolve o raio aproximado em metros.
+ * Coordenadas inválidas devolvem null.
+ */
+export function precisaoCoordenadaPorDecimais(lat: number | null, lon: number | null): number | null {
+  if (lat === null || lon === null || !Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+  const decimais = (n: number): number => {
+    const s = String(n);
+    const idx = s.indexOf(".");
+    return idx === -1 ? 0 : s.length - idx - 1;
+  };
+  const minDec = Math.min(decimais(lat), decimais(lon));
+  // Tabela aproximada (linha do Equador; latitudes brasileiras são similares):
+  // 0d ≈ 111000 m, 1d ≈ 11100, 2d ≈ 1110, 3d ≈ 111, 4d ≈ 11, 5d ≈ 1.1, 6d ≈ 0.11
+  const tabela = [111000, 11100, 1110, 111, 11, 1.1, 0.11];
+  if (minDec >= tabela.length) return tabela[tabela.length - 1];
+  if (minDec < 0) return null;
+  return Math.round(tabela[minDec] * 10) / 10;
+}
+
+/**
+ * M5 — Extrai quadra/lote de texto livre quando presentes.
+ * Retorna { quadra: "4", lote: "12" } a partir de "Qd 4 Lt 12" ou "Quadra C Lote 15".
+ */
+function extrairQuadraLote(end: string): { quadra: string | null; lote: string | null } {
+  const m = end.match(QUADRA_LOTE_REGEX);
+  if (!m) return { quadra: null, lote: null };
+  return {
+    quadra: m[1] ? m[1].toUpperCase() : null,
+    lote: m[2] ? m[2].toUpperCase() : null,
+  };
 }
 
 function extrairCEP(texto: string): string | null {
@@ -440,6 +531,8 @@ export function parsearEndereco(endereco: string, cidade = "", bairro = "", cepL
   const km = extrairKmRodovia(end);
   const viaIntersecao = extrairIntersecao(end);
   const bairroLimpo = limparBairro(bairro);
+  // M5 — quadra/lote estruturado a partir de texto livre (campos opcionais)
+  const { quadra, lote } = extrairQuadraLote(end);
 
   return {
     rua_principal: rua,
@@ -458,6 +551,12 @@ export function parsearEndereco(endereco: string, cidade = "", bairro = "", cepL
     // Quilometragem detectada (km!=null) também marca como rodovia, mesmo que
     // o nome local da via ("Rua Dez", "Rua Itaperuna") esconda esse fato.
     is_rodovia: RODOVIA_PREFIXO_REGEX.test(rua) || RODOVIA_QUALQUER_REGEX.test(end) || km !== null,
+    // M5 — condomínio/loteamento se a regex casa OU se quadra/lote foram extraídos
+    is_condominio: CONDOMINIO_REGEX.test(end) || quadra !== null || lote !== null,
+    // M8 — endereço composto se via secundária ou keyword interna estão presentes
+    is_composto: viaSecundaria !== null || ENDERECO_COMPOSTO_REGEX.test(end),
+    quadra,
+    lote,
   };
 }
 
@@ -1050,6 +1149,8 @@ export function verificarNuance(
   const ruaExtraida = parsed.rua_principal;
   const similaridade = calcularSimilaridade(ruaExtraida, ruaOficial);
   const limiar = limiarAdaptativo(ruaExtraida, parsed.is_avenida_extensa, parsed.is_comercio);
+  // M2 — tolerância ajustada por contexto (rodovia 4×, condomínio 50 m, etc.)
+  const adjTolerance = toleranciaAdaptativa(parsed, toleranceMeters);
 
   if (!ruaExtraida) {
     return {
@@ -1063,7 +1164,7 @@ export function verificarNuance(
   let distanciaMetros: number | null = null;
   if (gpsLat !== null && gpsLon !== null && geocodeLat !== null && geocodeLon !== null) {
     distanciaMetros = Math.round(haversineMetros(gpsLat, gpsLon, geocodeLat, geocodeLon));
-    logger.debug({ distanciaMetros, toleranceMeters, rua: ruaExtraida }, "Distância GPS vs geocoded");
+    logger.debug({ distanciaMetros, toleranceMeters, adjTolerance, rua: ruaExtraida }, "Distância GPS vs geocoded");
   }
 
   if (similaridade < limiar) {
@@ -1075,11 +1176,11 @@ export function verificarNuance(
       const simVia = calcularSimilaridadeVia(parsed.via_secundaria, ruaOficial);
       if (simVia >= 0.75) {
         // Via secundária confirma a rua oficial → endereço válido
-        if (distanciaMetros !== null && distanciaMetros > toleranceMeters) {
+        if (distanciaMetros !== null && distanciaMetros > adjTolerance) {
           return {
             is_nuance: true,
             similaridade: Math.round(simVia * 1000) / 1000,
-            motivo: `Via secundária "${parsed.via_secundaria}" confirma oficial "${ruaOficial}" (${Math.round(simVia * 100)}%), porém GPS a ${distanciaMetros}m (tolerância: ${toleranceMeters}m). Verificar precisão das coordenadas.`,
+            motivo: `Via secundária "${parsed.via_secundaria}" confirma oficial "${ruaOficial}" (${Math.round(simVia * 100)}%), porém GPS a ${distanciaMetros}m (tolerância adaptativa: ${adjTolerance}m). Verificar precisão das coordenadas.`,
             distancia_metros: distanciaMetros,
           };
         }
@@ -1117,7 +1218,19 @@ export function verificarNuance(
 
     // ── Comércio com GPS dentro da tolerância: confiar na coordenada ──
     // POIs comerciais têm nomes variáveis; se o GPS está próximo, o endereço provavelmente é válido.
-    if (parsed.is_comercio && distanciaMetros !== null && distanciaMetros <= toleranceMeters) {
+    if (parsed.is_comercio && distanciaMetros !== null && distanciaMetros <= adjTolerance) {
+      return {
+        is_nuance: false,
+        similaridade: Math.round(similaridade * 1000) / 1000,
+        motivo: "",
+        distancia_metros: distanciaMetros,
+      };
+    }
+
+    // ── Condomínio horizontal: nome da via pública pode divergir, GPS é rei ──
+    // Quando is_condominio=true e o GPS está dentro da tolerância restrita
+    // (50 m), o endereço é válido — o "número da rua" é nominal.
+    if (parsed.is_condominio && distanciaMetros !== null && distanciaMetros <= adjTolerance) {
       return {
         is_nuance: false,
         similaridade: Math.round(similaridade * 1000) / 1000,
@@ -1134,11 +1247,20 @@ export function verificarNuance(
     };
   }
 
-  if (distanciaMetros !== null && distanciaMetros > toleranceMeters) {
+  if (distanciaMetros !== null && distanciaMetros > adjTolerance) {
+    const contexto = parsed.is_comercio
+      ? ". Comércio/POI não confirmado."
+      : parsed.is_avenida_extensa
+      ? ". Avenida extensa: exige alta precisão."
+      : parsed.is_condominio
+      ? ". Condomínio/loteamento: o GPS deveria estar no portão (≤50 m)."
+      : parsed.is_composto
+      ? ". Endereço composto: servidão/beco interno detectado."
+      : "";
     return {
       is_nuance: true,
       similaridade: Math.round(similaridade * 1000) / 1000,
-      motivo: `Coordenada GPS a ${distanciaMetros}m do oficial (tolerância: ${toleranceMeters}m)${parsed.is_comercio ? ". Comércio/POI não confirmado." : parsed.is_avenida_extensa ? ". Avenida extensa: exige alta precisão." : ""}`,
+      motivo: `Coordenada GPS a ${distanciaMetros}m do oficial (tolerância adaptativa: ${adjTolerance}m)${contexto}`,
       distancia_metros: distanciaMetros,
     };
   }
@@ -1207,6 +1329,9 @@ export async function processarEndereco(
       parsed.is_comercio = PALAVRAS_COMERCIO_REGEX.test(parsed.poi) || PALAVRAS_COMERCIO_REGEX.test(item.endereco);
       parsed.is_avenida_extensa = AVENIDAS_EXTENSAS_REGEX.test(parsed.rua_principal);
       parsed.is_rodovia = RODOVIA_PREFIXO_REGEX.test(parsed.rua_principal) || RODOVIA_QUALQUER_REGEX.test(item.endereco);
+      // M5/M8 — recompute também flags estruturais quando IA reescreve campos
+      parsed.is_condominio = CONDOMINIO_REGEX.test(item.endereco) || parsed.quadra !== null || parsed.lote !== null;
+      parsed.is_composto = parsed.via_secundaria !== null || ENDERECO_COMPOSTO_REGEX.test(item.endereco);
     }
   }
 
@@ -1462,6 +1587,10 @@ export async function processarEndereco(
       poi_estruturado: (parsed as any).poi_estruturado ?? null,
       distancia_metros: verif.distancia_metros,
       tipo_endereco: tipoEndereco,
+      // M11 — precisão da coordenada GPS de origem (planilha)
+      precisao_coord_m: precisaoCoordenadaPorDecimais(item.lat, item.lon),
+      // M2 — tolerância efetivamente usada na decisão (rastreabilidade auditoria)
+      tolerancia_aplicada_m: toleranciaAdaptativa(parsed, toleranceMeters),
     },
     ultimaReq: newUltimaReq,
   };
