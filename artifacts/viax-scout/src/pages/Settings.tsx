@@ -47,7 +47,6 @@ export default function Settings() {
   const [toleranceMeters, setToleranceMeters] = useState(300);
   const [instanceMode, setInstanceMode] = useState<"builtin" | "geocodebr" | "googlemaps">("builtin");
   const [googleMapsApiKey, setGoogleMapsApiKey] = useState("");
-  const [geocodebrUrl, setGeocodebrUrl] = useState("");
   const [mapsKeyTouched, setMapsKeyTouched] = useState(false);
   const [valorPorRota, setValorPorRota] = useState("");
   const [cicloPagamentoDias, setCicloPagamentoDias] = useState(30);
@@ -62,7 +61,6 @@ export default function Settings() {
       setToleranceMeters(settings.toleranceMeters ?? 300);
       setInstanceMode(settings.instanceMode ?? "builtin");
       setGoogleMapsApiKey(settings.googleMapsApiKey ?? "");
-      setGeocodebrUrl(settings.geocodebrUrl ?? "");
       setValorPorRota(settings.valorPorRota != null ? String(settings.valorPorRota) : "");
       setCicloPagamentoDias(settings.cicloPagamentoDias ?? 30);
       setMetaMensalRotas(settings.metaMensalRotas != null ? String(settings.metaMensalRotas) : "");
@@ -144,7 +142,6 @@ export default function Settings() {
         data: {
           parserMode, aiProvider: aiProvider || null, aiApiKey: aiApiKey || null, toleranceMeters,
           instanceMode, googleMapsApiKey: googleMapsApiKey || null,
-          geocodebrUrl: geocodebrUrl.trim() || null,
           valorPorRota: valorPorRota ? Number(valorPorRota) : null,
           cicloPagamentoDias,
           metaMensalRotas: metaMensalRotas ? Number(metaMensalRotas) : null,
@@ -443,33 +440,15 @@ export default function Settings() {
                     );
                   })()}
 
-                  {/* geocodebr info + URL field */}
+                  {/* geocodebr info — endpoint hospedado pelo ViaX:Trace */}
                   {instanceMode === "geocodebr" && (
                     <div style={{ marginBottom: "1.25rem", padding: "1.1rem 1.2rem", borderRadius: 10, background: "rgba(124,58,237,0.05)", border: "1px solid rgba(124,58,237,0.2)" }}>
-                      <label style={labelStyle}>URL do seu microserviço GeocodeR BR</label>
-                      <input
-                        type="text"
-                        value={geocodebrUrl}
-                        onChange={(e) => setGeocodebrUrl(e.target.value)}
-                        placeholder="https://meu-geocodebr.exemplo.com"
-                        autoComplete="off"
-                        spellCheck={false}
-                        style={inputStyle}
-                      />
-                      {geocodebrUrl.trim() && !/^https?:\/\//i.test(geocodebrUrl.trim()) && (
-                        <div style={{ fontSize: "0.68rem", color: "var(--accent)", marginTop: "0.35rem" }}>
-                          A URL precisa começar com http:// ou https://
-                        </div>
-                      )}
-                      <div style={{ fontSize: "0.68rem", color: "var(--text-faint)", marginTop: "0.55rem", lineHeight: 1.6 }}>
-                        Você precisa rodar o microserviço por conta própria. Quando configurado, ele é usado como <strong>fallback</strong> para endereços que Photon/Overpass/Nominatim não conseguiram localizar (ideal para interior do país).
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.4rem" }}>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" strokeWidth="2.5"><polyline points="20,6 9,17 4,12"/></svg>
+                        <strong style={{ fontSize: "0.85rem", color: "#7c3aed" }}>Endpoint hospedado pelo ViaX:Trace</strong>
                       </div>
-                      <div style={{ fontSize: "0.7rem", fontWeight: 700, color: "#7c3aed", marginTop: "0.85rem", marginBottom: "0.4rem" }}>Via Docker</div>
-                      <code style={{ background: "var(--surface-2)", padding: "0.4rem 0.6rem", borderRadius: 6, fontSize: "0.66rem", display: "block", wordBreak: "break-all", lineHeight: 1.5 }}>
-                        docker run -d -p 8002:8002 -v geocodebr-cache:/root/.cache viax-geocodebr
-                      </code>
-                      <div style={{ fontSize: "0.66rem", color: "var(--text-faint)", marginTop: "0.5rem", lineHeight: 1.55 }}>
-                        Veja o <code style={{ background: "var(--surface-2)", padding: "0 0.25rem", borderRadius: 3 }}>artifacts/geocodebr-service/README.md</code> para instruções completas. Para expor publicamente, use Cloudflare Tunnel ou ngrok.
+                      <div style={{ fontSize: "0.72rem", color: "var(--text-faint)", lineHeight: 1.6 }}>
+                        Sem configuração necessária. O serviço CNEFE/IBGE roda na nossa infraestrutura e é usado automaticamente como <strong>fallback</strong> para endereços que Photon/Overpass/Nominatim não localizaram — ideal para interior do país e loteamentos pouco mapeados.
                       </div>
                     </div>
                   )}

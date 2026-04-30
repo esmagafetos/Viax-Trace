@@ -14,7 +14,6 @@ class SettingsProvider extends ChangeNotifier {
 
   String get instanceMode => (_data?['instanceMode'] as String?) ?? 'builtin';
   String get googleMapsApiKey => (_data?['googleMapsApiKey'] as String?) ?? '';
-  String get geocodebrUrl => (_data?['geocodebrUrl'] as String?) ?? '';
   String get parserMode => (_data?['parserMode'] as String?) ?? 'builtin';
 
   Future<void> load() async {

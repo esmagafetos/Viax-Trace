@@ -58,6 +58,18 @@ function requireAuth(req: Request, res: Response): number | null {
 }
 
 // ── /diag (legacy lightweight) ───────────────────────────────────────
+// Endpoint padrão hospedado (mantido em sincronia com geocoder.ts).
+const DEFAULT_GEOCODEBR_URL = "https://viaxtrace-viaxgeocoder.hf.space";
+
+function geocodebrAuthHeaders(): Record<string, string> {
+  const headers: Record<string, string> = {};
+  const hf = (process.env.GEOCODEBR_HF_TOKEN ?? "").trim();
+  const apiKey = (process.env.GEOCODEBR_API_KEY ?? "").trim();
+  if (hf) headers["Authorization"] = `Bearer ${hf}`;
+  if (apiKey) headers["X-API-Key"] = apiKey;
+  return headers;
+}
+
 router.get("/diag", async (_req, res) => {
   const out: Record<string, unknown> = {
     status: "ok",
@@ -65,7 +77,7 @@ router.get("/diag", async (_req, res) => {
     geocodebr: { configured: false, reachable: false, status: 0, message: "" },
   };
 
-  const url = process.env.GEOCODEBR_URL ?? "";
+  const url = (process.env.GEOCODEBR_URL ?? DEFAULT_GEOCODEBR_URL).trim();
   if (url) {
     (out.geocodebr as Record<string, unknown>).configured = true;
     try {
@@ -73,6 +85,7 @@ router.get("/diag", async (_req, res) => {
       const t = setTimeout(() => ctrl.abort(), 5000);
       const r = await fetch(`${url.replace(/\/$/, "")}/health`, {
         signal: ctrl.signal,
+        headers: geocodebrAuthHeaders(),
       });
       clearTimeout(t);
       const body = await r.text().catch(() => "");
@@ -123,7 +136,12 @@ router.get("/diag/providers", async (req, res) => {
     .where(eq(userSettingsTable.userId, userId))
     .limit(1);
   const s = settings[0];
-  const geocodebrUrl = s?.geocodebrUrl?.trim() ?? "";
+  // Per-user override → env override → endpoint hospedado padrão.
+  const geocodebrUrl = (
+    s?.geocodebrUrl?.trim() ||
+    process.env.GEOCODEBR_URL ||
+    DEFAULT_GEOCODEBR_URL
+  ).trim();
   const hasGoogleKey = !!s?.googleMapsApiKey?.trim();
 
   const ua = "ViaX-Trace/1.0 (diagnostic probe)";
@@ -151,7 +169,7 @@ router.get("/diag/providers", async (req, res) => {
     geocodebrUrl
       ? probe(
           `${geocodebrUrl.replace(/\/$/, "")}/health`,
-          { headers: { "User-Agent": ua } },
+          { headers: { "User-Agent": ua, ...geocodebrAuthHeaders() } },
           5000,
         )
       : Promise.resolve(null),
@@ -175,8 +193,8 @@ router.get("/diag/providers", async (req, res) => {
       brasilApi: { name: "BrasilAPI", ...brasilApi },
       overpass: { name: "Overpass API", ...overpass },
       geocodebr: geocodebr
-        ? { name: "GeocodeR BR (sua instância)", configured: true, ...geocodebr }
-        : { name: "GeocodeR BR (sua instância)", configured: false },
+        ? { name: "GeocodeR BR (hospedado)", configured: true, ...geocodebr }
+        : { name: "GeocodeR BR (hospedado)", configured: false },
       googlemaps: googlemaps
         ? { name: "Google Maps", configured: true, ...googlemaps }
         : { name: "Google Maps", configured: false },

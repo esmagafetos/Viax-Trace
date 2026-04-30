@@ -2,10 +2,46 @@ import { logger } from "./logger.js";
 
 const USER_AGENT = "ViaX-Scout/8.0 (viax-system-br)";
 
-// geocodebr microservice — CNEFE/IBGE (opcional; usado como fallback final)
-// URL é configurada per-user em "Configurações → Instâncias" (campo geocodebrUrl).
-// Como fallback global, ainda respeita a variável de ambiente GEOCODEBR_URL
-// (útil para deploys self-hosted onde o operador roda o serviço internamente).
+// geocodebr microservice — CNEFE/IBGE (fallback final para interior do país)
+// Endpoint padrão: nosso Space hospedado em https://viaxtrace-viaxgeocoder.hf.space.
+// Resolução do baseUrl, do mais específico para o mais geral:
+//   1. URL passada por argumento (override per-user no DB; não exposta na UI atual)
+//   2. process.env.GEOCODEBR_URL (override global do operador)
+//   3. DEFAULT_GEOCODEBR_URL (nosso endpoint hospedado)
+// Auth headers (Bearer + X-API-Key) são lidos dos secrets GEOCODEBR_HF_TOKEN
+// e GEOCODEBR_API_KEY. O Bearer é necessário porque o Space é privado; o
+// X-API-Key valida no filtro do plumber.R (variável VIAX_API_KEY no Space).
+const DEFAULT_GEOCODEBR_URL = "https://viaxtrace-viaxgeocoder.hf.space";
+
+function geocodebrAuthHeaders(): Record<string, string> {
+  const headers: Record<string, string> = {};
+  const hf = (process.env.GEOCODEBR_HF_TOKEN ?? "").trim();
+  const apiKey = (process.env.GEOCODEBR_API_KEY ?? "").trim();
+  if (hf) headers["Authorization"] = `Bearer ${hf}`;
+  if (apiKey) headers["X-API-Key"] = apiKey;
+  return headers;
+}
+
+async function httpGetWithHeaders(
+  url: string,
+  extraHeaders: Record<string, string>,
+  timeout = 10000
+): Promise<any> {
+  try {
+    const resp = await fetch(url, {
+      headers: { "User-Agent": USER_AGENT, "Accept": "application/json", ...extraHeaders },
+      signal: AbortSignal.timeout(timeout),
+    });
+    if (!resp.ok) {
+      logger.debug({ url, status: resp.status }, "HTTP request failed");
+      return null;
+    }
+    return await resp.json();
+  } catch (err: any) {
+    logger.debug({ url, error: err?.message }, "HTTP fetch error");
+    return null;
+  }
+}
 
 const NOMINATIM_INSTANCES = [
   "https://nominatim.openstreetmap.org",
@@ -780,18 +816,24 @@ export async function geocodeForwardPOI(
 
 // ── geocodebr — CNEFE/IBGE (fallback para interior e municípios pouco mapeados) ──
 // Chama o microserviço R/Plumber que usa o pacote geocodebr do IPEA.
-// Completamente opcional: se GEOCODEBR_URL não estiver configurado, retorna null silenciosamente.
+// Por padrão usa nosso endpoint hospedado (DEFAULT_GEOCODEBR_URL); aceita
+// override via argumento (per-user no DB) ou env GEOCODEBR_URL.
 export async function geocodeGeocobeBR(
   logradouro: string,
   municipio: string,
   numero: string = "",
   url: string | null = null
 ): Promise<GeoResult | null> {
-  const baseUrl = (url || process.env.GEOCODEBR_URL || "").trim().replace(/\/+$/, "");
+  const baseUrl = (url || process.env.GEOCODEBR_URL || DEFAULT_GEOCODEBR_URL)
+    .trim()
+    .replace(/\/+$/, "");
   if (!baseUrl) return null;
   try {
     const params = new URLSearchParams({ logradouro, numero, municipio });
-    const data = await httpGet(`${baseUrl}/geocode?${params.toString()}`);
+    const data = await httpGetWithHeaders(
+      `${baseUrl}/geocode?${params.toString()}`,
+      geocodebrAuthHeaders()
+    );
     if (data && data.encontrado === true && typeof data.lat === "number" && typeof data.lon === "number") {
       const precisao = typeof data.precisao === "number" ? data.precisao : 6;
       logger.debug(
