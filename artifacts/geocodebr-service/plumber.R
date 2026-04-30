@@ -8,36 +8,51 @@ library(geocodebr)
 # Marcador de versão deste arquivo — facilita confirmar "o servidor recarregou
 # o plumber.R novo" sem precisar grep do disco. Aparece no log de startup
 # (start.R) e numa resposta HTTP do /version.
-.PLUMBER_VERSION <- "2026-04-30.enderecobr-named-args"
+.PLUMBER_VERSION <- "2026-04-30.enderecobr-correspondencia"
 cat(sprintf("[plumber.R] carregado (versao=%s)\n", .PLUMBER_VERSION))
 
-# Loga a assinatura real da enderecobr::padronizar_enderecos no startup, para
-# que qualquer mudança futura de API fique imediatamente visível.
+# Loga as assinaturas reais das funções do enderecobr no startup, para que
+# qualquer mudança futura de API fique imediatamente visível nos logs.
 if (requireNamespace("enderecobr", quietly = TRUE)) {
-  .args_padroniza <- names(formals(enderecobr::padronizar_enderecos))
-  cat(sprintf("[plumber.R] enderecobr::padronizar_enderecos args = %s\n",
-              paste(.args_padroniza, collapse = ", ")))
+  cat("[plumber.R] padronizar_enderecos:",
+      paste(names(formals(enderecobr::padronizar_enderecos)), collapse=", "), "\n")
+  cat("[plumber.R] correspondencia_campos:",
+      paste(names(formals(enderecobr::correspondencia_campos)), collapse=", "), "\n")
 }
 
-# Chamar enderecobr explicitamente em vez de delegar para o `padronizar_enderecos
-# = TRUE` interno do geocodebr: assim contornamos qualquer mismatch de versão
-# entre geocodebr 0.6.2 e enderecobr 0.5.0 (única versão pré-compilada arm64).
+# Chamar enderecobr explicitamente contorna o mismatch entre geocodebr 0.6.2
+# (espera marker interno do enderecobr >=0.6) e enderecobr 0.5.0 (única versão
+# pré-compilada para arm64 disponível no r-universe).
 #
-# enderecobr 0.5.0 NÃO recebe `campos_endereco`; cada coluna é passada como
-# argumento próprio cujo VALOR é o nome da coluna no data.frame. O argumento
-# de coluna ausente deve ser NULL.
+# A assinatura real de `padronizar_enderecos` em 0.5.0 é:
+#   padronizar_enderecos(enderecos, campos_do_endereco = correspondencia_campos(),
+#                        formato_estados, formato_numeros, ...)
+# onde `correspondencia_campos()` recebe os NOMES das colunas do df como args
+# nomeados (logradouro=, numero=, municipio=, estado=, etc.) e retorna uma
+# tibble de mapeamento que `padronizar_enderecos` consome via `campos_do_endereco`.
 .padronizar <- function(df, tem_estado) {
   if (!requireNamespace("enderecobr", quietly = TRUE)) {
     stop("Pacote 'enderecobr' nao instalado. Rode bash install-geocodebr-termux.sh")
   }
+  campos_corresp <- if (tem_estado) {
+    enderecobr::correspondencia_campos(
+      logradouro = "logradouro",
+      numero     = "numero",
+      municipio  = "municipio",
+      estado     = "estado"
+    )
+  } else {
+    enderecobr::correspondencia_campos(
+      logradouro = "logradouro",
+      numero     = "numero",
+      municipio  = "municipio"
+    )
+  }
   enderecobr::padronizar_enderecos(
-    enderecos       = df,
-    logradouro      = "logradouro",
-    numero          = "numero",
-    municipio       = "municipio",
-    estado          = if (tem_estado) "estado" else NULL,
-    formato_estados = "sigla",
-    formato_numeros = "integer"
+    enderecos          = df,
+    campos_do_endereco = campos_corresp,
+    formato_estados    = "sigla",
+    formato_numeros    = "integer"
   )
 }
 
