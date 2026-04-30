@@ -5,6 +5,31 @@
 # =============================================================================
 library(geocodebr)
 
+# Marcador de versão deste arquivo — facilita confirmar "o servidor recarregou
+# o plumber.R novo" sem precisar grep do disco. Aparece no log de startup
+# (start.R) e numa resposta HTTP do /version.
+.PLUMBER_VERSION <- "2026-04-30.padronizar"
+cat(sprintf("[plumber.R] carregado (versao=%s, padronizar_enderecos=TRUE)\n",
+            .PLUMBER_VERSION))
+
+# Desempacota um erro do callr/rlang até a mensagem-raiz mais informativa.
+# Sem isto, todo erro vem como "in callr subprocess." e a causa fica enterrada
+# em e$parent$parent$...
+.unwrap_error <- function(e) {
+  msgs <- character()
+  cur  <- e
+  depth <- 0
+  while (!is.null(cur) && depth < 8) {
+    if (!is.null(cur$message) && nzchar(cur$message)) {
+      msgs <- c(msgs, trimws(cur$message))
+    }
+    cur <- cur$parent
+    depth <- depth + 1
+  }
+  msgs <- unique(msgs)
+  paste(msgs, collapse = " | ")
+}
+
 # ── Filtro CORS (necessário para chamadas do Node.js) ────────────────────────
 #* @filter cors
 function(req, res) {
@@ -86,8 +111,27 @@ function(logradouro = "", numero = "", municipio = "", estado = "") {
       list(encontrado = FALSE, lat = NULL, lon = NULL, precisao = NULL, tipo = "nao_encontrado")
     }
   }, error = function(e) {
-    list(encontrado = FALSE, erro = as.character(e$message), lat = NULL, lon = NULL)
+    list(
+      encontrado = FALSE,
+      erro       = .unwrap_error(e),
+      classe     = paste(class(e), collapse = "/"),
+      lat        = NULL,
+      lon        = NULL
+    )
   })
+}
+
+# ── GET /version ──────────────────────────────────────────────────────────────
+#* Retorna a versão do plumber.R em uso (útil para confirmar reload do servidor)
+#* @get /version
+#* @serializer json list(auto_unbox=TRUE)
+function() {
+  list(
+    plumber_version      = .PLUMBER_VERSION,
+    padronizar_enderecos = TRUE,
+    geocodebr            = as.character(packageVersion("geocodebr")),
+    r_version            = as.character(R.version$version.string)
+  )
 }
 
 # ── GET /health ───────────────────────────────────────────────────────────────
