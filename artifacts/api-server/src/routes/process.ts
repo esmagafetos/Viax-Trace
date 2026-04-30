@@ -126,7 +126,11 @@ router.post("/process/upload", upload.single("arquivo"), async (req, res): Promi
 
     const instanceMode = (settings as any).instanceMode ?? "builtin";
     const googleMapsApiKey = (settings as any).googleMapsApiKey ?? null;
-    const geocodebrUrl = (settings as any).geocodebrUrl ?? null;
+    // A coluna `geocodebrUrl` per-user permanece no DB por back-compat,
+    // mas não é mais consultada — o endpoint hospedado (DEFAULT_GEOCODEBR_URL
+    // em geocoder.ts, sobrescrito apenas via env GEOCODEBR_URL) é a fonte
+    // da verdade desde a migração para o Space privado do HF.
+    const geocodebrUrl: string | null = null;
     const toleranceMeters = (settings as any).toleranceMeters ?? 300;
     const parserMode = (settings as any).parserMode ?? "builtin";
     const aiProvider = (settings as any).aiProvider ?? null;

@@ -136,11 +136,13 @@ router.get("/diag/providers", async (req, res) => {
     .where(eq(userSettingsTable.userId, userId))
     .limit(1);
   const s = settings[0];
-  // Per-user override → env override → endpoint hospedado padrão.
+  // Endpoint hospedado é a fonte da verdade. A coluna `geocodebrUrl`
+  // per-user permanece no DB por back-compat (registros antigos), mas
+  // não é mais consultada — a UI manual foi removida e o Space privado
+  // do ViaX:Trace é o único endpoint suportado. Operadores ainda podem
+  // forçar uma URL global via env GEOCODEBR_URL para staging/dev.
   const geocodebrUrl = (
-    s?.geocodebrUrl?.trim() ||
-    process.env.GEOCODEBR_URL ||
-    DEFAULT_GEOCODEBR_URL
+    process.env.GEOCODEBR_URL || DEFAULT_GEOCODEBR_URL
   ).trim();
   const hasGoogleKey = !!s?.googleMapsApiKey?.trim();
 
