@@ -8,9 +8,27 @@ library(geocodebr)
 # Marcador de versão deste arquivo — facilita confirmar "o servidor recarregou
 # o plumber.R novo" sem precisar grep do disco. Aparece no log de startup
 # (start.R) e numa resposta HTTP do /version.
-.PLUMBER_VERSION <- "2026-04-30.padronizar"
-cat(sprintf("[plumber.R] carregado (versao=%s, padronizar_enderecos=TRUE)\n",
-            .PLUMBER_VERSION))
+.PLUMBER_VERSION <- "2026-04-30.enderecobr-explicit"
+cat(sprintf("[plumber.R] carregado (versao=%s)\n", .PLUMBER_VERSION))
+
+# Chamar enderecobr explicitamente (em vez de delegar para o
+# `padronizar_enderecos = TRUE` interno do geocodebr) evita um bug de
+# pareamento de versões: geocodebr 0.6.2 espera um marker/atributo que o
+# enderecobr 0.5.0 (única versão pré-compilada para arm64) não produz da
+# forma esperada. Padronizando aqui antes da chamada, o `geocode()`
+# detecta que os dados já vieram padronizados e segue direto.
+.padronizar <- function(df, tem_estado) {
+  if (!requireNamespace("enderecobr", quietly = TRUE)) {
+    stop("Pacote 'enderecobr' nao instalado. Rode bash install-geocodebr-termux.sh")
+  }
+  enderecobr::padronizar_enderecos(
+    enderecos        = df,
+    campos_endereco  = if (tem_estado) c("logradouro","numero","municipio","estado")
+                       else            c("logradouro","numero","municipio"),
+    formato_estados  = "sigla",
+    formato_numeros  = "integer"
+  )
+}
 
 # Desempacota um erro do callr/rlang até a mensagem-raiz mais informativa.
 # Sem isto, todo erro vem como "in callr subprocess." e a causa fica enterrada
@@ -83,19 +101,17 @@ function(logradouro = "", numero = "", municipio = "", estado = "") {
       )
     }
 
+    df_padronizado <- .padronizar(df, tem_estado)
+
     resultado <- geocodebr::geocode(
-      enderecos            = df,
+      enderecos            = df_padronizado,
       campos_endereco      = campos,
       resultado_completo   = FALSE,
       resolver_empates     = TRUE,
       resultado_sf         = FALSE,
       verboso              = FALSE,
       cache                = TRUE,
-      # geocodebr >=0.6.2 exige inputs padronizados (UPPERCASE, sem acento).
-      # Sem isto, o callr subprocess emite "Os dados de entrada nao estao
-      # padronizados" — que era exatamente o erro mascarado por
-      # "in callr subprocess." vindo do tryCatch externo.
-      padronizar_enderecos = TRUE
+      padronizar_enderecos = FALSE
     )
 
     if (nrow(resultado) > 0 && !is.na(resultado$lat[1]) && !is.na(resultado$lon[1])) {
@@ -127,10 +143,12 @@ function(logradouro = "", numero = "", municipio = "", estado = "") {
 #* @serializer json list(auto_unbox=TRUE)
 function() {
   list(
-    plumber_version      = .PLUMBER_VERSION,
-    padronizar_enderecos = TRUE,
-    geocodebr            = as.character(packageVersion("geocodebr")),
-    r_version            = as.character(R.version$version.string)
+    plumber_version    = .PLUMBER_VERSION,
+    padronizacao       = "explicita_via_enderecobr",
+    geocodebr          = as.character(packageVersion("geocodebr")),
+    enderecobr         = tryCatch(as.character(packageVersion("enderecobr")),
+                                  error = function(e) "AUSENTE"),
+    r_version          = as.character(R.version$version.string)
   )
 }
 
