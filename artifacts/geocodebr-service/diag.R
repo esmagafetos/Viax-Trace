@@ -9,7 +9,7 @@
 options(error = function() { traceback(3); quit(status = 1) })
 
 cat("R       :", R.version.string, "\n")
-for (p in c("arrow", "duckdb", "callr", "geocodebr", "sf", "dplyr")) {
+for (p in c("arrow", "duckdb", "callr", "geocodebr", "enderecobr", "sf", "dplyr")) {
   v <- tryCatch(as.character(packageVersion(p)), error = function(e) "AUSENTE")
   cat(sprintf("%-9s: %s\n", p, v))
 }
