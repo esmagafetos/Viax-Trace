@@ -101,6 +101,7 @@ export interface GeoResult {
   fonte?: "reverse" | "forward" | "photon" | "overpass" | "brasilapi" | "awesomeapi" | "google" | "geocodebr";
   confianca?: "rua" | "localidade" | "estimado";
   localidade?: string;
+  uf?: string;
 }
 
 export interface ParsedAddress {
@@ -667,19 +668,21 @@ export function haversineMetros(lat1: number, lon1: number, lat2: number, lon2: 
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-export async function geocodeBrasilAPI(cep: string): Promise<{ rua: string; cidade: string; bairro: string; lat?: number; lon?: number } | null> {
+export async function geocodeBrasilAPI(cep: string): Promise<{ rua: string; cidade: string; bairro: string; uf?: string; lat?: number; lon?: number } | null> {
   const limpo = cep.replace(/\D/g, "");
   if (limpo.length !== 8) return null;
   logger.debug({ cep: limpo }, "geocodeBrasilAPI v2 call");
-  // v2 returns location.coordinates with lat/lon — primary Brazilian geocoder
+  // v2 returns location.coordinates com lat/lon e state (UF) — primary Brazilian geocoder
   const data = await httpGet(`https://brasilapi.com.br/api/cep/v2/${limpo}`);
   if (!data?.street) return null;
   const lat = data.location?.coordinates?.latitude != null ? parseFloat(String(data.location.coordinates.latitude)) : undefined;
   const lon = data.location?.coordinates?.longitude != null ? parseFloat(String(data.location.coordinates.longitude)) : undefined;
+  const ufRaw = typeof data.state === "string" ? data.state.trim().toUpperCase() : "";
   return {
     rua: data.street.replace(/\b\w/g, (c: string) => c.toUpperCase()),
     cidade: data.city ?? "",
     bairro: data.neighborhood ?? "",
+    uf: /^[A-Z]{2}$/.test(ufRaw) ? ufRaw : undefined,
     lat: lat && !isNaN(lat) ? lat : undefined,
     lon: lon && !isNaN(lon) ? lon : undefined,
   };
@@ -711,13 +714,14 @@ export async function geocodeCEPBrasileiro(cep: string): Promise<GeoResult | nul
 
   const brasilResult = await geocodeBrasilAPI(limpo);
   if (brasilResult?.rua) {
-    logger.debug({ cep: limpo, rua: brasilResult.rua, lat: brasilResult.lat }, "BrasilAPI v2 CEP hit");
+    logger.debug({ cep: limpo, rua: brasilResult.rua, lat: brasilResult.lat, uf: brasilResult.uf }, "BrasilAPI v2 CEP hit");
     return {
       rua: brasilResult.rua,
       lat: brasilResult.lat,
       lon: brasilResult.lon,
       fonte: "brasilapi",
       confianca: brasilResult.lat ? "rua" : "localidade",
+      uf: brasilResult.uf,
     };
   }
 
@@ -818,9 +822,20 @@ export async function geocodeForwardPOI(
 // Chama o microserviço R/Plumber que usa o pacote geocodebr do IPEA.
 // Por padrão usa nosso endpoint hospedado (DEFAULT_GEOCODEBR_URL); aceita
 // override via argumento (per-user no DB) ou env GEOCODEBR_URL.
+// Extrai UF (2 letras) de strings de cidade comuns:
+//   "São Paulo - SP" / "São Paulo/SP" / "São Paulo, SP" / "Sao Paulo (SP)"
+export function extractUFFromCidade(cidade: string | null | undefined): string | null {
+  if (!cidade) return null;
+  const m = String(cidade).match(/[\s\-\/,\(]([A-Z]{2})[\s\)]*$/i);
+  if (!m) return null;
+  const uf = m[1].toUpperCase();
+  return /^[A-Z]{2}$/.test(uf) ? uf : null;
+}
+
 export async function geocodeGeocobeBR(
   logradouro: string,
   municipio: string,
+  estado: string | null,
   numero: string = "",
   url: string | null = null
 ): Promise<GeoResult | null> {
@@ -828,8 +843,16 @@ export async function geocodeGeocobeBR(
     .trim()
     .replace(/\/+$/, "");
   if (!baseUrl) return null;
+  // Plumber exige UF de 2 letras (plumber.R linha 84-86). Sem UF não chamamos:
+  // poupa round-trip e evita poluir o log do Space com erro 200 "obrigatórios".
+  const uf = (estado || "").trim().toUpperCase();
+  if (!/^[A-Z]{2}$/.test(uf)) {
+    logger.debug({ logradouro, municipio }, "geocodebr skip (UF ausente)");
+    return null;
+  }
+  if (!logradouro?.trim() || !municipio?.trim()) return null;
   try {
-    const params = new URLSearchParams({ logradouro, numero, municipio });
+    const params = new URLSearchParams({ logradouro, numero, municipio, estado: uf });
     const data = await httpGetWithHeaders(
       `${baseUrl}/geocode?${params.toString()}`,
       geocodebrAuthHeaders()
@@ -837,7 +860,7 @@ export async function geocodeGeocobeBR(
     if (data && data.encontrado === true && typeof data.lat === "number" && typeof data.lon === "number") {
       const precisao = typeof data.precisao === "number" ? data.precisao : 6;
       logger.debug(
-        { logradouro, municipio, lat: data.lat, lon: data.lon, precisao, tipo: data.tipo },
+        { logradouro, municipio, uf, lat: data.lat, lon: data.lon, precisao, tipo: data.tipo },
         "geocodebr CNEFE hit"
       );
       return {
@@ -847,11 +870,12 @@ export async function geocodeGeocobeBR(
         fonte: "geocodebr",
         // precisao 1-2 = endereço exato; 3-4 = logradouro; 5-6 = localidade
         confianca: precisao <= 2 ? "rua" : precisao <= 4 ? "localidade" : "estimado",
+        uf,
       };
     }
     return null;
   } catch (err) {
-    logger.debug({ logradouro, municipio, err: String(err) }, "geocodebr indisponível ou sem resultado");
+    logger.debug({ logradouro, municipio, uf, err: String(err) }, "geocodebr indisponível ou sem resultado");
     return null;
   }
 }
@@ -1501,15 +1525,19 @@ export async function processarEndereco(
 
     // CEP detectado: usar geocodificação brasileira (BrasilAPI v2 → AwesomeAPI)
     // como fonte primária para endereços brasileiros — substitui Photon/Nominatim para ruas
+    let ufHint: string | null = extractUFFromCidade(item.cidade) || extractUFFromCidade(parsed.cidade);
     if (cep) {
       const cepGeo = await geocodeCEPBrasileiro(cep);
       if (cepGeo) {
         if (!parsed.rua_principal) parsed.rua_principal = cepGeo.rua;
+        // UF do CEP é fonte autoritativa pro CNEFE/IBGE (geocodebr exige sigla)
+        if (!ufHint && cepGeo.uf) ufHint = cepGeo.uf;
         // Preencher campos de localidade vazios
         if (!parsed.cidade) {
           const raw = await geocodeBrasilAPI(cep);
           if (raw?.cidade) parsed.cidade = raw.cidade;
           if (raw?.bairro && !parsed.bairro) parsed.bairro = raw.bairro;
+          if (!ufHint && raw?.uf) ufHint = raw.uf;
         }
         // Se o geocodificador de CEP retornou coordenadas E o reverso não é confiável,
         // usar as coordenadas do CEP como ponto de partida
@@ -1541,23 +1569,35 @@ export async function processarEndereco(
           if (forwardGeoResult?.lon) geocodeLon = forwardGeoResult.lon;
         }
       } else {
-        const fwd = await geocodeForwardNominatim(query, newUltimaReq);
-        forwardGeoResult = fwd.result;
-        newUltimaReq = fwd.ultimaReq;
-        if (forwardConfirmaRua(parsed, forwardGeoResult)) {
-          geoResult = forwardGeoResult;
-          if (forwardGeoResult?.lat) geocodeLat = forwardGeoResult.lat;
-          if (forwardGeoResult?.lon) geocodeLon = forwardGeoResult.lon;
-        }
-
-        // 3. geocodebr (CNEFE/IBGE) — fallback para interior e municípios pouco mapeados no OSM
-        // Ativado apenas quando Photon + Nominatim falharam em confirmar a rua.
-        if (!geoResult && parsed.rua_principal && item.cidade) {
-          const geocobrResult = await geocodeGeocobeBR(parsed.rua_principal, item.cidade, parsed.numero, geocodebrUrl);
-          if (geocobrResult) {
+        // 1. geocodebr (CNEFE/IBGE) — PRIORIDADE para extração de rua e validação
+        //    de coordenadas em endereços brasileiros. CNEFE indexa todo o país,
+        //    inclusive interior pouco mapeado no OSM, e não tem rate-limit como
+        //    Nominatim. Requer UF (derivada do CEP/cidade acima). Em modo
+        //    "geocodebr" sempre tenta primeiro; em modo "builtin" também — só
+        //    pulamos se UF não estiver disponível.
+        const cidadeGeo = item.cidade || parsed.cidade;
+        if (parsed.rua_principal && cidadeGeo && ufHint) {
+          const geocobrResult = await geocodeGeocobeBR(parsed.rua_principal, cidadeGeo, ufHint, parsed.numero, geocodebrUrl);
+          if (geocobrResult && forwardConfirmaRua(parsed, geocobrResult)) {
             forwardGeoResult = geocobrResult;
             geoResult = geocobrResult;
             if (geocobrResult.lat) { geocodeLat = geocobrResult.lat; geocodeLon = geocobrResult.lon!; }
+          }
+        }
+
+        // 2. Nominatim forward — fallback quando geocodebr falhou ou foi pulado
+        //    (sem UF). Mantém compatibilidade com endereços fora do Brasil e com
+        //    casos onde o CNEFE não tem o logradouro indexado.
+        if (!isRuaConfiavel(geoResult)) {
+          const fwd = await geocodeForwardNominatim(query, newUltimaReq);
+          newUltimaReq = fwd.ultimaReq;
+          if (fwd.result && forwardConfirmaRua(parsed, fwd.result)) {
+            forwardGeoResult = fwd.result;
+            geoResult = fwd.result;
+            if (fwd.result.lat) geocodeLat = fwd.result.lat;
+            if (fwd.result.lon) geocodeLon = fwd.result.lon;
+          } else if (!forwardGeoResult) {
+            forwardGeoResult = fwd.result;
           }
         }
 

@@ -265,13 +265,6 @@ class _ProcessScreenState extends State<ProcessScreen> {
         'action': 'Adicione sua chave em Configurações → Instâncias.',
       };
     }
-    if (s.instanceMode == 'geocodebr') {
-      return {
-        'type': 'info',
-        'message': 'Motor GeocodeR BR (CNEFE/IBGE) ativo.',
-        'action': 'Microserviço R deve rodar na porta 8002.',
-      };
-    }
     return null;
   }
 

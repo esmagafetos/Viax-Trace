@@ -164,7 +164,12 @@ router.post("/process/upload", upload.single("arquivo"), async (req, res): Promi
       sendSSE(res, "step", { step: `⚠️ Arquivo tem ${totalOriginal} endereços. Processando os primeiros ${MAX_ENDERECOS}.` });
     }
 
-    const instanceLabel = instanceMode === "googlemaps" ? "Google Maps API" : "Nominatim/OSM + BrasilAPI";
+    const instanceLabel =
+      instanceMode === "googlemaps"
+        ? "Google Maps API"
+        : instanceMode === "geocodebr"
+        ? "GeocodeR BR (CNEFE/IBGE) → Photon → Nominatim"
+        : "GeocodeR BR (CNEFE/IBGE) + Photon + BrasilAPI + Nominatim";
     const parserLabel = parserMode === "ai" && aiProvider ? `IA (${aiProvider})` : "Parser embutido";
     sendSSE(res, "step", { step: `${enderecos.length} endereço(s) · Instância: ${instanceLabel} · Parser: ${parserLabel} · Tolerância: ${toleranceMeters}m` });
 
