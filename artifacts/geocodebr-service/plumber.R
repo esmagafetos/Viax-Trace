@@ -59,13 +59,18 @@ function(logradouro = "", numero = "", municipio = "", estado = "") {
     }
 
     resultado <- geocodebr::geocode(
-      enderecos          = df,
-      campos_endereco    = campos,
-      resultado_completo = FALSE,
-      resolver_empates   = TRUE,
-      resultado_sf       = FALSE,
-      verboso            = FALSE,
-      cache              = TRUE
+      enderecos            = df,
+      campos_endereco      = campos,
+      resultado_completo   = FALSE,
+      resolver_empates     = TRUE,
+      resultado_sf         = FALSE,
+      verboso              = FALSE,
+      cache                = TRUE,
+      # geocodebr >=0.6.2 exige inputs padronizados (UPPERCASE, sem acento).
+      # Sem isto, o callr subprocess emite "Os dados de entrada nao estao
+      # padronizados" — que era exatamente o erro mascarado por
+      # "in callr subprocess." vindo do tryCatch externo.
+      padronizar_enderecos = TRUE
     )
 
     if (nrow(resultado) > 0 && !is.na(resultado$lat[1]) && !is.na(resultado$lon[1])) {
