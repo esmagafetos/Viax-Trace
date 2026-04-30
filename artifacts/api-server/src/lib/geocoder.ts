@@ -853,14 +853,29 @@ export async function geocodeGeocobeBR(
   if (!logradouro?.trim() || !municipio?.trim()) return null;
   try {
     const params = new URLSearchParams({ logradouro, numero, municipio, estado: uf });
+    // 20s timeout: HF Space free-tier hiberna; cold-start observado em ~11-16s.
+    // Quando warm a chamada volta em ~200ms, então o timeout largo só "paga"
+    // no primeiro endereço de uma rota após pausa longa.
     const data = await httpGetWithHeaders(
       `${baseUrl}/geocode?${params.toString()}`,
-      geocodebrAuthHeaders()
+      geocodebrAuthHeaders(),
+      20000
     );
     if (data && data.encontrado === true && typeof data.lat === "number" && typeof data.lon === "number") {
-      const precisao = typeof data.precisao === "number" ? data.precisao : 6;
+      // geocodebr retorna `precisao` como string categórica (não número):
+      //   "numero" / "numero_aproximado"  → endereço com número predial (alta)
+      //   "logradouro" / "cep"            → rua/CEP sem número (média)
+      //   "localidade" / "municipio"      → bairro ou cidade (baixa)
+      // Ver: https://ipeagit.github.io/geocodebr/articles/geocodebr.html#categorias-de-precisao
+      const precisao = String(data.precisao ?? "").toLowerCase();
+      const confianca: "rua" | "localidade" | "estimado" =
+        precisao === "numero" || precisao === "numero_aproximado"
+          ? "rua"
+          : precisao === "logradouro" || precisao === "cep"
+          ? "localidade"
+          : "estimado";
       logger.debug(
-        { logradouro, municipio, uf, lat: data.lat, lon: data.lon, precisao, tipo: data.tipo },
+        { logradouro, municipio, uf, lat: data.lat, lon: data.lon, precisao, tipo: data.tipo, confianca },
         "geocodebr CNEFE hit"
       );
       return {
@@ -868,8 +883,7 @@ export async function geocodeGeocobeBR(
         lat: data.lat,
         lon: data.lon,
         fonte: "geocodebr",
-        // precisao 1-2 = endereço exato; 3-4 = logradouro; 5-6 = localidade
-        confianca: precisao <= 2 ? "rua" : precisao <= 4 ? "localidade" : "estimado",
+        confianca,
         uf,
       };
     }
