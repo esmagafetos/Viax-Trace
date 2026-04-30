@@ -8,52 +8,52 @@ library(geocodebr)
 # Marcador de versão deste arquivo — facilita confirmar "o servidor recarregou
 # o plumber.R novo" sem precisar grep do disco. Aparece no log de startup
 # (start.R) e numa resposta HTTP do /version.
-.PLUMBER_VERSION <- "2026-04-30.enderecobr-correspondencia"
+.PLUMBER_VERSION <- "2026-04-30.enderecobr-overwrite"
 cat(sprintf("[plumber.R] carregado (versao=%s)\n", .PLUMBER_VERSION))
 
-# Loga as assinaturas reais das funções do enderecobr no startup, para que
-# qualquer mudança futura de API fique imediatamente visível nos logs.
-if (requireNamespace("enderecobr", quietly = TRUE)) {
-  cat("[plumber.R] padronizar_enderecos:",
-      paste(names(formals(enderecobr::padronizar_enderecos)), collapse=", "), "\n")
-  cat("[plumber.R] correspondencia_campos:",
-      paste(names(formals(enderecobr::correspondencia_campos)), collapse=", "), "\n")
-}
-
 # Chamar enderecobr explicitamente contorna o mismatch entre geocodebr 0.6.2
-# (espera marker interno do enderecobr >=0.6) e enderecobr 0.5.0 (única versão
-# pré-compilada para arm64 disponível no r-universe).
+# (espera dados já padronizados nas colunas-alvo) e enderecobr 0.5.0 (única
+# versão pré-compilada para arm64 no r-universe).
 #
-# A assinatura real de `padronizar_enderecos` em 0.5.0 é:
-#   padronizar_enderecos(enderecos, campos_do_endereco = correspondencia_campos(),
-#                        formato_estados, formato_numeros, ...)
-# onde `correspondencia_campos()` recebe os NOMES das colunas do df como args
-# nomeados (logradouro=, numero=, municipio=, estado=, etc.) e retorna uma
-# tibble de mapeamento que `padronizar_enderecos` consome via `campos_do_endereco`.
+# CRÍTICO: enderecobr 0.5.0 NÃO sobrescreve as colunas originais — ele cria
+# colunas novas com sufixo `_padr` (ex.: logradouro_padr, municipio_padr).
+# Como geocodebr lê as colunas APONTADAS por `campos_endereco`, precisamos
+# substituir os valores originais pelos padronizados antes de passar adiante.
 .padronizar <- function(df, tem_estado) {
   if (!requireNamespace("enderecobr", quietly = TRUE)) {
     stop("Pacote 'enderecobr' nao instalado. Rode bash install-geocodebr-termux.sh")
   }
   campos_corresp <- if (tem_estado) {
     enderecobr::correspondencia_campos(
-      logradouro = "logradouro",
-      numero     = "numero",
-      municipio  = "municipio",
-      estado     = "estado"
+      logradouro = "logradouro", numero = "numero",
+      municipio  = "municipio",  estado = "estado"
     )
   } else {
     enderecobr::correspondencia_campos(
-      logradouro = "logradouro",
-      numero     = "numero",
+      logradouro = "logradouro", numero = "numero",
       municipio  = "municipio"
     )
   }
-  enderecobr::padronizar_enderecos(
+  out <- enderecobr::padronizar_enderecos(
     enderecos          = df,
     campos_do_endereco = campos_corresp,
     formato_estados    = "sigla",
     formato_numeros    = "integer"
   )
+  # data.table -> data.frame para evitar semântica por referência
+  out <- as.data.frame(out, stringsAsFactors = FALSE)
+
+  # Sobrescreve originais com as versões _padr e remove as _padr.
+  cols <- if (tem_estado) c("logradouro","numero","municipio","estado")
+          else            c("logradouro","numero","municipio")
+  for (c in cols) {
+    padr <- paste0(c, "_padr")
+    if (padr %in% names(out)) {
+      out[[c]]    <- out[[padr]]
+      out[[padr]] <- NULL
+    }
+  }
+  out
 }
 
 # Desempacota um erro do callr/rlang até a mensagem-raiz mais informativa.
