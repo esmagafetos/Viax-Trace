@@ -120,7 +120,7 @@ class CompletionNotifications {
           importance: Importance.high,
           priority: Priority.high,
           autoCancel: true,
-          category: AndroidNotificationCategory.err,
+          category: AndroidNotificationCategory.error,
         ),
         iOS: DarwinNotificationDetails(),
       ),

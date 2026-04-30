@@ -65,6 +65,26 @@ jobs:
       - name: Generate launcher icons
         run: dart run flutter_launcher_icons || true
 
+      # Xcode 15/16 ainda exige um Development Team mesmo com --no-codesign,
+      # a menos que o code signing seja explicitamente desligado nas
+      # build settings via xcconfig. Esse passo escreve um xcconfig
+      # que zera CODE_SIGNING_ALLOWED/REQUIRED e o anexa ao Release.xcconfig
+      # gerado pelo `flutter create`.
+      - name: Disable iOS code signing for unsigned CI build
+        run: |
+          cat > ios/Flutter/NoCodeSign.xcconfig <<'EOF'
+          CODE_SIGNING_ALLOWED = NO
+          CODE_SIGNING_REQUIRED = NO
+          CODE_SIGN_IDENTITY =
+          CODE_SIGN_STYLE = Manual
+          DEVELOPMENT_TEAM =
+          EOF
+          if ! grep -q 'NoCodeSign.xcconfig' ios/Flutter/Release.xcconfig; then
+            echo '#include "NoCodeSign.xcconfig"' >> ios/Flutter/Release.xcconfig
+          fi
+          echo "--- Release.xcconfig ---"
+          cat ios/Flutter/Release.xcconfig
+
       - name: Build iOS (no codesign)
         run: |
           flutter build ios --release --no-codesign \
