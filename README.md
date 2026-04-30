@@ -2,7 +2,7 @@
 
 # ViaX:Trace
 
-**Auditoria automatizada de rotas logísticas — XLSX/CSV vs. coordenadas GPS reais**
+**Auditoria automatizada de rotas logísticas**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-orange.svg?style=flat-square)](https://opensource.org/licenses/MIT)
 [![Backend](https://img.shields.io/badge/Backend-Render-46E3B7?style=flat-square&logo=render&logoColor=white)](https://viax-trace-api.onrender.com)
