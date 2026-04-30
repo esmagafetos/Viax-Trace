@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useLayoutEffect, useRef } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import ViaXLogo, { LogoIcon } from "@/components/ViaXLogo";
@@ -73,7 +73,7 @@ interface LayoutProps {
 export default function Layout({ children, showNav = true }: LayoutProps) {
   const { user, logout } = useAuth();
   const { dark, toggle } = useTheme();
-  const [loc] = useLocation();
+  const [loc, setLocation] = useLocation();
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
 
@@ -84,6 +84,64 @@ export default function Layout({ children, showNav = true }: LayoutProps) {
     { href: "/history", label: "Histórico" },
     { href: "/docs", label: "Docs" },
   ];
+
+  // Índice da aba ativa (-1 quando estamos numa rota fora das abas, ex.: /settings)
+  const navIndex = navLinks.findIndex(
+    (l) => loc === l.href || (l.href !== "/dashboard" && loc.startsWith(l.href)),
+  );
+
+  // Refs e estado para o indicador laranja deslizante (desktop + mobile)
+  const desktopTabRefs = useRef<(HTMLSpanElement | null)[]>([]);
+  const mobileTabRefs = useRef<(HTMLSpanElement | null)[]>([]);
+  const [desktopInd, setDesktopInd] = useState<{ left: number; width: number } | null>(null);
+  const [mobileInd, setMobileInd] = useState<{ left: number; width: number } | null>(null);
+
+  useLayoutEffect(() => {
+    if (navIndex < 0) {
+      setDesktopInd(null);
+      setMobileInd(null);
+      return;
+    }
+    const measure = () => {
+      const d = desktopTabRefs.current[navIndex];
+      if (d) setDesktopInd({ left: d.offsetLeft, width: d.offsetWidth });
+      const m = mobileTabRefs.current[navIndex];
+      if (m) setMobileInd({ left: m.offsetLeft, width: m.offsetWidth });
+    };
+    measure();
+    // Re-mede em resize (responsivo) e nos próximos frames (após fontes carregarem)
+    const raf = requestAnimationFrame(measure);
+    window.addEventListener("resize", measure);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("resize", measure);
+    };
+  }, [loc, navIndex]);
+
+  // Swipe horizontal entre abas (mobile)
+  const swipeStart = useRef<{ x: number; y: number; t: number } | null>(null);
+
+  const onSwipeStart = (e: React.TouchEvent) => {
+    if (navIndex === -1) return;
+    const t = e.touches[0];
+    swipeStart.current = { x: t.clientX, y: t.clientY, t: Date.now() };
+  };
+
+  const onSwipeEnd = (e: React.TouchEvent) => {
+    const start = swipeStart.current;
+    swipeStart.current = null;
+    if (!start || navIndex === -1) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - start.x;
+    const dy = t.clientY - start.y;
+    const dt = Date.now() - start.t;
+    // Gesto válido: horizontal forte, vertical pequeno, rápido
+    if (Math.abs(dx) < 70 || Math.abs(dy) > 60 || dt > 600) return;
+    const nextIdx = dx < 0 ? navIndex + 1 : navIndex - 1;
+    if (nextIdx >= 0 && nextIdx < navLinks.length) {
+      setLocation(navLinks[nextIdx].href);
+    }
+  };
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -115,22 +173,47 @@ export default function Layout({ children, showNav = true }: LayoutProps) {
               </Link>
 
               {/* Desktop Nav */}
-              <nav className="desktop-nav" style={{ display: "flex", gap: "0.25rem", alignItems: "center", flex: 1, justifyContent: "center" }}>
-                {navLinks.map((link) => {
-                  const isActive = loc === link.href || (link.href !== "/dashboard" && loc.startsWith(link.href));
+              <nav className="desktop-nav" style={{ position: "relative", display: "flex", gap: "0.25rem", alignItems: "center", flex: 1, justifyContent: "center" }}>
+                {desktopInd && (
+                  <span
+                    aria-hidden
+                    className="viax-tab-indicator"
+                    style={{
+                      position: "absolute",
+                      left: desktopInd.left,
+                      width: desktopInd.width,
+                      top: "50%",
+                      transform: "translateY(-50%)",
+                      height: 34,
+                      background: "var(--accent-dim)",
+                      border: "1px solid rgba(212,82,26,0.35)",
+                      borderRadius: 99,
+                      transition: "left 320ms cubic-bezier(0.4,0,0.2,1), width 320ms cubic-bezier(0.4,0,0.2,1)",
+                      pointerEvents: "none",
+                      zIndex: 0,
+                    }}
+                  />
+                )}
+                {navLinks.map((link, i) => {
+                  const isActive = i === navIndex;
                   return (
                     <Link key={link.href} href={link.href}>
-                      <span className={`nav-link ${isActive ? "active" : ""}`} style={{
-                        display: "flex", alignItems: "center", gap: "0.4rem",
-                        padding: "0.45rem 0.9rem",
-                        borderRadius: 99,
-                        fontSize: "0.82rem",
-                        fontWeight: isActive ? 600 : 500,
-                        cursor: "pointer",
-                        transition: "all 0.2s ease",
-                        color: isActive ? "var(--accent)" : "var(--text-muted)",
-                        background: isActive ? "var(--accent-dim)" : "transparent",
-                      }}>
+                      <span
+                        ref={(el) => { desktopTabRefs.current[i] = el; }}
+                        className={`nav-link ${isActive ? "active" : ""}`}
+                        style={{
+                          position: "relative", zIndex: 1,
+                          display: "flex", alignItems: "center", gap: "0.4rem",
+                          padding: "0.45rem 0.9rem",
+                          borderRadius: 99,
+                          fontSize: "0.82rem",
+                          fontWeight: isActive ? 600 : 500,
+                          cursor: "pointer",
+                          transition: "color 0.2s ease",
+                          color: isActive ? "var(--accent)" : "var(--text-muted)",
+                          background: "transparent",
+                        }}
+                      >
                         {NAV_ICONS[link.href]}
                         {link.label}
                       </span>
@@ -219,19 +302,43 @@ export default function Layout({ children, showNav = true }: LayoutProps) {
 
             {/* Mobile Nav */}
             <div className="mobile-nav-scroll" style={{ display: "none" }}>
-              <nav style={{ display: "flex", gap: "0.4rem", padding: "0 0 0.6rem 0", overflowX: "auto", scrollbarWidth: "none", WebkitOverflowScrolling: "touch" }}>
-                {navLinks.map((link) => {
-                  const isActive = loc === link.href;
+              <nav style={{ position: "relative", display: "flex", gap: "0.4rem", padding: "0 0 0.6rem 0", overflowX: "auto", scrollbarWidth: "none", WebkitOverflowScrolling: "touch" }}>
+                {mobileInd && (
+                  <span
+                    aria-hidden
+                    className="viax-tab-indicator"
+                    style={{
+                      position: "absolute",
+                      left: mobileInd.left,
+                      width: mobileInd.width,
+                      top: 0,
+                      height: "calc(100% - 0.6rem)",
+                      background: "var(--accent-dim)",
+                      border: "1px solid rgba(212,82,26,0.35)",
+                      borderRadius: 99,
+                      transition: "left 320ms cubic-bezier(0.4,0,0.2,1), width 320ms cubic-bezier(0.4,0,0.2,1)",
+                      pointerEvents: "none",
+                      zIndex: 0,
+                    }}
+                  />
+                )}
+                {navLinks.map((link, i) => {
+                  const isActive = i === navIndex;
                   return (
                     <Link key={link.href} href={link.href}>
-                      <span className={`nav-link ${isActive ? "active" : ""}`} style={{
-                        display: "flex", alignItems: "center", gap: "0.35rem",
-                        padding: "0.45rem 0.8rem", borderRadius: 99, fontSize: "0.82rem",
-                        fontWeight: isActive ? 600 : 500, cursor: "pointer", transition: "all 0.2s ease",
-                        color: isActive ? "var(--accent)" : "var(--text-muted)",
-                        background: isActive ? "var(--accent-dim)" : "var(--surface-2)",
-                        whiteSpace: "nowrap", flexShrink: 0,
-                      }}>
+                      <span
+                        ref={(el) => { mobileTabRefs.current[i] = el; }}
+                        className={`nav-link ${isActive ? "active" : ""}`}
+                        style={{
+                          position: "relative", zIndex: 1,
+                          display: "flex", alignItems: "center", gap: "0.35rem",
+                          padding: "0.45rem 0.8rem", borderRadius: 99, fontSize: "0.82rem",
+                          fontWeight: isActive ? 600 : 500, cursor: "pointer", transition: "color 0.2s ease",
+                          color: isActive ? "var(--accent)" : "var(--text-muted)",
+                          background: isActive ? "transparent" : "var(--surface-2)",
+                          whiteSpace: "nowrap", flexShrink: 0,
+                        }}
+                      >
                         {NAV_ICONS[link.href]}{link.label}
                       </span>
                     </Link>
@@ -243,10 +350,27 @@ export default function Layout({ children, showNav = true }: LayoutProps) {
         </header>
       )}
 
-      <main style={{ maxWidth: 1200, margin: "0 auto", padding: showNav ? "2rem 1.25rem 3rem" : 0 }}>
+      <main
+        onTouchStart={onSwipeStart}
+        onTouchEnd={onSwipeEnd}
+        style={{ maxWidth: 1200, margin: "0 auto", padding: showNav ? "2rem 1.25rem 3rem" : 0, touchAction: "pan-y" }}
+      >
         {children}
       </main>
 
+      {/* Animação sutil de pulso laranja sobre a aba ativa */}
+      <style>{`
+        @keyframes viax-tab-pulse {
+          0%, 100% { box-shadow: 0 0 0 0 rgba(212,82,26,0.0), 0 0 12px -2px rgba(212,82,26,0.18); }
+          50%      { box-shadow: 0 0 0 2px rgba(212,82,26,0.08), 0 0 18px -2px rgba(212,82,26,0.32); }
+        }
+        .viax-tab-indicator {
+          animation: viax-tab-pulse 2.6s ease-in-out infinite;
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .viax-tab-indicator { animation: none; transition: none !important; }
+        }
+      `}</style>
     </div>
   );
 }

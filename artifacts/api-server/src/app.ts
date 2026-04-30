@@ -44,6 +44,14 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 const sessionSecret = process.env.SESSION_SECRET ?? "viax-scout-secret-change-in-production";
+if (!process.env.SESSION_SECRET) {
+  // Aviso defensivo: o fallback é estável, mas se ele mudar entre deploys
+  // todas as sessões ficam inválidas. Em produção isso é o sintoma típico
+  // de "fui deslogado depois que o servidor dormiu".
+  logger.warn(
+    "SESSION_SECRET não definido — usando fallback. Defina o secret nas variáveis de ambiente para que sessões sobrevivam a redeploys/cold-starts.",
+  );
+}
 
 // Persist sessions in PostgreSQL so users stay logged in across API restarts
 // (Render redeploys, free-tier cold starts, etc). Reuses the same pg Pool as
@@ -80,14 +88,17 @@ sessionStore.on("error", (err: Error) => {
 
 app.use(
   session({
+    name: "viax.sid",
     store: sessionStore,
     secret: sessionSecret,
     resave: false,
+    rolling: true,             // renova o cookie a cada request → usuário ativo nunca é deslogado
     saveUninitialized: false,
+    proxy: true,               // honra X-Forwarded-Proto vindo do load balancer (Render/Replit)
     cookie: {
       secure: process.env.NODE_ENV === "production",
       httpOnly: true,
-      maxAge: 7 * 24 * 60 * 60 * 1000,
+      maxAge: 30 * 24 * 60 * 60 * 1000,   // 30 dias rolantes (era 7 fixos)
       sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
     },
   })

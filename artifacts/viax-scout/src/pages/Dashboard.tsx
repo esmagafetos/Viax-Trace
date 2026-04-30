@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link } from "wouter";
 import {
   useGetDashboardSummary,
@@ -197,9 +197,29 @@ function FinancialPanel({ financial }: { financial: any }) {
   );
 }
 
-function HeroBanner({ userName }: { userName: string }) {
-  const [dismissed, setDismissed] = useState(false);
-  if (dismissed) return null;
+const HERO_BANNER_DISMISS_KEY = "viax-hero-banner-dismissed";
+
+function HeroBanner({ userName, hasAnalyses }: { userName: string; hasAnalyses: boolean }) {
+  const [dismissed, setDismissed] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem(HERO_BANNER_DISMISS_KEY) === "1";
+  });
+
+  // Esconde permanentemente assim que o usuário fizer (ou já tiver feito) a primeira análise.
+  useEffect(() => {
+    if (hasAnalyses && !dismissed) {
+      window.localStorage.setItem(HERO_BANNER_DISMISS_KEY, "1");
+      setDismissed(true);
+    }
+  }, [hasAnalyses, dismissed]);
+
+  if (dismissed || hasAnalyses) return null;
+
+  const handleClose = () => {
+    window.localStorage.setItem(HERO_BANNER_DISMISS_KEY, "1");
+    setDismissed(true);
+  };
+
   return (
     <div style={{
       position: "relative", overflow: "hidden",
@@ -260,7 +280,7 @@ function HeroBanner({ userName }: { userName: string }) {
             </button>
           </Link>
           <button
-            onClick={() => setDismissed(true)}
+            onClick={handleClose}
             style={{ background: "none", border: "none", color: "rgba(240,237,232,0.3)", cursor: "pointer", padding: "0.25rem", display: "flex", alignItems: "center", flexShrink: 0 }}
             title="Fechar"
           >
@@ -282,9 +302,11 @@ export default function Dashboard() {
   const r = (recent as any[]) ?? [];
   const f = financial as any;
 
+  const hasAnalyses = Array.isArray(r) && r.length > 0;
+
   return (
     <Layout>
-      <HeroBanner userName={user?.name?.split(" ")[0] ?? "usuário"} />
+      <HeroBanner userName={user?.name?.split(" ")[0] ?? "usuário"} hasAnalyses={hasAnalyses} />
 
       {/* Page title */}
       <div style={{ marginBottom: "1.5rem" }}>
