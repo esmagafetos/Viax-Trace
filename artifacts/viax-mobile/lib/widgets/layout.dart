@@ -194,7 +194,10 @@ class _Header extends StatelessWidget {
                       Padding(
                         padding: const EdgeInsets.only(bottom: 8, top: 2),
                         child: SizedBox(
-                          height: 38,
+                          // Altura extra pra o glow pulsante do pill ativo
+                          // (BoxShadow blur até 18 + spread) respirar sem
+                          // ser cortado pelo clip do SingleChildScrollView.
+                          height: 50,
                           child: _NavRow(
                             items: navItems,
                             isActive: isActive,
@@ -304,13 +307,16 @@ class _NavRowState extends State<_NavRow> {
         children: [
           // 1) Indicador laranja: posicionado (não conta para o tamanho do
           //    Stack) e desenhado primeiro → fica ATRÁS dos chips.
+          //    Top/bottom em 4 pra o glow pulsante (BoxShadow) respirar
+          //    sem encostar nas bordas verticais — mesmo truque do web
+          //    (`height: calc(100% - 0.6rem)`).
           if (hasIndicator)
             AnimatedPositioned(
               duration: const Duration(milliseconds: 320),
               curve: Curves.easeOutCubic,
               left: _lefts[_activeIdx],
-              top: 0,
-              bottom: 0,
+              top: 4,
+              bottom: 4,
               width: _widths[_activeIdx],
               child: const IgnorePointer(child: _PulsingPill()),
             ),
