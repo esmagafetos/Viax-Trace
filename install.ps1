@@ -1,16 +1,16 @@
 # =============================================================================
 #  ViaX: System — Instalador para Windows (PowerShell 5.1+)
-#  https://github.com/esmagafetos/Viax-Scout
+#  https://github.com/ViaXTrace/Viax-Trace
 #
 #  Como usar (PowerShell como Administrador):
 #    Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
-#    iwr -useb https://raw.githubusercontent.com/esmagafetos/Viax-Scout/main/install.ps1 | iex
+#    iwr -useb https://raw.githubusercontent.com/ViaXTrace/Viax-Trace/main/install.ps1 | iex
 # =============================================================================
 
 $ErrorActionPreference = "Stop"
 $ProgressPreference    = "SilentlyContinue"
 
-$REPO_URL  = "https://github.com/esmagafetos/Viax-Scout.git"
+$REPO_URL  = "https://github.com/ViaXTrace/Viax-Trace.git"
 $APP_DIR   = Join-Path $env:USERPROFILE "viax-system"
 $DB_NAME   = "viax_system"
 $API_PORT  = 8080

@@ -117,7 +117,7 @@ export default function ViaXLogo({
 }
 
 export function GitHubBanner() {
-  const REPO_URL = "https://github.com/esmagafetos/Viax-Scout";
+  const REPO_URL = "https://github.com/ViaXTrace/Viax-Trace";
   return (
     <a
       href={REPO_URL}

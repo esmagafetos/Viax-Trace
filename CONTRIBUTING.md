@@ -8,8 +8,8 @@ Ao participar deste projeto, você concorda em seguir o nosso [Código de Condut
 
 ## Como posso contribuir?
 
-- 🐛 **Reportar bugs** — abra uma [issue de bug](https://github.com/esmagafetos/Viax-Scout/issues/new?template=bug_report.md)
-- ✨ **Sugerir funcionalidades** — abra uma [issue de feature](https://github.com/esmagafetos/Viax-Scout/issues/new?template=feature_request.md)
+- 🐛 **Reportar bugs** — abra uma [issue de bug](https://github.com/ViaXTrace/Viax-Trace/issues/new?template=bug_report.md)
+- ✨ **Sugerir funcionalidades** — abra uma [issue de feature](https://github.com/ViaXTrace/Viax-Trace/issues/new?template=feature_request.md)
 - 📝 **Melhorar a documentação** — qualquer melhoria no `README.md`, comentários, ou exemplos é bem-vinda
 - 🔧 **Enviar código** — siga o fluxo abaixo
 
@@ -27,7 +27,7 @@ git clone https://github.com/SEU-USUARIO/Viax-Scout.git
 cd Viax-Scout
 
 # 2. Adicione o upstream para sincronizar
-git remote add upstream https://github.com/esmagafetos/Viax-Scout.git
+git remote add upstream https://github.com/ViaXTrace/Viax-Trace.git
 
 # 3. Instale dependências
 pnpm install
@@ -114,7 +114,7 @@ Mais detalhes em [`README.md`](README.md#-arquitetura) e [`replit.md`](replit.md
 
 ## Dúvidas
 
-Use [GitHub Discussions](https://github.com/esmagafetos/Viax-Scout/discussions) para perguntas abertas e [Issues](https://github.com/esmagafetos/Viax-Scout/issues) apenas para bugs e features.
+Use [GitHub Discussions](https://github.com/ViaXTrace/Viax-Trace/discussions) para perguntas abertas e [Issues](https://github.com/ViaXTrace/Viax-Trace/issues) apenas para bugs e features.
 
 ---
 

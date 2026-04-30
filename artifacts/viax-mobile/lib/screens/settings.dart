@@ -879,16 +879,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget _sobreTab() {
     final repoLinks = const [
       (
-        'https://github.com/esmagafetos/Viax-Scout',
+        'https://github.com/ViaXTrace/Viax-Trace',
         Icons.code,
-        'GitHub — esmagafetos/Viax-Scout',
+        'GitHub — ViaXTrace/Viax-Trace',
         'Código-fonte, issues, pull requests e releases',
         'Open Source',
         Color(0xFF16A34A),
         Color(0x1A16A34A),
       ),
       (
-        'https://github.com/esmagafetos/Viax-Scout/blob/main/README.md',
+        'https://github.com/ViaXTrace/Viax-Trace/blob/main/README.md',
         Icons.menu_book_outlined,
         'Documentação (README)',
         'Guia de instalação, configuração e uso',
@@ -897,7 +897,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         Color(0x1A1D4ED8),
       ),
       (
-        'https://github.com/esmagafetos/Viax-Scout/issues',
+        'https://github.com/ViaXTrace/Viax-Trace/issues',
         Icons.error_outline,
         'Issues & Suporte',
         'Reporte bugs, solicite funcionalidades ou tire dúvidas',
@@ -906,7 +906,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         Color(0x1AB45309),
       ),
       (
-        'https://github.com/esmagafetos/Viax-Scout/releases',
+        'https://github.com/ViaXTrace/Viax-Trace/releases',
         Icons.local_offer_outlined,
         'Releases & Changelog',
         'Histórico de versões, notas de atualização',
@@ -932,12 +932,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
       (
         'Linux / macOS',
         Icons.desktop_mac_outlined,
-        'curl -fsSL https://raw.githubusercontent.com/esmagafetos/Viax-Scout/main/install.sh | bash',
+        'curl -fsSL https://raw.githubusercontent.com/ViaXTrace/Viax-Trace/main/install.sh | bash',
       ),
       (
         'Windows (PowerShell)',
         Icons.computer_outlined,
-        'iwr -useb https://raw.githubusercontent.com/esmagafetos/Viax-Scout/main/install.ps1 | iex',
+        'iwr -useb https://raw.githubusercontent.com/ViaXTrace/Viax-Trace/main/install.ps1 | iex',
       ),
       (
         'Docker',
@@ -1230,9 +1230,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
               _aboutInfo('Ambiente', 'Node.js 18+', 'pnpm · PostgreSQL 14+'),
               _aboutInfoLink(
                 'Repositório',
-                'github.com/esmagafetos/Viax-Scout',
+                'github.com/ViaXTrace/Viax-Trace',
                 'Fork & contribua!',
-                'https://github.com/esmagafetos/Viax-Scout',
+                'https://github.com/ViaXTrace/Viax-Trace',
               ),
             ],
           ),

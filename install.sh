@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # =============================================================================
 #  ViaX: System — Instalador Universal (Linux & macOS)
-#  https://github.com/esmagafetos/Viax-Scout
+#  https://github.com/ViaXTrace/Viax-Trace
 # =============================================================================
 set -euo pipefail
 
-REPO_URL="https://github.com/esmagafetos/Viax-Scout.git"
+REPO_URL="https://github.com/ViaXTrace/Viax-Trace.git"
 APP_DIR="${VIAX_DIR:-$HOME/viax-system}"
 DB_NAME="viax_system"
 DB_USER="${USER:-viax}"

@@ -21,7 +21,7 @@ O ViaX:Trace tem dois componentes:
 
 Acesse a página de Releases do projeto e baixe o APK mais recente:
 
-**[github.com/esmagafetos/Viax-Scout/releases](https://github.com/esmagafetos/Viax-Scout/releases)**
+**[github.com/ViaXTrace/Viax-Trace/releases](https://github.com/ViaXTrace/Viax-Trace/releases)**
 
 Procure pelo arquivo `viax-trace-vX.Y.Z.apk` (a versão mais recente fica no topo da lista).
 
@@ -91,6 +91,6 @@ Você não precisa — o app oficial já vem configurado. Mas se quiser hospedar
 
 <div align="center">
 
-[Voltar para o README](../README.md) · [Reportar problema](https://github.com/esmagafetos/Viax-Scout/issues/new)
+[Voltar para o README](../README.md) · [Reportar problema](https://github.com/ViaXTrace/Viax-Trace/issues/new)
 
 </div>

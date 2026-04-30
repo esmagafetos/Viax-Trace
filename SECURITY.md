@@ -15,7 +15,7 @@ A versão do branch `main` é a única ativamente suportada com correções de s
 
 Use uma das duas formas abaixo:
 
-1. **Recomendado** — abra um [Security Advisory privado](https://github.com/esmagafetos/Viax-Scout/security/advisories/new) no GitHub.
+1. **Recomendado** — abra um [Security Advisory privado](https://github.com/ViaXTrace/Viax-Trace/security/advisories/new) no GitHub.
 2. Envie um e-mail para **security@viax-trace.dev** com:
    - Descrição da vulnerabilidade
    - Passos para reproduzir

@@ -26,7 +26,7 @@ Exemplos de comportamento inaceitável:
 
 ## Aplicação
 
-Casos de comportamento abusivo, de assédio, ou de outra forma inaceitável podem ser reportados aos mantenedores em **conduct@viax-trace.dev** ou abrindo uma [Security Advisory privada](https://github.com/esmagafetos/Viax-Scout/security/advisories/new).
+Casos de comportamento abusivo, de assédio, ou de outra forma inaceitável podem ser reportados aos mantenedores em **conduct@viax-trace.dev** ou abrindo uma [Security Advisory privada](https://github.com/ViaXTrace/Viax-Trace/security/advisories/new).
 
 Todas as queixas serão revisadas e investigadas de forma rápida e justa. Os mantenedores são obrigados a respeitar a privacidade e a segurança de quem reportar qualquer incidente.
 

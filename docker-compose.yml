@@ -2,7 +2,7 @@ version: "3.9"
 
 # =============================================================================
 #  ViaX: System — Docker Compose
-#  https://github.com/esmagafetos/Viax-Scout
+#  https://github.com/ViaXTrace/Viax-Trace
 #
 #  Iniciar:  docker compose up -d
 #  Parar:    docker compose down

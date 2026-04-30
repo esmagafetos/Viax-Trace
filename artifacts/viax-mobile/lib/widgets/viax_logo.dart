@@ -78,7 +78,7 @@ class GitHubBanner extends StatelessWidget {
               children: [
                 Text('Open Source', style: TextStyle(color: context.text, fontWeight: FontWeight.w700, fontSize: 13)),
                 const SizedBox(height: 2),
-                Text('github.com/esmagafetos/Viax-Scout',
+                Text('github.com/ViaXTrace/Viax-Trace',
                     style: TextStyle(color: context.textMuted, fontSize: 11)),
               ],
             ),

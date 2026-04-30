@@ -13,6 +13,8 @@ pnpm workspace monorepo with React+Vite web frontend, Express 5 API backend, and
 
 **April 2026 cleanup:** README/COMECE-AQUI rewritten with professional tone (no emojis, screenshots removed). Settings pages (web + mobile) no longer push the Termux self-host path; geocodebr instance card now says "instância oficial em breve". `.github/workflows/mobile-release.yml` defaults `API_BASE` to the Render URL (was `viax-scout.replit.app`) and renames release artifacts from `viax-scout-*` to `viax-trace-*`. Android `network_security_config.xml` tightened: cleartext denied globally, allowed only for `localhost` / `127.0.0.1` / `10.0.2.2` (Android emulator → host loopback) for local dev.
 
+**GitHub identity (April 29, 2026):** account renamed `esmagafetos` → `ViaXTrace` and the project repo moved to **`ViaXTrace/Viax-Trace`** (https://github.com/ViaXTrace/Viax-Trace). All in-app links (web Settings, mobile settings, install scripts, README, CONTRIBUTING, SECURITY, COMECE-AQUI, docker-compose comment, viax_logo widget) now point to the new namespace. Local artifact directory names (`artifacts/viax-scout/`, `artifacts/viax-mobile/`) remain unchanged — only repo URLs and display labels were updated.
+
 ## Project
 
 **ViaX:Trace** (v8.0) — Brazilian Portuguese SaaS logistics auditing platform.
