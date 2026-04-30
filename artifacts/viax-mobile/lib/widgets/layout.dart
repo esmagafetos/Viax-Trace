@@ -193,17 +193,11 @@ class _Header extends StatelessWidget {
                     if (compact)
                       Padding(
                         padding: const EdgeInsets.only(bottom: 8, top: 2),
-                        child: SizedBox(
-                          // Altura extra pra o glow pulsante do pill ativo
-                          // (BoxShadow blur até 18 + spread) respirar sem
-                          // ser cortado pelo clip do SingleChildScrollView.
-                          height: 50,
-                          child: _NavRow(
-                            items: navItems,
-                            isActive: isActive,
-                            center: false,
-                            chipBg: context.surface2,
-                          ),
+                        child: _NavRow(
+                          items: navItems,
+                          isActive: isActive,
+                          center: false,
+                          chipBg: context.surface2,
                         ),
                       ),
                   ],
@@ -242,7 +236,9 @@ class _NavRow extends StatefulWidget {
 class _NavRowState extends State<_NavRow> {
   late List<GlobalKey> _keys;
   late List<double> _lefts;
+  late List<double> _tops;
   late List<double> _widths;
+  late List<double> _heights;
   int _activeIdx = -1;
   final GlobalKey _stackKey = GlobalKey();
 
@@ -263,7 +259,9 @@ class _NavRowState extends State<_NavRow> {
   void _rebuildKeys() {
     _keys = List.generate(widget.items.length, (_) => GlobalKey());
     _lefts = List.filled(widget.items.length, 0);
+    _tops = List.filled(widget.items.length, 0);
     _widths = List.filled(widget.items.length, 0);
+    _heights = List.filled(widget.items.length, 0);
   }
 
   void _scheduleMeasure() {
@@ -282,9 +280,15 @@ class _NavRowState extends State<_NavRow> {
       if (box == null || !box.hasSize) continue;
       final off = box.localToGlobal(Offset.zero, ancestor: stackBox);
       final w = box.size.width;
-      if ((_lefts[i] - off.dx).abs() > 0.5 || (_widths[i] - w).abs() > 0.5) {
+      final h = box.size.height;
+      if ((_lefts[i] - off.dx).abs() > 0.5 ||
+          (_tops[i] - off.dy).abs() > 0.5 ||
+          (_widths[i] - w).abs() > 0.5 ||
+          (_heights[i] - h).abs() > 0.5) {
         _lefts[i] = off.dx;
+        _tops[i] = off.dy;
         _widths[i] = w;
+        _heights[i] = h;
         changed = true;
       }
     }
@@ -307,17 +311,19 @@ class _NavRowState extends State<_NavRow> {
         children: [
           // 1) Indicador laranja: posicionado (não conta para o tamanho do
           //    Stack) e desenhado primeiro → fica ATRÁS dos chips.
-          //    Top/bottom em 4 pra o glow pulsante (BoxShadow) respirar
-          //    sem encostar nas bordas verticais — mesmo truque do web
-          //    (`height: calc(100% - 0.6rem)`).
+          //    Posicionado com left/top/width/height EXATOS do chip ativo
+          //    (medidos via GlobalKey) para que o pill case 1:1 com o chip
+          //    e nunca fique mais alto/largo que ele — independente de o
+          //    Stack ter sido expandido pelo SingleChildScrollView pra
+          //    preencher o cross-axis do parent.
           if (hasIndicator)
             AnimatedPositioned(
               duration: const Duration(milliseconds: 320),
               curve: Curves.easeOutCubic,
               left: _lefts[_activeIdx],
-              top: 4,
-              bottom: 4,
+              top: _tops[_activeIdx],
               width: _widths[_activeIdx],
+              height: _heights[_activeIdx],
               child: const IgnorePointer(child: _PulsingPill()),
             ),
           // 2) Linha de chips: dimensiona o Stack e fica POR CIMA do indicador.
