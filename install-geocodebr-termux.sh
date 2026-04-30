@@ -354,7 +354,7 @@ cat("\n=== Resultado ===\n")
 if (length(ok_pkgs))  cat(sprintf("[ok]    %s\n", paste(ok_pkgs,  collapse = ", ")))
 if (length(nok_pkgs)) cat(sprintf("[FALHA] %s\n", paste(nok_pkgs, collapse = ", ")))
 
-essenciais <- c("plumber", "geocodebr")
+essenciais <- c("plumber", "geocodebr", "enderecobr")
 faltando   <- essenciais[!sapply(essenciais, requireNamespace, quietly = TRUE)]
 
 if (length(faltando) > 0) {
