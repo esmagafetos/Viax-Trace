@@ -1,46 +1,44 @@
 # =============================================================================
-#  ViaX:Trace — geocodebr Microservice
-#  Geocodificação via CNEFE/IBGE (pacote geocodebr do IPEA)
+#  ViaX:Trace — geocodebr Microservice (Hugging Face Spaces / Docker)
 #
-#  Local:
+#  Build local:
 #    docker build -t viax-geocodebr .
-#    docker run -p 8002:8002 -v geocodebr-cache:/root/.cache viax-geocodebr
+#    docker run -p 7860:7860 -e VIAX_API_KEY=test viax-geocodebr
 #
-#  Render:
-#    Use o blueprint na raiz (render.yaml). O serviço lê $PORT em runtime.
+#  Hugging Face Spaces:
+#    O Space lê o README.md (frontmatter) e usa este Dockerfile como build.
+#    Defina o secret VIAX_API_KEY em Settings → Variables and secrets.
 # =============================================================================
 FROM rocker/r-ver:4.4.1
 
-LABEL maintainer="ViaX:Trace"
-LABEL description="geocodebr microservice — CNEFE/IBGE Brazilian address geocoding"
+LABEL org.opencontainers.image.source="https://github.com/ViaXTrace/Viax-Trace"
+LABEL org.opencontainers.image.title="ViaX:Trace — geocodebr microservice"
 
-# Dependências de sistema para pacotes espaciais (sf, geocodebr)
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Dependências de sistema para sf, arrow, duckdb, e curl (healthcheck)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libgdal-dev \
-    libgeos-dev \
-    libproj-dev \
-    libudunits2-dev \
-    libcurl4-openssl-dev \
-    libssl-dev \
-    libxml2-dev \
+      libgdal-dev libgeos-dev libproj-dev libudunits2-dev \
+      libcurl4-openssl-dev libssl-dev libxml2-dev \
+      curl ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Instalar pacotes R necessários
-RUN Rscript -e "\
-  options(repos = c(CRAN = 'https://cran.rstudio.com/')); \
-  install.packages(c('plumber', 'geocodebr', 'future', 'promises', 'jsonlite'), \
-  dependencies = TRUE, quiet = TRUE)"
+# rocker/r-ver pré-configura Posit Public Package Manager (P3M) com binários
+# Ubuntu pré-compilados — instalação fica em ~2-4 min. Listamos enderecobr
+# explicitamente para garantir versão atual (>=0.6) compatível com geocodebr 0.6.2.
+RUN Rscript -e "install.packages(c('plumber','future','promises','jsonlite','geocodebr','enderecobr','arrow','duckdb','sf','dplyr','httr2','h3r','geoarrow','duckspatial'), dependencies=TRUE, quiet=TRUE); cat('\n=== Versoes instaladas ===\n'); for (p in c('plumber','geocodebr','enderecobr','arrow','duckdb','sf')) cat(sprintf('%-10s: %s\n', p, packageVersion(p)))"
 
 WORKDIR /app
 COPY plumber.R start.R ./
 
-# Volume para cache do CNEFE (evita re-download a cada restart)
-VOLUME ["/root/.cache"]
+# Cache CNEFE — em free tier do HF é efêmero (perdido em rebuild).
+# Em VPS ou paid persistent storage, monte um volume aqui pra persistir.
+VOLUME ["/root/.cache/R/geocodebr"]
 
-EXPOSE 8002
+EXPOSE 7860
+ENV PORT=7860
 
-# Healthcheck local (Render usa healthCheckPath do blueprint)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=3 \
-  CMD Rscript -e "p <- Sys.getenv('PORT', Sys.getenv('GEOCODEBR_PORT', '8002')); tryCatch(readLines(sprintf('http://localhost:%s/health', p)), error=function(e) quit(status=1))"
+  CMD curl -fsS "http://localhost:${PORT:-7860}/health" >/dev/null || exit 1
 
 CMD ["Rscript", "start.R"]
