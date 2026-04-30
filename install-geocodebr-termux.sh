@@ -451,10 +451,16 @@ echo ""
 
 exec proot-distro login ubuntu -- bash -c "
   export GEOCODEBR_PORT=$PORT
-  if [[ -f /root/viax-geocodebr/start.R ]]; then
-    exec Rscript /root/viax-geocodebr/start.R
-  elif [[ -f /root/viax-geocodebr/plumber.R ]]; then
-    exec Rscript /root/viax-geocodebr/plumber.R
+  cd /root/viax-geocodebr 2>/dev/null || {
+    echo ''
+    echo 'ERRO: diretório /root/viax-geocodebr não existe.'
+    echo 'Execute novamente: bash ~/viax-system/install-geocodebr-termux.sh'
+    exit 1
+  }
+  if [[ -f start.R ]]; then
+    exec Rscript start.R
+  elif [[ -f plumber.R ]]; then
+    exec Rscript plumber.R
   else
     echo ''
     echo 'ERRO: nenhum arquivo R encontrado em /root/viax-geocodebr/'
