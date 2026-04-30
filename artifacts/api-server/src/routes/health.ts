@@ -23,28 +23,49 @@ async function probe(
   url: string,
   init?: RequestInit,
   timeoutMs = 5000,
+  retries = 1,
+  captureBody = false,
 ): Promise<ProbeResult> {
-  const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), timeoutMs);
-  const start = Date.now();
-  try {
-    const r = await fetch(url, { ...init, signal: ctrl.signal });
-    const latencyMs = Date.now() - start;
-    clearTimeout(t);
-    let message = "";
-    if (!r.ok) {
-      message = (await r.text().catch(() => "")).slice(0, 160);
+  // Faz a chamada com timeout próprio. Se o fetch quebrar antes de receber
+  // qualquer resposta (status 0 — undici "TypeError: fetch failed",
+  // tipicamente keep-alive socket reciclado pelo edge / proxy), tenta uma
+  // vez de novo: a 2ª request abre conexão nova e geralmente passa.
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), timeoutMs);
+    const start = Date.now();
+    try {
+      const r = await fetch(url, { ...init, signal: ctrl.signal });
+      const latencyMs = Date.now() - start;
+      clearTimeout(t);
+      let message = "";
+      if (!r.ok || captureBody) {
+        message = (await r.text().catch(() => "")).slice(0, 200);
+      }
+      return { ok: r.ok, status: r.status, latencyMs, message };
+    } catch (err) {
+      clearTimeout(t);
+      const isLastAttempt = attempt === retries;
+      const isAbort =
+        err instanceof Error &&
+        (err.name === "AbortError" || /aborted/i.test(err.message));
+      // Aborts (timeout estourado) não devem ser retry'ados — o problema
+      // é latência, não keep-alive. Erros de rede transitórios sim.
+      if (isLastAttempt || isAbort) {
+        return {
+          ok: false,
+          status: 0,
+          latencyMs: null,
+          message: String(err).slice(0, 160),
+        };
+      }
+      // Pequeno backoff antes do retry (50ms) — suficiente pra undici
+      // descartar a conexão morta e abrir uma nova.
+      await new Promise((resolve) => setTimeout(resolve, 50));
     }
-    return { ok: r.ok, status: r.status, latencyMs, message };
-  } catch (err) {
-    clearTimeout(t);
-    return {
-      ok: false,
-      status: 0,
-      latencyMs: null,
-      message: String(err).slice(0, 160),
-    };
   }
+  // Inalcançável (o loop sempre retorna), mas TypeScript não infere.
+  return { ok: false, status: 0, latencyMs: null, message: "unreachable" };
 }
 
 function requireAuth(req: Request, res: Response): number | null {
@@ -80,21 +101,23 @@ router.get("/diag", async (_req, res) => {
   const url = (process.env.GEOCODEBR_URL ?? DEFAULT_GEOCODEBR_URL).trim();
   if (url) {
     (out.geocodebr as Record<string, unknown>).configured = true;
-    try {
-      const ctrl = new AbortController();
-      const t = setTimeout(() => ctrl.abort(), 5000);
-      const r = await fetch(`${url.replace(/\/$/, "")}/health`, {
-        signal: ctrl.signal,
-        headers: geocodebrAuthHeaders(),
-      });
-      clearTimeout(t);
-      const body = await r.text().catch(() => "");
-      (out.geocodebr as Record<string, unknown>).reachable = r.ok;
-      (out.geocodebr as Record<string, unknown>).status = r.status;
-      (out.geocodebr as Record<string, unknown>).message = body.slice(0, 200);
-    } catch (err) {
-      (out.geocodebr as Record<string, unknown>).message = String(err);
-      logger.debug({ err: String(err) }, "geocodebr unreachable in /diag");
+    // Reusa probe() — assim ganha o retry automático contra socket
+    // morto do undici e fica em sincronia com /diag/providers.
+    const r = await probe(
+      `${url.replace(/\/$/, "")}/health`,
+      { headers: geocodebrAuthHeaders() },
+      10000,
+      1,
+      true, // capturar body — /diag é endpoint de debug humano
+    );
+    (out.geocodebr as Record<string, unknown>).reachable = r.ok;
+    (out.geocodebr as Record<string, unknown>).status = r.status;
+    (out.geocodebr as Record<string, unknown>).message = r.message.slice(
+      0,
+      200,
+    );
+    if (!r.ok) {
+      logger.debug({ status: r.status, msg: r.message }, "geocodebr unreachable in /diag");
     }
   }
 
@@ -172,7 +195,10 @@ router.get("/diag/providers", async (req, res) => {
       ? probe(
           `${geocodebrUrl.replace(/\/$/, "")}/health`,
           { headers: { "User-Agent": ua, ...geocodebrAuthHeaders() } },
-          5000,
+          // 10s pra cobrir cold-start ocasional do Space (free tier
+          // pode levar até 8s pra acordar) sem travar a UI mobile.
+          10000,
+          1,
         )
       : Promise.resolve(null),
     hasGoogleKey
