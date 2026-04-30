@@ -329,30 +329,14 @@ export default function Process() {
         {isProcessing && (
           <div style={{ padding: "1.5rem 1.5rem 2rem", display: "flex", flexDirection: "column", alignItems: "center", gap: "1rem" }}>
             <div style={{ width: 40, height: 40, border: "2px solid var(--border-strong)", borderTopColor: "var(--accent)", borderRadius: "50%" }} className="animate-spin-ring" />
-            <div style={{ fontSize: "0.8rem", fontWeight: 500, color: "var(--text-muted)" }}>Processando arquivo...</div>
-
-            {/* Barra de progresso — aparece assim que job_id é recebido */}
-            {progress && progress.total > 0 && (
-              <div style={{ width: "100%", maxWidth: 420 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.35rem" }}>
-                  <span style={{ fontSize: "0.7rem", color: "var(--text-faint)", fontWeight: 500 }}>Endereços processados</span>
-                  <span style={{ fontSize: "0.7rem", color: "var(--text-muted)", fontVariantNumeric: "tabular-nums", fontWeight: 600 }}>
-                    {progress.processed} / {progress.total}
-                  </span>
-                </div>
-                <div style={{ height: 5, borderRadius: 99, background: "var(--border-strong)", overflow: "hidden" }}>
-                  <div style={{
-                    height: "100%", borderRadius: 99,
-                    background: "var(--accent)",
-                    width: `${Math.round((progress.processed / progress.total) * 100)}%`,
-                    transition: "width 0.35s cubic-bezier(0.16,1,0.3,1)",
-                  }} />
-                </div>
-                <div style={{ textAlign: "right", marginTop: "0.25rem", fontSize: "0.68rem", color: "var(--text-faint)" }}>
-                  {Math.round((progress.processed / progress.total) * 100)}%
-                </div>
-              </div>
-            )}
+            <div style={{ fontSize: "0.8rem", fontWeight: 500, color: "var(--text-muted)", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+              Processando arquivo...
+              {progress && progress.total > 0 && (
+                <span style={{ fontSize: "0.75rem", fontVariantNumeric: "tabular-nums", color: "var(--accent)", fontWeight: 600 }}>
+                  {progress.processed}&thinsp;/&thinsp;{progress.total}
+                </span>
+              )}
+            </div>
 
             <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem", width: "100%", maxWidth: 420 }}>
               {steps.map((step, i) => (
