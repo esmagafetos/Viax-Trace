@@ -5,188 +5,149 @@
 # =============================================================================
 library(geocodebr)
 
-# Marcador de versão deste arquivo — facilita confirmar "o servidor recarregou
-# o plumber.R novo" sem precisar grep do disco. Aparece no log de startup
-# (start.R) e numa resposta HTTP do /version.
-.PLUMBER_VERSION <- "2026-04-30.enderecobr-overwrite"
+.PLUMBER_VERSION <- "2026-04-30.cep-bairro-na"
 cat(sprintf("[plumber.R] carregado (versao=%s)\n", .PLUMBER_VERSION))
 
-# Chamar enderecobr explicitamente contorna o mismatch entre geocodebr 0.6.2
-# (espera dados já padronizados nas colunas-alvo) e enderecobr 0.5.0 (única
-# versão pré-compilada para arm64 no r-universe).
+# ─────────────────────────────────────────────────────────────────────────────
+# Por que adicionamos cep e bairro como NA:
 #
-# CRÍTICO: enderecobr 0.5.0 NÃO sobrescreve as colunas originais — ele cria
-# colunas novas com sufixo `_padr` (ex.: logradouro_padr, municipio_padr).
-# Como geocodebr lê as colunas APONTADAS por `campos_endereco`, precisamos
-# substituir os valores originais pelos padronizados antes de passar adiante.
-.padronizar <- function(df, tem_estado) {
-  if (!requireNamespace("enderecobr", quietly = TRUE)) {
-    stop("Pacote 'enderecobr' nao instalado. Rode bash install-geocodebr-termux.sh")
-  }
-  campos_corresp <- if (tem_estado) {
-    enderecobr::correspondencia_campos(
-      logradouro = "logradouro", numero = "numero",
-      municipio  = "municipio",  estado = "estado"
-    )
-  } else {
-    enderecobr::correspondencia_campos(
-      logradouro = "logradouro", numero = "numero",
-      municipio  = "municipio"
-    )
-  }
-  out <- enderecobr::padronizar_enderecos(
-    enderecos          = df,
-    campos_do_endereco = campos_corresp,
-    formato_estados    = "sigla",
-    formato_numeros    = "integer"
-  )
-  # data.table -> data.frame para evitar semântica por referência
-  out <- as.data.frame(out, stringsAsFactors = FALSE)
+# Lendo R/geocode.R do geocodebr 0.6.2 (linhas 246-258), vimos que o pacote
+# exige que TODAS as 6 colunas `_padr` estejam presentes no input já
+# padronizado, sem exceção:
+#
+#   all_cols_padr <- c("estado_padr", "municipio_padr", "logradouro_padr",
+#                      "numero_padr", "cep_padr", "bairro_padr")
+#   if (isFALSE(all(all_cols_padr %in% names(input_padrao))))
+#     error_input_nao_padronizado()
+#
+# O `enderecobr::padronizar_enderecos` só cria a coluna `*_padr` se o
+# argumento correspondente foi passado em `correspondencia_campos()`. Ou
+# seja: quando NÃO temos cep e bairro nos dados de entrada, precisamos
+# (a) adicionar essas colunas ao df como NA, e (b) declará-las em
+# `definir_campos()`. Aí o `geocodebr` chama internamente o `enderecobr`
+# com cep e bairro, gera `cep_padr=NA` e `bairro_padr=NA`, e o check passa.
+#
+# Com isso voltamos a usar `padronizar_enderecos = TRUE` (interno do
+# geocodebr) — não há ganho em padronizar manualmente.
+# ─────────────────────────────────────────────────────────────────────────────
 
-  # Sobrescreve originais com as versões _padr e remove as _padr.
-  cols <- if (tem_estado) c("logradouro","numero","municipio","estado")
-          else            c("logradouro","numero","municipio")
-  for (c in cols) {
-    padr <- paste0(c, "_padr")
-    if (padr %in% names(out)) {
-      out[[c]]    <- out[[padr]]
-      out[[padr]] <- NULL
-    }
-  }
-  out
-}
-
-# Desempacota um erro do callr/rlang até a mensagem-raiz mais informativa.
-# Sem isto, todo erro vem como "in callr subprocess." e a causa fica enterrada
-# em e$parent$parent$...
 .unwrap_error <- function(e) {
-  msgs <- character()
-  cur  <- e
-  depth <- 0
+  msgs <- character(); cur <- e; depth <- 0
   while (!is.null(cur) && depth < 8) {
-    if (!is.null(cur$message) && nzchar(cur$message)) {
+    if (!is.null(cur$message) && nzchar(cur$message))
       msgs <- c(msgs, trimws(cur$message))
-    }
-    cur <- cur$parent
-    depth <- depth + 1
+    cur <- cur$parent; depth <- depth + 1
   }
-  msgs <- unique(msgs)
-  paste(msgs, collapse = " | ")
+  paste(unique(msgs), collapse = " | ")
 }
 
-# ── Filtro CORS (necessário para chamadas do Node.js) ────────────────────────
 #* @filter cors
 function(req, res) {
   res$setHeader("Access-Control-Allow-Origin",  "*")
   res$setHeader("Access-Control-Allow-Methods", "GET, OPTIONS")
   res$setHeader("Access-Control-Allow-Headers", "Content-Type")
-  if (req$REQUEST_METHOD == "OPTIONS") {
-    res$status <- 200
-    return(list())
-  }
+  if (req$REQUEST_METHOD == "OPTIONS") { res$status <- 200; return(list()) }
   plumber::forward()
 }
 
-# ── GET /geocode ─────────────────────────────────────────────────────────────
 #* Geocodifica um endereço brasileiro (CNEFE/IBGE)
 #* @param logradouro Nome do logradouro (ex: "Rua das Flores")
 #* @param numero     Número do imóvel (ex: "123")
-#* @param municipio  Município (ex: "São Paulo")
-#* @param estado     Sigla do estado, opcional (ex: "SP")
+#* @param municipio  Município (ex: "São Paulo") — OBRIGATÓRIO
+#* @param estado     Sigla do estado (ex: "SP") — OBRIGATÓRIO em geocodebr
+#* @param cep        CEP, opcional (ex: "01310-100")
+#* @param bairro     Bairro, opcional (ex: "Bela Vista")
 #* @get /geocode
 #* @serializer json list(auto_unbox=TRUE, na="null")
-function(logradouro = "", numero = "", municipio = "", estado = "") {
+function(logradouro = "", numero = "", municipio = "",
+         estado = "", cep = "", bairro = "") {
   tryCatch({
-    if (nchar(trimws(logradouro)) == 0 || nchar(trimws(municipio)) == 0) {
-      res$status <- 400
-      return(list(erro = "logradouro e municipio sao obrigatorios"))
+    if (nchar(trimws(logradouro)) == 0 || nchar(trimws(municipio)) == 0
+        || nchar(trimws(estado)) != 2) {
+      return(list(erro = "logradouro, municipio e estado (sigla 2 letras) sao obrigatorios"))
     }
 
-    tem_estado <- nchar(trimws(estado)) == 2
+    tem_cep    <- nchar(trimws(cep))    > 0
+    tem_bairro <- nchar(trimws(bairro)) > 0
 
+    # Sempre incluímos cep e bairro como colunas no df (NA quando o cliente
+    # não passou). Isso garante que o padronizador interno crie cep_padr e
+    # bairro_padr — sem elas, o check do geocodebr (R/geocode.R linha 247)
+    # falha com "Os dados de entrada nao estao padronizados".
     df <- data.frame(
       logradouro = trimws(logradouro),
       numero     = trimws(numero),
       municipio  = trimws(municipio),
-      estado     = if (tem_estado) trimws(toupper(estado)) else NA_character_,
+      estado     = trimws(toupper(estado)),
+      cep        = if (tem_cep)    trimws(cep)    else NA_character_,
+      bairro     = if (tem_bairro) trimws(bairro) else NA_character_,
       stringsAsFactors = FALSE
     )
 
-    if (tem_estado) {
-      campos <- geocodebr::definir_campos(
-        logradouro = "logradouro",
-        numero     = "numero",
-        municipio  = "municipio",
-        estado     = "estado"
-      )
-    } else {
-      campos <- geocodebr::definir_campos(
-        logradouro = "logradouro",
-        numero     = "numero",
-        municipio  = "municipio"
-      )
-    }
-
-    df_padronizado <- .padronizar(df, tem_estado)
+    # definir_campos sempre recebe TODAS as 6 colunas como strings (não
+    # aceita NA_character_, então passamos os nomes mesmo quando os valores
+    # nas linhas estão NA — o que importa pro padronizador é a coluna existir).
+    campos <- geocodebr::definir_campos(
+      logradouro = "logradouro",
+      numero     = "numero",
+      municipio  = "municipio",
+      estado     = "estado",
+      cep        = "cep",
+      localidade = "bairro"
+    )
 
     resultado <- geocodebr::geocode(
-      enderecos            = df_padronizado,
+      enderecos            = df,
       campos_endereco      = campos,
       resultado_completo   = FALSE,
       resolver_empates     = TRUE,
       resultado_sf         = FALSE,
       verboso              = FALSE,
       cache                = TRUE,
-      padronizar_enderecos = FALSE
+      padronizar_enderecos = TRUE
     )
 
     if (nrow(resultado) > 0 && !is.na(resultado$lat[1]) && !is.na(resultado$lon[1])) {
       list(
-        lat          = as.numeric(resultado$lat[1]),
-        lon          = as.numeric(resultado$lon[1]),
-        precisao     = resultado$precisao[1],
-        tipo         = as.character(resultado$tipo_resultado[1]),
-        desvio_metros = if (!is.na(resultado$desvio_metros[1])) as.numeric(resultado$desvio_metros[1]) else NULL,
-        encontrado   = TRUE
+        encontrado    = TRUE,
+        lat           = as.numeric(resultado$lat[1]),
+        lon           = as.numeric(resultado$lon[1]),
+        precisao      = resultado$precisao[1],
+        tipo          = as.character(resultado$tipo_resultado[1]),
+        desvio_metros = if (!is.na(resultado$desvio_metros[1])) as.numeric(resultado$desvio_metros[1]) else NULL
       )
     } else {
-      list(encontrado = FALSE, lat = NULL, lon = NULL, precisao = NULL, tipo = "nao_encontrado")
+      list(encontrado = FALSE, lat = NULL, lon = NULL,
+           precisao = NULL, tipo = "nao_encontrado")
     }
   }, error = function(e) {
     list(
       encontrado = FALSE,
       erro       = .unwrap_error(e),
       classe     = paste(class(e), collapse = "/"),
-      lat        = NULL,
-      lon        = NULL
+      lat        = NULL, lon = NULL
     )
   })
 }
 
-# ── GET /version ──────────────────────────────────────────────────────────────
-#* Retorna a versão do plumber.R em uso (útil para confirmar reload do servidor)
+#* Retorna a versão do plumber.R em uso
 #* @get /version
 #* @serializer json list(auto_unbox=TRUE)
 function() {
   list(
-    plumber_version    = .PLUMBER_VERSION,
-    padronizacao       = "explicita_via_enderecobr",
-    geocodebr          = as.character(packageVersion("geocodebr")),
-    enderecobr         = tryCatch(as.character(packageVersion("enderecobr")),
-                                  error = function(e) "AUSENTE"),
-    r_version          = as.character(R.version$version.string)
+    plumber_version = .PLUMBER_VERSION,
+    abordagem       = "padronizar_enderecos=TRUE com cep e bairro NA",
+    geocodebr       = as.character(packageVersion("geocodebr")),
+    enderecobr      = tryCatch(as.character(packageVersion("enderecobr")),
+                               error = function(e) "AUSENTE"),
+    r_version       = as.character(R.version$version.string)
   )
 }
 
-# ── GET /health ───────────────────────────────────────────────────────────────
 #* Verifica saúde do serviço
 #* @get /health
 #* @serializer json list(auto_unbox=TRUE)
 function() {
-  list(
-    status = "ok",
-    servico = "geocodebr",
-    fonte = "CNEFE/IBGE",
-    r_versao = as.character(R.version$version.string)
-  )
+  list(status = "ok", servico = "geocodebr", fonte = "CNEFE/IBGE",
+       r_versao = as.character(R.version$version.string))
 }
