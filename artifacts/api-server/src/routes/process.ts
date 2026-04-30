@@ -358,4 +358,71 @@ router.post("/process/upload", upload.single("arquivo"), async (req, res): Promi
   }
 });
 
+router.get("/process/status/:id", async (req, res): Promise<void> => {
+  const userId = requireAuth(req, res);
+  if (!userId) return;
+
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id) || id <= 0) {
+    res.status(400).json({ error: "ID de análise inválido." });
+    return;
+  }
+
+  const rows = await db
+    .select({
+      id: analysesTable.id,
+      fileName: analysesTable.fileName,
+      totalAddresses: analysesTable.totalAddresses,
+      nuances: analysesTable.nuances,
+      geocodeSuccess: analysesTable.geocodeSuccess,
+      similarityAvg: analysesTable.similarityAvg,
+      processingTimeMs: analysesTable.processingTimeMs,
+      parserMode: analysesTable.parserMode,
+      status: analysesTable.status,
+      results: analysesTable.results,
+      createdAt: analysesTable.createdAt,
+      userId: analysesTable.userId,
+    })
+    .from(analysesTable)
+    .where(eq(analysesTable.id, id))
+    .limit(1);
+
+  if (rows.length === 0) {
+    res.status(404).json({ error: "Análise não encontrada." });
+    return;
+  }
+
+  const row = rows[0];
+  if (row.userId !== userId) {
+    res.status(403).json({ error: "Acesso negado." });
+    return;
+  }
+
+  const total = row.totalAddresses;
+  const percentualProblema =
+    total > 0 ? Math.round((row.nuances / total) * 100 * 10) / 10 : 0;
+
+  let detalhes: unknown[] = [];
+  try {
+    if (row.results) detalhes = JSON.parse(row.results);
+  } catch {
+    detalhes = [];
+  }
+
+  res.json({
+    id: row.id,
+    status: row.status,
+    file_name: row.fileName,
+    created_at: row.createdAt,
+    total_enderecos: total,
+    total_nuances: row.nuances,
+    percentual_problema: percentualProblema,
+    geocode_success: row.geocodeSuccess,
+    similarity_avg: row.similarityAvg,
+    processing_time_ms: row.processingTimeMs,
+    parser_mode: row.parserMode,
+    detalhes,
+  });
+});
+
 export default router;

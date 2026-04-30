@@ -405,60 +405,22 @@ class _NavChip extends StatelessWidget {
   }
 }
 
-/// Pílula laranja com glow pulsante — usada como indicador da aba ativa.
-/// Pulsa de forma sutil (2.6 s, ease-in-out) e respeita reduce-motion.
-class _PulsingPill extends StatefulWidget {
+/// Pílula estática — indicador refinado da aba ativa.
+/// Fundo levemente tintado + borda sutil, sem glow nem animação pulsante.
+class _PulsingPill extends StatelessWidget {
   const _PulsingPill();
 
   @override
-  State<_PulsingPill> createState() => _PulsingPillState();
-}
-
-class _PulsingPillState extends State<_PulsingPill>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _c;
-  late final Animation<double> _glow;
-
-  @override
-  void initState() {
-    super.initState();
-    _c = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 2600),
-    );
-    _glow = CurvedAnimation(parent: _c, curve: Curves.easeInOut);
-    final reduceMotion =
-        WidgetsBinding.instance.platformDispatcher.accessibilityFeatures.disableAnimations;
-    if (!reduceMotion) _c.repeat(reverse: true);
-  }
-
-  @override
-  void dispose() {
-    _c.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _glow,
-      builder: (ctx, _) {
-        final g = _glow.value;
-        return Container(
-          decoration: BoxDecoration(
-            color: ctx.accentDim,
-            borderRadius: BorderRadius.circular(99),
-            border: Border.all(color: ctx.accent.withValues(alpha: 0.35)),
-            boxShadow: [
-              BoxShadow(
-                color: ctx.accent.withValues(alpha: 0.10 + 0.18 * g),
-                blurRadius: 12 + 6 * g,
-                spreadRadius: g * 0.6,
-              ),
-            ],
-          ),
-        );
-      },
+    return Container(
+      decoration: BoxDecoration(
+        color: context.accentDim,
+        borderRadius: BorderRadius.circular(99),
+        border: Border.all(
+          color: context.accent.withValues(alpha: 0.22),
+          width: 1,
+        ),
+      ),
     );
   }
 }
