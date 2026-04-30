@@ -24,7 +24,9 @@ ViaX:Trace employs a monorepo structure managed by pnpm workspaces. The system i
     - Advanced parser hardening and nuance auditing (`geocoder.ts`, `process.ts`) for improved address matching accuracy, including adaptive tolerance, quadra/lote parsing, compound address detection, duplicate GPS deduplication, and homonym grouping.
 - **Data Retention:** History feature retains processed analysis data for 3 days, with detailed views available.
 - **Avatar Management:** User avatars are stored as base64 data URLs in the database.
-- **Mobile Application:** A native Flutter application (`artifacts/viax-mobile`) mirrors the web frontend's functionality, UI, and SSE processing flow. It includes support for Android foreground services for background processing and adheres to strict network security configurations.
+- **Mobile Application:** A native Flutter application (`artifacts/viax-mobile`) mirrors the web frontend's functionality, UI, and SSE processing flow. It includes support for Android foreground services for background processing, **local notifications fired on processing completion** (success/error) that deep-link to `/history/:id` (or `/history` for the list, or the original returnPath for non-process kinds) via `flutter_local_notifications` + a global `GoRouter` reference kept in `CompletionNotifications.router`, and adheres to strict network security configurations.
+- **Geocoder false-positive guard (Apr 2026):** The "GPS within tolerance ⇒ pass" shortcut for `is_comercio` and `is_condominio` now requires either similarity ≥ `MIN_SIMILARIDADE_PASS_GPS` (0.15) OR strong contextual confirmation (recognizable POI / quadra+lote both present). Without this, addresses where Photon/Nominatim returned a totally different nearby street were silently approved — typical in Brazilian loteamentos where OSM only maps the trunk avenue. Now those cases emit an explicit nuance with the two diverging street names.
+- **GeocodeR BR self-host on Android:** `install-geocodebr-termux.sh` + generated `start-geocodebr.sh` mitigate the four known Termux 2025/26 killers — Phantom Process Killer (Android 12+, requires one-time ADB toggle), Doze/wake lock (auto-acquired via `termux-wake-lock` if Termux:API present), proot-distro DNS reset (issue #264, re-applied on every start), and battery optimization. Optional autostart configured via Termux:Boot. Full operator guide at `docs/TERMUX-GEOCODEBR.md`.
 
 **System Design Choices:**
 - **Monorepo:** Facilitates code sharing and consistent development across frontend, backend, and mobile applications.
@@ -58,6 +60,8 @@ ViaX:Trace employs a monorepo structure managed by pnpm workspaces. The system i
     - `go_router`
     - `provider`
     - `dio`, `cookie_jar`, `dio_cookie_manager`
+    - `flutter_foreground_task` (background SSE)
+    - `flutter_local_notifications` + `timezone` (completion alerts)
     - `fl_chart`
     - `file_picker`
     - `image_picker`

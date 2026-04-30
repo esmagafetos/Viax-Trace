@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 
 import '../api/api_client.dart';
 import '../api/sse_client.dart';
+import 'completion_notifications.dart';
 import 'foreground_processing.dart';
 
 /// Holds the state of a single in-flight upload+SSE job, so it can keep
@@ -95,16 +96,63 @@ class ProcessingService extends ChangeNotifier {
         _error = 'Erro de conexão: $e';
         _active = false;
         unawaited(ForegroundProcessing.stop());
+        unawaited(_fireCompletionNotification());
         notifyListeners();
       },
       onDone: () {
         if (_cancelled) return;
         _active = false;
         unawaited(ForegroundProcessing.stop());
+        unawaited(_fireCompletionNotification());
         notifyListeners();
       },
       cancelOnError: false,
     );
+  }
+
+  /// Dispara a notificação local de conclusão. O processamento em foreground
+  /// service (`ForegroundProcessing`) só mantém uma notificação persistente
+  /// "estou rodando" — ela é descartada ao parar o serviço, então emitimos
+  /// uma notificação separada de "terminou" que abre o app no resultado.
+  Future<void> _fireCompletionNotification() async {
+    try {
+      if (_error != null) {
+        await CompletionNotifications.showError(
+          label: _label,
+          deepLink: _kind == 'process' ? '/history' : _returnPath,
+          errorText: _error,
+        );
+        return;
+      }
+      if (_result == null) return;
+      // /history/:id quando o backend devolver analysis_id; senão
+      // mandamos para a lista (o item recém-criado fica no topo).
+      String deepLink;
+      if (_kind == 'process') {
+        final id = _result!['analysis_id'];
+        deepLink = (id is num) ? '/history/${id.toInt()}' : '/history';
+      } else {
+        deepLink = _returnPath;
+      }
+      String? subtitle;
+      if (_kind == 'process') {
+        final total = _result!['total_enderecos'];
+        final nuances = _result!['total_nuances'];
+        if (total is num && nuances is num) {
+          subtitle =
+              '$total endereço(s) · $nuances nuance(s) — toque para ver';
+        }
+      } else if (_kind == 'condominium') {
+        subtitle = 'Sequência logística pronta — toque para abrir';
+      }
+      await CompletionNotifications.showSuccess(
+        label: _label,
+        deepLink: deepLink,
+        subtitle: subtitle,
+      );
+    } catch (e) {
+      if (kDebugMode) debugPrint('completion notification fail: $e');
+    }
   }
 
   /// Stops the current job (if any) and resets state. Called when the

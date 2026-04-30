@@ -9,6 +9,7 @@ import 'router.dart';
 import 'screens/splash.dart';
 import 'services/haptics.dart';
 import 'state/auth_provider.dart';
+import 'state/completion_notifications.dart';
 import 'state/foreground_processing.dart';
 import 'state/processing_service.dart';
 import 'state/settings_provider.dart';
@@ -18,6 +19,10 @@ import 'theme/theme.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   ForegroundProcessing.initialize();
+  // Inicializa o canal de notificações de conclusão antes do MaterialApp
+  // — assim o tap em uma notificação que abre o app fria já encontra
+  // o handler registrado.
+  await CompletionNotifications.initialize();
   await initializeDateFormatting('pt_BR', null);
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,
@@ -57,6 +62,10 @@ class ViaXApp extends StatelessWidget {
       child: Consumer2<AuthProvider, ThemeProvider>(
         builder: (context, auth, theme, _) {
           final router = createRouter(auth);
+          // Mantém a referência viva para que o tap em uma notificação
+          // de conclusão consiga navegar (o router é recriado a cada
+          // mudança de auth — sempre apontamos para o atual).
+          CompletionNotifications.router = router;
           return MaterialApp.router(
             title: 'ViaX:Trace',
             debugShowCheckedModeBanner: false,

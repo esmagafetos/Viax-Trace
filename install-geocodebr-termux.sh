@@ -9,12 +9,33 @@
 #     r-universe (cran.r-universe.dev, duckdb.r-universe.dev, apache.r-universe.dev)
 #   • ZERO compilação C++: sem cmake, sem libarrow-dev, sem OOM-kill
 #
+# LIMITAÇÕES CONHECIDAS DO TERMUX 2025/2026 (mitigadas neste script):
+#   1. Phantom Process Killer (Android 12+) — mata processos com >32 children.
+#      R + Plumber + proot facilmente excede esse limite. MITIGAÇÃO: pedir ao
+#      usuário para rodar via ADB:
+#        adb shell settings put global settings_enable_monitor_phantom_procs 0
+#      (ver docs/TERMUX-GEOCODEBR.md). Sem isso, o serviço pode morrer ~30 min
+#      após iniciar, sem aviso. Não há solução só dentro do Termux.
+#   2. Doze mode / wake lock (Android 6+) — ao apagar a tela, a CPU congela.
+#      MITIGAÇÃO: o start-geocodebr.sh adquire termux-wake-lock se Termux:API
+#      estiver instalado. Sem Termux:API, recomendar ao usuário usar a opção
+#      "Acquire Wakelock" no shade de notificação do Termux.
+#   3. DNS perdido em proot (issue termux/proot-distro#264) — proot-distro
+#      sobrescreve /etc/resolv.conf no rootfs em alguns updates. MITIGAÇÃO: o
+#      start-geocodebr.sh re-aplica o resolv.conf antes de cada start.
+#   4. Battery Optimization (todos os Android) — Termux precisa estar em
+#      "Unrestricted" no menu de bateria para sobreviver longas execuções.
+#      Verificado pelo install no final.
+#
 # Fontes consultadas:
 #   https://docs.r-universe.dev/install/binaries.html
 #   https://arrow.apache.org/docs/r/articles/install.html
 #   https://cran.r-project.org/bin/linux/ubuntu/fullREADME.html
 #   https://cran.r-universe.dev/arrow      → binário noble-aarch64 R4.5 ✓
 #   https://duckdb.r-universe.dev/duckdb   → binário noble-aarch64 R4.5 ✓
+#   https://github.com/termux/proot-distro/issues/264   (DNS reset)
+#   https://github.com/termux/termux-app/issues/3855    (Android 14)
+#   https://github.com/termux/termux-boot               (autostart)
 #
 # Uso: bash install-geocodebr-termux.sh
 # =============================================================================
@@ -371,15 +392,61 @@ fi
 step "Criando start-geocodebr.sh..."
 cat > "$APP/start-geocodebr.sh" << 'STARTSCRIPT'
 #!/usr/bin/env bash
+# =============================================================================
 # ViaX:Trace — Inicia o microserviço GeocodeR BR (Ubuntu via proot-distro)
+# Aplica todas as mitigações conhecidas para Termux 2025/2026:
+#   • Re-aplica DNS dentro do rootfs (proot-distro sobrescreve em updates)
+#   • Adquire wake lock (se Termux:API instalado) → sobrevive à tela apagada
+#   • Avisa sobre Phantom Process Killer se usuário não desativou via ADB
+#   • Roda Plumber dentro de proot (não há outra forma — R só roda em glibc)
+# =============================================================================
+set -u
 PORT="${GEOCODEBR_PORT:-8002}"
+G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; C='\033[0;36m'; B='\033[1m'; N='\033[0m'
 
 echo ""
-echo "  GeocodeR BR iniciando na porta $PORT..."
-echo "  Aguarde: 'Listening on 0.0.0.0:$PORT'"
+echo -e "${B}${C}╔══════════════════════════════════════════════════════════╗${N}"
+echo -e "${B}${C}║   ViaX:Trace — GeocodeR BR (Termux + proot Ubuntu)       ║${N}"
+echo -e "${B}${C}╚══════════════════════════════════════════════════════════╝${N}"
 echo ""
-echo "  AVISO: No primeiro inicio os dados CNEFE (~1-2 GB) serao"
-echo "         baixados automaticamente. Isso pode levar varios minutos."
+
+# ── Mitigação 1: re-aplica /etc/resolv.conf dentro do rootfs ─────────────────
+# Issue termux/proot-distro#264 — proot-distro pode sobrescrever resolv.conf
+# em update; sem isso, R não consegue baixar CNEFE da rede.
+ROOTFS="$PREFIX/var/lib/proot-distro/installed-rootfs/ubuntu"
+if [[ -d "$ROOTFS/etc" ]]; then
+  printf 'nameserver 1.1.1.1\nnameserver 8.8.8.8\nnameserver 9.9.9.9\n' \
+    > "$ROOTFS/etc/resolv.conf" 2>/dev/null || true
+  echo -e "  ${G}✓${N} DNS reaplicado no rootfs Ubuntu (1.1.1.1 / 8.8.8.8)"
+fi
+
+# ── Mitigação 2: wake lock para sobreviver tela apagada ──────────────────────
+if command -v termux-wake-lock >/dev/null 2>&1; then
+  termux-wake-lock 2>/dev/null && \
+    echo -e "  ${G}✓${N} Wake lock adquirido (CPU não congela com tela off)"
+else
+  echo -e "  ${Y}!${N} Termux:API não instalado — instale-o do F-Droid OU"
+  echo -e "    puxe a barra de notificação do Termux e toque ${B}Acquire Wakelock${N}"
+fi
+
+# ── Mitigação 3: alerta sobre Phantom Process Killer ─────────────────────────
+# Não há como detectar de dentro do Termux se o killer está ativo (precisa de
+# adb dumpsys), então sempre lembramos o usuário no primeiro start.
+PHANTOM_FLAG="$HOME/.viax-phantom-checked"
+if [[ ! -f "$PHANTOM_FLAG" ]]; then
+  echo ""
+  echo -e "  ${Y}AVISO IMPORTANTE — Phantom Process Killer (Android 12+):${N}"
+  echo -e "  Sem desativá-lo via ADB, o GeocodeR pode morrer após ~30min."
+  echo -e "  Conecte o celular ao PC com USB debugging e rode UMA vez:"
+  echo -e "    ${C}adb shell settings put global settings_enable_monitor_phantom_procs 0${N}"
+  echo -e "  Detalhes: ${C}docs/TERMUX-GEOCODEBR.md${N}"
+  touch "$PHANTOM_FLAG"
+fi
+
+echo ""
+echo -e "  ${B}Iniciando GeocodeR BR na porta $PORT...${N}"
+echo -e "  Aguarde: '${C}Listening on 0.0.0.0:$PORT${N}'"
+echo -e "  No 1º start os dados CNEFE (~1-2 GB) são baixados — paciência."
 echo ""
 
 exec proot-distro login ubuntu -- bash -c "
@@ -397,7 +464,23 @@ exec proot-distro login ubuntu -- bash -c "
 "
 STARTSCRIPT
 chmod +x "$APP/start-geocodebr.sh"
-ok "start-geocodebr.sh criado"
+ok "start-geocodebr.sh criado (com mitigações Termux 2025/26)"
+
+# ── Termux:Boot autostart (opcional) ─────────────────────────────────────────
+BOOT_DIR="$HOME/.termux/boot"
+if [[ ! -f "$BOOT_DIR/start-geocodebr" ]]; then
+  mkdir -p "$BOOT_DIR"
+  cat > "$BOOT_DIR/start-geocodebr" << BOOTSCRIPT
+#!/data/data/com.termux/files/usr/bin/sh
+# Autostart do GeocodeR BR no boot do Android. Requer o app Termux:Boot
+# instalado do F-Droid e aberto pelo menos uma vez.
+termux-wake-lock 2>/dev/null
+exec bash $APP/start-geocodebr.sh >> $HOME/geocodebr-boot.log 2>&1
+BOOTSCRIPT
+  chmod +x "$BOOT_DIR/start-geocodebr"
+  ok "Autostart configurado em ~/.termux/boot/start-geocodebr"
+  inf "Instale o app Termux:Boot do F-Droid e abra-o uma vez para ativar."
+fi
 
 # ===========================================================================
 # PASSO 9 — Atualiza .env

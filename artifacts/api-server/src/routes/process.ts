@@ -303,7 +303,7 @@ router.post("/process/upload", upload.single("arquivo"), async (req, res): Promi
     const tempoMs = Date.now() - tInicio;
     const similarityAvg = detalhes.reduce((s, d) => s + (d.similaridade ?? 0), 0) / Math.max(total, 1);
 
-    await db.insert(analysesTable).values({
+    const [inserted] = await db.insert(analysesTable).values({
       userId,
       fileName: req.file.originalname,
       totalAddresses: total,
@@ -314,7 +314,8 @@ router.post("/process/upload", upload.single("arquivo"), async (req, res): Promi
       parserMode: instanceMode === "googlemaps" ? "googlemaps" : parserMode,
       status: "done",
       results: JSON.stringify(detalhes),
-    });
+    }).returning({ id: analysesTable.id });
+    const analysisId = inserted?.id ?? null;
 
     const percentualProblema = total > 0 ? Math.round((totalNuances / total) * 100 * 10) / 10 : 0;
 
@@ -326,6 +327,7 @@ router.post("/process/upload", upload.single("arquivo"), async (req, res): Promi
     sendSSE(res, "result", {
       result: {
         success: true,
+        analysis_id: analysisId,
         total_enderecos: total,
         total_nuances: totalNuances,
         percentual_problema: percentualProblema,

@@ -18,6 +18,13 @@ const OVERPASS_ENDPOINTS = [
 ];
 const SIMILARITY_THRESHOLD_DEFAULT = 0.68;
 const SIMILARITY_THRESHOLD_AVENIDA = 0.92;
+// Piso mínimo de similaridade para liberar a regra "GPS dentro da tolerância
+// = OK" para comércio/condomínio. Quando o nome escrito não tem nenhum token
+// significativo em comum com o nome oficial (similaridade ≈ 0), é altamente
+// provável que o geocoder devolveu uma rua próxima errada (típico em
+// loteamentos brasileiros onde OSM não mapeia ruas internas). Nesses casos
+// emitimos uma nuance ao invés de aprovar silenciosamente.
+const MIN_SIMILARIDADE_PASS_GPS = 0.15;
 
 const OSM_HIGHWAY_PRIORITIES = [
   "trunk", "primary", "secondary", "tertiary",
@@ -1217,24 +1224,56 @@ export function verificarNuance(
     }
 
     // ── Comércio com GPS dentro da tolerância: confiar na coordenada ──
-    // POIs comerciais têm nomes variáveis; se o GPS está próximo, o endereço provavelmente é válido.
+    // POIs comerciais têm nomes variáveis; se o GPS está próximo, o endereço
+    // provavelmente é válido — MAS só damos esse "passe livre" quando há
+    // algum sinal textual de que o geocoder não pegou uma rua totalmente
+    // diferente. Sem essa guarda, paradas com 0% de overlap entre o nome
+    // escrito e a rua oficial passavam silenciosamente, mesmo quando o
+    // geocoder errou e devolveu a via principal/rodovia mais próxima
+    // (loteamentos onde OSM mapeia só a avenida-tronco).
     if (parsed.is_comercio && distanciaMetros !== null && distanciaMetros <= adjTolerance) {
+      const temPOIReconhecivel = !!(
+        parsed.poi &&
+        parsed.poi.length >= 3 &&
+        (PALAVRAS_COMERCIO_REGEX.test(parsed.poi) || NEGOCIO_INFORMAL_REGEX.test(parsed.poi))
+      );
+      if (similaridade >= MIN_SIMILARIDADE_PASS_GPS || temPOIReconhecivel) {
+        return {
+          is_nuance: false,
+          similaridade: Math.round(similaridade * 1000) / 1000,
+          motivo: "",
+          distancia_metros: distanciaMetros,
+        };
+      }
       return {
-        is_nuance: false,
+        is_nuance: true,
         similaridade: Math.round(similaridade * 1000) / 1000,
-        motivo: "",
+        motivo: `GPS está a ${distanciaMetros}m, porém a rua oficial "${ruaOficial}" não tem nenhuma palavra significativa em comum com "${ruaExtraida}"${parsed.poi ? ` (POI: "${parsed.poi}")` : " (POI não identificado)"}. O ponto pode ter sido marcado na rua errada — confirme antes de roteirizar.`,
         distancia_metros: distanciaMetros,
       };
     }
 
     // ── Condomínio horizontal: nome da via pública pode divergir, GPS é rei ──
     // Quando is_condominio=true e o GPS está dentro da tolerância restrita
-    // (50 m), o endereço é válido — o "número da rua" é nominal.
+    // (50 m), o endereço é válido — o "número da rua" é nominal. Mesma
+    // guarda do comércio: se a divergência for total (0 % de tokens em
+    // comum), exigimos pelo menos marcadores fortes de condomínio
+    // (Quadra E Lote ambos presentes), senão é provável que o geocoder
+    // tenha pego a via principal próxima em vez da rua interna correta.
     if (parsed.is_condominio && distanciaMetros !== null && distanciaMetros <= adjTolerance) {
+      const temMarcadoresFortes = parsed.quadra !== null && parsed.lote !== null;
+      if (similaridade >= MIN_SIMILARIDADE_PASS_GPS || temMarcadoresFortes) {
+        return {
+          is_nuance: false,
+          similaridade: Math.round(similaridade * 1000) / 1000,
+          motivo: "",
+          distancia_metros: distanciaMetros,
+        };
+      }
       return {
-        is_nuance: false,
+        is_nuance: true,
         similaridade: Math.round(similaridade * 1000) / 1000,
-        motivo: "",
+        motivo: `GPS está a ${distanciaMetros}m, mas "${ruaExtraida}" não tem palavra em comum com a via oficial "${ruaOficial}" e os marcadores de condomínio (Quadra/Lote) não foram identificados de forma completa. Pode ser uma rua de loteamento não mapeada — confirme.`,
         distancia_metros: distanciaMetros,
       };
     }
