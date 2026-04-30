@@ -53,26 +53,47 @@ class AppLayout extends StatelessWidget {
     return false;
   }
 
+  int _activeIndex() => _navItems.indexWhere(
+        (it) => currentPath == it.path || (it.path != '/dashboard' && currentPath.startsWith(it.path)),
+      );
+
   @override
   Widget build(BuildContext context) {
     final mq = MediaQuery.of(context);
+    final activeIdx = _activeIndex();
     return Scaffold(
       backgroundColor: context.bg,
       body: Column(
         children: [
           if (showNav) _Header(navItems: _navItems, isActive: _isActive),
           Expanded(
-            child: SingleChildScrollView(
-              padding: EdgeInsets.only(
-                left: 0,
-                right: 0,
-                top: 0,
-                bottom: mq.padding.bottom,
-              ),
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 1200),
-                  child: Padding(padding: padding, child: child),
+            child: GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              // Swipe horizontal navega entre as abas (Dashboard → Processar →
+              // Ferramenta → Histórico → Docs). Não interfere com o scroll
+              // vertical: o GestureArena do Flutter direciona o gesto pelo
+              // eixo dominante.
+              onHorizontalDragEnd: (details) {
+                if (activeIdx == -1) return;
+                final v = details.primaryVelocity ?? 0;
+                if (v.abs() < 250) return;
+                final next = activeIdx + (v < 0 ? 1 : -1);
+                if (next < 0 || next >= _navItems.length) return;
+                AppHaptics.selection();
+                context.go(_navItems[next].path);
+              },
+              child: SingleChildScrollView(
+                padding: EdgeInsets.only(
+                  left: 0,
+                  right: 0,
+                  top: 0,
+                  bottom: mq.padding.bottom,
+                ),
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 1200),
+                    child: Padding(padding: padding, child: child),
+                  ),
                 ),
               ),
             ),
@@ -195,7 +216,11 @@ class _Header extends StatelessWidget {
   }
 }
 
-class _NavRow extends StatelessWidget {
+/// Linha horizontal de chips com um *indicador laranja deslizante* que se
+/// move suavemente entre as abas (320 ms easeOutCubic) e pulsa de leve
+/// para reforçar a aba ativa. Espelha o comportamento do `Layout.tsx`
+/// do web (artifacts/viax-scout).
+class _NavRow extends StatefulWidget {
   final List<_NavItem> items;
   final bool Function(String) isActive;
   final bool center;
@@ -208,24 +233,109 @@ class _NavRow extends StatelessWidget {
   });
 
   @override
+  State<_NavRow> createState() => _NavRowState();
+}
+
+class _NavRowState extends State<_NavRow> {
+  late List<GlobalKey> _keys;
+  late List<double> _lefts;
+  late List<double> _widths;
+  int _activeIdx = -1;
+  final GlobalKey _stackKey = GlobalKey();
+
+  @override
+  void initState() {
+    super.initState();
+    _rebuildKeys();
+    _scheduleMeasure();
+  }
+
+  @override
+  void didUpdateWidget(covariant _NavRow oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.items.length != oldWidget.items.length) _rebuildKeys();
+    _scheduleMeasure();
+  }
+
+  void _rebuildKeys() {
+    _keys = List.generate(widget.items.length, (_) => GlobalKey());
+    _lefts = List.filled(widget.items.length, 0);
+    _widths = List.filled(widget.items.length, 0);
+  }
+
+  void _scheduleMeasure() {
+    WidgetsBinding.instance.addPostFrameCallback((_) => _measure());
+  }
+
+  void _measure() {
+    if (!mounted) return;
+    final stackBox = _stackKey.currentContext?.findRenderObject() as RenderBox?;
+    if (stackBox == null || !stackBox.hasSize) return;
+    bool changed = false;
+    for (var i = 0; i < widget.items.length; i++) {
+      final ctx = _keys[i].currentContext;
+      if (ctx == null) continue;
+      final box = ctx.findRenderObject() as RenderBox?;
+      if (box == null || !box.hasSize) continue;
+      final off = box.localToGlobal(Offset.zero, ancestor: stackBox);
+      final w = box.size.width;
+      if ((_lefts[i] - off.dx).abs() > 0.5 || (_widths[i] - w).abs() > 0.5) {
+        _lefts[i] = off.dx;
+        _widths[i] = w;
+        changed = true;
+      }
+    }
+    final newIdx = widget.items.indexWhere((it) => widget.isActive(it.path));
+    if (newIdx != _activeIdx || changed) {
+      setState(() => _activeIdx = newIdx);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final children = items
-        .map((it) => Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 2),
-              child: _NavChip(
-                item: it,
-                active: isActive(it.path),
-                bgInactive: chipBg,
-              ),
-            ))
-        .toList();
+    final hasIndicator =
+        _activeIdx >= 0 && _activeIdx < _widths.length && _widths[_activeIdx] > 0;
 
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
-      child: Row(
-        mainAxisAlignment: center ? MainAxisAlignment.center : MainAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: children,
+      child: Stack(
+        key: _stackKey,
+        clipBehavior: Clip.none,
+        children: [
+          // 1) Indicador laranja: posicionado (não conta para o tamanho do
+          //    Stack) e desenhado primeiro → fica ATRÁS dos chips.
+          if (hasIndicator)
+            AnimatedPositioned(
+              duration: const Duration(milliseconds: 320),
+              curve: Curves.easeOutCubic,
+              left: _lefts[_activeIdx],
+              top: 0,
+              bottom: 0,
+              width: _widths[_activeIdx],
+              child: const IgnorePointer(child: _PulsingPill()),
+            ),
+          // 2) Linha de chips: dimensiona o Stack e fica POR CIMA do indicador.
+          Row(
+            mainAxisAlignment:
+                widget.center ? MainAxisAlignment.center : MainAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: List.generate(widget.items.length, (i) {
+              final it = widget.items[i];
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 2),
+                child: KeyedSubtree(
+                  key: _keys[i],
+                  child: _NavChip(
+                    item: it,
+                    active: widget.isActive(it.path),
+                    bgInactive: widget.chipBg,
+                    activeBgTransparent: true,
+                  ),
+                ),
+              );
+            }),
+          ),
+        ],
       ),
     );
   }
@@ -235,13 +345,23 @@ class _NavChip extends StatelessWidget {
   final _NavItem item;
   final bool active;
   final Color? bgInactive;
-  const _NavChip({required this.item, required this.active, this.bgInactive});
+
+  /// Quando true e a aba está ativa, o fundo do chip é transparente para
+  /// que o indicador laranja deslizante (renderizado atrás) apareça.
+  final bool activeBgTransparent;
+
+  const _NavChip({
+    required this.item,
+    required this.active,
+    this.bgInactive,
+    this.activeBgTransparent = false,
+  });
 
   @override
   Widget build(BuildContext context) {
     final fg = active ? context.accent : context.textMuted;
     final bg = active
-        ? context.accentDim
+        ? (activeBgTransparent ? Colors.transparent : context.accentDim)
         : (bgInactive ?? Colors.transparent);
     return Material(
       color: bg,
@@ -269,6 +389,64 @@ class _NavChip extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Pílula laranja com glow pulsante — usada como indicador da aba ativa.
+/// Pulsa de forma sutil (2.6 s, ease-in-out) e respeita reduce-motion.
+class _PulsingPill extends StatefulWidget {
+  const _PulsingPill();
+
+  @override
+  State<_PulsingPill> createState() => _PulsingPillState();
+}
+
+class _PulsingPillState extends State<_PulsingPill>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c;
+  late final Animation<double> _glow;
+
+  @override
+  void initState() {
+    super.initState();
+    _c = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2600),
+    );
+    _glow = CurvedAnimation(parent: _c, curve: Curves.easeInOut);
+    final reduceMotion =
+        WidgetsBinding.instance.platformDispatcher.accessibilityFeatures.disableAnimations;
+    if (!reduceMotion) _c.repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _glow,
+      builder: (ctx, _) {
+        final g = _glow.value;
+        return Container(
+          decoration: BoxDecoration(
+            color: ctx.accentDim,
+            borderRadius: BorderRadius.circular(99),
+            border: Border.all(color: ctx.accent.withValues(alpha: 0.35)),
+            boxShadow: [
+              BoxShadow(
+                color: ctx.accent.withValues(alpha: 0.10 + 0.18 * g),
+                blurRadius: 12 + 6 * g,
+                spreadRadius: g * 0.6,
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

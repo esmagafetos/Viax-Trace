@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../api/api_client.dart';
 import '../state/auth_provider.dart';
@@ -17,6 +18,10 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
+  // Mesma chave usada pelo web (artifacts/viax-scout) para manter
+  // o comportamento idêntico: o banner aparece só na primeira vez.
+  static const _kHeroDismissedKey = 'viax-hero-banner-dismissed';
+
   Map<String, dynamic>? _summary;
   List<dynamic>? _recent;
   Map<String, dynamic>? _financial;
@@ -28,7 +33,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   void initState() {
     super.initState();
+    _restoreHeroDismiss();
     _load();
+  }
+
+  Future<void> _restoreHeroDismiss() async {
+    final prefs = await SharedPreferences.getInstance();
+    final dismissed = prefs.getBool(_kHeroDismissedKey) ?? false;
+    if (mounted && dismissed && !_heroDismissed) {
+      setState(() => _heroDismissed = true);
+    }
+  }
+
+  Future<void> _markHeroDismissed() async {
+    if (_heroDismissed) return;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_kHeroDismissedKey, true);
+    if (mounted) setState(() => _heroDismissed = true);
   }
 
   Future<void> _load() async {
@@ -40,6 +61,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     });
     api.dashboardRecent().then((v) {
       if (mounted) setState(() { _recent = v; _loadingRecent = false; });
+      // Esconde permanentemente assim que existir qualquer análise.
+      if (v is List && v.isNotEmpty) _markHeroDismissed();
     }).catchError((_) {
       if (mounted) setState(() => _loadingRecent = false);
     });
@@ -65,7 +88,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           if (!_heroDismissed)
             _HeroBanner(
               userName: firstName,
-              onDismiss: () => setState(() => _heroDismissed = true),
+              onDismiss: _markHeroDismissed,
               onPrimary: () => context.go('/process'),
             ),
           if (!_heroDismissed) const SizedBox(height: 18),
