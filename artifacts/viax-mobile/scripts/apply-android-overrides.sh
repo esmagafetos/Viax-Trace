@@ -108,4 +108,68 @@ if [[ -f "$APP_MANIFEST" ]]; then
   echo "[apply-android-overrides] android:label = ViaX:Trace"
 fi
 
+# 4. Habilita core library desugaring no app/build.gradle[.kts]
+#    O `flutter_local_notifications` (e algumas outras libs Android modernas)
+#    usam APIs java.time/java.util.* que não existem em minSdk < 26 e exigem
+#    desugaring habilitado no Gradle. Sem isso, `checkReleaseAarMetadata`
+#    falha com "Dependency ':flutter_local_notifications' requires core
+#    library desugaring to be enabled for :app."
+APP_GRADLE_KTS="$ANDROID_DIR/app/build.gradle.kts"
+APP_GRADLE_GROOVY="$ANDROID_DIR/app/build.gradle"
+if [[ -f "$APP_GRADLE_KTS" ]]; then
+  APP_GRADLE="$APP_GRADLE_KTS"
+elif [[ -f "$APP_GRADLE_GROOVY" ]]; then
+  APP_GRADLE="$APP_GRADLE_GROOVY"
+else
+  APP_GRADLE=""
+fi
+
+if [[ -n "$APP_GRADLE" ]]; then
+python3 - "$APP_GRADLE" <<'PY'
+import re, sys
+p = sys.argv[1]
+src = open(p, encoding='utf-8').read()
+orig = src
+is_kts = p.endswith('.kts')
+DESUGAR_VERSION = "2.1.4"
+
+if is_kts:
+    if 'isCoreLibraryDesugaringEnabled' not in src:
+        src = re.sub(
+            r'(compileOptions\s*\{)',
+            r'\1\n        isCoreLibraryDesugaringEnabled = true',
+            src, count=1)
+        print("[apply-android-overrides] isCoreLibraryDesugaringEnabled = true (kts)")
+    if 'coreLibraryDesugaring' not in src:
+        dep_line = f'    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:{DESUGAR_VERSION}")'
+        if re.search(r'(?m)^dependencies\s*\{', src):
+            src = re.sub(r'(dependencies\s*\{)', r'\1\n' + dep_line, src, count=1)
+        else:
+            src += f'\ndependencies {{\n{dep_line}\n}}\n'
+        print("[apply-android-overrides] coreLibraryDesugaring dep adicionada (kts)")
+else:
+    if 'coreLibraryDesugaringEnabled' not in src:
+        src = re.sub(
+            r'(compileOptions\s*\{)',
+            r'\1\n        coreLibraryDesugaringEnabled true',
+            src, count=1)
+        print("[apply-android-overrides] coreLibraryDesugaringEnabled true (groovy)")
+    if 'coreLibraryDesugaring ' not in src:
+        dep_line = f"    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:{DESUGAR_VERSION}'"
+        if re.search(r'(?m)^dependencies\s*\{', src):
+            src = re.sub(r'(dependencies\s*\{)', r'\1\n' + dep_line, src, count=1)
+        else:
+            src += f"\ndependencies {{\n{dep_line}\n}}\n"
+        print("[apply-android-overrides] coreLibraryDesugaring dep adicionada (groovy)")
+
+if src != orig:
+    open(p, 'w', encoding='utf-8').write(src)
+    print(f"[apply-android-overrides] {p} patcheado.")
+else:
+    print(f"[apply-android-overrides] {p} já estava patcheado.")
+PY
+else
+  echo "[apply-android-overrides] WARN: app/build.gradle[.kts] não encontrado."
+fi
+
 echo "[apply-android-overrides] OK."
