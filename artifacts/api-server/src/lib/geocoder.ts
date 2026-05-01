@@ -238,6 +238,7 @@ export interface GeoResult {
   confianca?: "rua" | "localidade" | "estimado";
   localidade?: string;
   uf?: string;
+  cidade?: string;
 }
 
 export interface ParsedAddress {
@@ -793,10 +794,15 @@ async function aguardarRateLimit(ultimaReq: number): Promise<number> {
 
 function extrairDadosNominatim(data: any): GeoResult | null {
   const addr = data?.address ?? {};
-  // Extrai UF do campo "state" do Nominatim (ex: "Rio de Janeiro" → "RJ")
+  // UF do Nominatim (ex: "Rio de Janeiro" → "RJ")
   const ufNominatim = estadoParaUF(addr.state ?? addr.state_code ?? null)
     ?? (/^[A-Z]{2}$/.test(String(addr.state_code ?? "").trim().toUpperCase())
         ? String(addr.state_code).trim().toUpperCase() : null);
+  // Cidade do Nominatim (para validação de município no forward)
+  const cidadeNominatim: string | undefined =
+    (addr.city ?? addr.town ?? addr.municipality ?? addr.village ?? undefined)
+      ? String(addr.city ?? addr.town ?? addr.municipality ?? addr.village).trim()
+      : undefined;
   const campos = ["road", "pedestrian", "footway", "cycleway", "path", "street", "residential"];
   for (const c of campos) {
     if (addr[c]) {
@@ -807,6 +813,7 @@ function extrairDadosNominatim(data: any): GeoResult | null {
         fonte: "reverse",
         confianca: "rua",
         ...(ufNominatim ? { uf: ufNominatim } : {}),
+        ...(cidadeNominatim ? { cidade: cidadeNominatim } : {}),
       };
     }
   }
@@ -820,6 +827,7 @@ function extrairDadosNominatim(data: any): GeoResult | null {
       confianca: "localidade",
       localidade: String(localidade).trim(),
       ...(ufNominatim ? { uf: ufNominatim } : {}),
+      ...(cidadeNominatim ? { cidade: cidadeNominatim } : {}),
     };
   }
   return null;
@@ -1195,6 +1203,11 @@ export async function geocodeForwardPhoton(query: string): Promise<GeoResult | n
 
   const priorityTypes = ["residential", "primary", "secondary", "tertiary", "living_street", "service", "unclassified"];
 
+  const extrairCidadePhoton = (props: any): string | undefined => {
+    const c = props.city ?? props.locality ?? props.county ?? null;
+    return c ? String(c).trim() : undefined;
+  };
+
   // First pass: prefer highway features with recognized types
   for (const f of data.features) {
     const props = f.properties ?? {};
@@ -1203,12 +1216,16 @@ export async function geocodeForwardPhoton(query: string): Promise<GeoResult | n
     const osmKey = String(props.osm_key ?? "").toLowerCase();
     if (!rua || String(rua).trim().length < 4) continue;
     if (osmKey === "highway" && priorityTypes.includes(osmValue)) {
+      const cidadePhoton = extrairCidadePhoton(props);
+      const ufPhoton = estadoParaUF(props.state ?? null);
       return {
         rua: String(rua).trim(),
         lat: f.geometry?.coordinates?.[1],
         lon: f.geometry?.coordinates?.[0],
         fonte: "photon",
         confianca: "rua",
+        ...(cidadePhoton ? { cidade: cidadePhoton } : {}),
+        ...(ufPhoton ? { uf: ufPhoton } : {}),
       };
     }
   }
@@ -1218,12 +1235,16 @@ export async function geocodeForwardPhoton(query: string): Promise<GeoResult | n
     const props = f.properties ?? {};
     const rua = props.street ?? (props.osm_key === "highway" ? props.name : null);
     if (rua && String(rua).trim().length > 3) {
+      const cidadePhoton = extrairCidadePhoton(props);
+      const ufPhoton = estadoParaUF(props.state ?? null);
       return {
         rua: String(rua).trim(),
         lat: f.geometry?.coordinates?.[1],
         lon: f.geometry?.coordinates?.[0],
         fonte: "photon",
         confianca: "rua",
+        ...(cidadePhoton ? { cidade: cidadePhoton } : {}),
+        ...(ufPhoton ? { uf: ufPhoton } : {}),
       };
     }
   }
@@ -1390,6 +1411,58 @@ function montarQueryBusca(parsed: ParsedAddress): string {
 function forwardConfirmaRua(parsed: ParsedAddress, result: GeoResult | null): boolean {
   if (!isRuaConfiavel(result) || !parsed.rua_principal || !result) return false;
   return calcularSimilaridade(parsed.rua_principal, result.rua) >= 0.6;
+}
+
+/**
+ * Valida se o município retornado pelo geocoder forward bate com o município
+ * esperado da planilha. Rejeita resultados claramente de outra cidade.
+ *
+ * Retorna `true` (aceitar) quando:
+ *  - Não há cidade esperada ou retornada suficiente para comparar
+ *  - As cidades batem (exato ou substring)
+ *  - Mesma UF e a cidade retornada não está na tabela de municípios conhecidos
+ *    (pode ser subdistrito, localidade, etc.)
+ *
+ * Retorna `false` (rejeitar) quando:
+ *  - UFs diferentes (claramente estado errado)
+ *  - Ambas as cidades são municípios conhecidos e são diferentes
+ */
+function validarCidadeForward(
+  cidadeEsperada: string | null | undefined,
+  ufEsperada: string | null | undefined,
+  result: GeoResult | null | undefined
+): boolean {
+  if (!cidadeEsperada || !result?.cidade) return true;
+  const exp = normStr(cidadeEsperada);
+  const ret = normStr(result.cidade);
+  if (!exp || !ret) return true;
+
+  // Match exato ou um contém o outro (ex: "Cabo Frio" ⊂ "Cabo Frio, RJ")
+  if (exp === ret || exp.includes(ret) || ret.includes(exp)) return true;
+
+  // UF diferente → claramente errado
+  const ufRet = result.uf ?? MUNICIPIO_PARA_UF[ret] ?? null;
+  if (ufEsperada && ufRet && ufEsperada !== ufRet) {
+    logger.debug(
+      { cidadeEsperada, cidadeRetornada: result.cidade, ufEsperada, ufRet },
+      "validarCidadeForward: UF diverge → resultado forward rejeitado"
+    );
+    return false;
+  }
+
+  // Ambos são municípios conhecidos na mesma UF mas diferentes → rejeitar
+  const ufExp = ufEsperada ?? MUNICIPIO_PARA_UF[exp] ?? null;
+  const ambosConhecidos = MUNICIPIO_PARA_UF[exp] && MUNICIPIO_PARA_UF[ret];
+  if (ambosConhecidos && ufExp && ufRet && ufExp === ufRet && exp !== ret) {
+    logger.debug(
+      { cidadeEsperada, cidadeRetornada: result.cidade },
+      "validarCidadeForward: municípios distintos na mesma UF → resultado forward rejeitado"
+    );
+    return false;
+  }
+
+  // Não conseguimos determinar com segurança → aceitar (evita falsos negativos)
+  return true;
 }
 
 export function verificarNuance(
@@ -1845,10 +1918,12 @@ export async function processarEndereco(
     if (parsed.rua_principal && !isRuaConfiavel(reverseGeoResult)) {
       const query = montarQueryBusca(parsed);
       const cacheKey = `fwd_${query}`;
+      const cidadeRef = item.cidade || parsed.cidade || null;
       const cached = cache.get(cacheKey);
       if (cached && Date.now() - cached.ts < 2 * 3600 * 1000) {
         forwardGeoResult = cached.data;
-        if (forwardConfirmaRua(parsed, forwardGeoResult)) {
+        if (forwardConfirmaRua(parsed, forwardGeoResult)
+            && validarCidadeForward(cidadeRef, ufHint, forwardGeoResult)) {
           geoResult = forwardGeoResult;
           if (forwardGeoResult?.lat) geocodeLat = forwardGeoResult.lat;
           if (forwardGeoResult?.lon) geocodeLon = forwardGeoResult.lon;
@@ -1860,6 +1935,8 @@ export async function processarEndereco(
         //    Nominatim. Requer UF (derivada do CEP/cidade acima). Em modo
         //    "geocodebr" sempre tenta primeiro; em modo "builtin" também — só
         //    pulamos se UF não estiver disponível.
+        //    geocodebr já é constrangido pela cidade passada como argumento —
+        //    validarCidadeForward não é necessário (inerentemente correto).
         const cidadeGeo = item.cidade || parsed.cidade;
         if (parsed.rua_principal && cidadeGeo && ufHint) {
           const geocobrResult = await geocodeGeocobeBR(parsed.rua_principal, cidadeGeo, ufHint, parsed.numero, geocodebrUrl);
@@ -1870,17 +1947,23 @@ export async function processarEndereco(
           }
         }
 
-        // 2. Nominatim forward — fallback quando geocodebr falhou ou foi pulado
-        //    (sem UF). Mantém compatibilidade com endereços fora do Brasil e com
-        //    casos onde o CNEFE não tem o logradouro indexado.
+        // 2. Nominatim forward (Photon → Nominatim internamente) — fallback quando
+        //    geocodebr falhou ou foi pulado (sem UF). Aplicamos validarCidadeForward
+        //    aqui porque Photon/Nominatim podem retornar rua homônima em outra cidade.
         if (!isRuaConfiavel(geoResult)) {
           const fwd = await geocodeForwardNominatim(query, newUltimaReq);
           newUltimaReq = fwd.ultimaReq;
           if (fwd.result && forwardConfirmaRua(parsed, fwd.result)) {
-            forwardGeoResult = fwd.result;
-            geoResult = fwd.result;
-            if (fwd.result.lat) geocodeLat = fwd.result.lat;
-            if (fwd.result.lon) geocodeLon = fwd.result.lon;
+            if (validarCidadeForward(cidadeRef, ufHint, fwd.result)) {
+              forwardGeoResult = fwd.result;
+              geoResult = fwd.result;
+              if (fwd.result.lat) geocodeLat = fwd.result.lat;
+              if (fwd.result.lon) geocodeLon = fwd.result.lon;
+            } else {
+              // Rua correta mas município errado: guardamos como candidato fraco
+              // (usado em motivo de nuance) mas não como resultado principal
+              if (!forwardGeoResult) forwardGeoResult = fwd.result;
+            }
           } else if (!forwardGeoResult) {
             forwardGeoResult = fwd.result;
           }
