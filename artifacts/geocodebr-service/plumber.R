@@ -149,6 +149,58 @@ function(logradouro = "", numero = "", municipio = "",
   })
 }
 
+#* Geolocalização reversa — retorna o endereço CNEFE/IBGE mais próximo das coordenadas
+#* @param lat      Latitude decimal (ex: -22.9068)
+#* @param lon      Longitude decimal (ex: -43.1729)
+#* @param dist_max Raio máximo de busca em metros; configurável pelo usuário (padrão: 500)
+#* @get /reverse
+#* @serializer json list(auto_unbox=TRUE, na="null")
+function(lat = "", lon = "", dist_max = "500") {
+  tryCatch({
+    lat_n  <- suppressWarnings(as.numeric(lat))
+    lon_n  <- suppressWarnings(as.numeric(lon))
+    dist_n <- suppressWarnings(as.numeric(dist_max))
+
+    if (is.na(lat_n) || is.na(lon_n)) {
+      return(list(erro = "lat e lon sao obrigatorios e devem ser numericos"))
+    }
+    if (is.na(dist_n) || dist_n <= 0) dist_n <- 500
+
+    ponto <- sf::st_as_sf(
+      data.frame(id = 1L, lon = lon_n, lat = lat_n),
+      coords = c("lon", "lat"),
+      crs    = 4326
+    )
+
+    resultado <- geocodebr::geocode_reverso(
+      pontos   = ponto,
+      dist_max = dist_n,
+      verboso  = FALSE,
+      n_cores  = 1
+    )
+
+    if (!is.null(resultado) && nrow(resultado) > 0) {
+      coords <- sf::st_coordinates(resultado$geometry[1])
+      list(
+        encontrado       = TRUE,
+        logradouro       = as.character(resultado$logradouro[1]),
+        numero           = if (!is.na(resultado$numero[1]))    as.character(resultado$numero[1])    else NULL,
+        municipio        = as.character(resultado$municipio[1]),
+        estado           = as.character(resultado$estado[1]),
+        cep              = if (!is.na(resultado$cep[1]))        as.character(resultado$cep[1])       else NULL,
+        localidade       = if (!is.na(resultado$localidade[1])) as.character(resultado$localidade[1]) else NULL,
+        distancia_metros = as.numeric(resultado$distancia_metros[1]),
+        lat_cnefe        = as.numeric(coords[1, "Y"]),
+        lon_cnefe        = as.numeric(coords[1, "X"])
+      )
+    } else {
+      list(encontrado = FALSE, logradouro = NULL, distancia_metros = NULL)
+    }
+  }, error = function(e) {
+    list(encontrado = FALSE, erro = .unwrap_error(e))
+  })
+}
+
 #* Retorna a versão do plumber.R em uso
 #* @get /version
 #* @serializer json list(auto_unbox=TRUE)
