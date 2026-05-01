@@ -52,6 +52,142 @@ const OVERPASS_ENDPOINTS = [
   "https://overpass.kumi.systems/api/interpreter",
   "https://overpass.openstreetmap.ru/api/interpreter",
 ];
+// ── UF: estado nome completo → sigla ─────────────────────────────────────────
+const ESTADO_PARA_UF: Record<string, string> = {
+  "acre":"AC","alagoas":"AL","amapa":"AP","amazonas":"AM","bahia":"BA",
+  "ceara":"CE","distrito federal":"DF","espirito santo":"ES","goias":"GO",
+  "maranhao":"MA","mato grosso":"MT","mato grosso do sul":"MS",
+  "minas gerais":"MG","para":"PA","paraiba":"PB","parana":"PR",
+  "pernambuco":"PE","piaui":"PI","rio de janeiro":"RJ",
+  "rio grande do norte":"RN","rio grande do sul":"RS","rondonia":"RO",
+  "roraima":"RR","santa catarina":"SC","sao paulo":"SP","sergipe":"SE",
+  "tocantins":"TO",
+};
+
+function normStr(s: string): string {
+  return s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z\s]/g,"").trim();
+}
+function estadoParaUF(estado: string | null | undefined): string | null {
+  if (!estado) return null;
+  const n = normStr(estado);
+  return ESTADO_PARA_UF[n] ?? null;
+}
+
+// ── Tabela município → UF ─────────────────────────────────────────────────────
+// Cobre capitais + municípios do RJ + principais cidades de cada estado.
+// Chave: nome normalizado (sem acento, minúsculo). Valor: sigla UF.
+const MUNICIPIO_PARA_UF: Record<string, string> = {
+  // ── Rio de Janeiro (prioritário para este sistema) ────────────────────────
+  "rio de janeiro":"RJ","niteroi":"RJ","sao goncalo":"RJ","duque de caxias":"RJ",
+  "nova iguacu":"RJ","belford roxo":"RJ","sao joao de meriti":"RJ","campos dos goytacazes":"RJ",
+  "petropolis":"RJ","volta redonda":"RJ","mage":"RJ","itaborai":"RJ",
+  "angra dos reis":"RJ","mesquita":"RJ","nilopolis":"RJ","marica":"RJ",
+  "itaguai":"RJ","seropedica":"RJ","queimados":"RJ","japeri":"RJ",
+  "paracambi":"RJ","mangaratiba":"RJ","paraty":"RJ","parati":"RJ",
+  "arraial do cabo":"RJ","iguaba grande":"RJ","armacao dos buzios":"RJ","buzios":"RJ",
+  "casimiro de abreu":"RJ","rio das ostras":"RJ","macae":"RJ","carapebus":"RJ",
+  "quissama":"RJ","sao francisco de itabapoana":"RJ","itaperuna":"RJ",
+  "miracema":"RJ","santo antonio de padua":"RJ","cambuci":"RJ",
+  "sao pedro da aldeia":"RJ","araruama":"RJ","saquarema":"RJ","silva jardim":"RJ",
+  "nova friburgo":"RJ","teresopolis":"RJ","cachoeiras de macacu":"RJ",
+  "guapimirim":"RJ","tangua":"RJ","resende":"RJ","barra mansa":"RJ",
+  "pinheiro":"RJ","tres rios":"RJ","valenca":"RJ","vassouras":"RJ",
+  "barra do pirai":"RJ","pirai":"RJ","pinheiral":"RJ","porto real":"RJ",
+  "itatiaia":"RJ","quatis":"RJ","cardoso moreira":"RJ","conceicao de macabu":"RJ",
+  "sao fidelis":"RJ","porciucula":"RJ","natividade":"RJ","bom jesus do itabapoana":"RJ",
+  "cordeiro":"RJ","cantagalo":"RJ","duas barras":"RJ","bom jardim":"RJ",
+  "santa maria madalena":"RJ","rio claro":"RJ","comendador levy gasparian":"RJ",
+  "paty do alferes":"RJ","mendes":"RJ","engenheiro paulo de frontin":"RJ",
+  "sapucaia":"RJ","areal":"RJ","sao jose do vale do rio preto":"RJ",
+  "sumidouro":"RJ","trajano de moraes":"RJ","macuco":"RJ","carmo":"RJ",
+  "aperibe":"RJ","italva":"RJ","varre-sai":"RJ","sao jose de uba":"RJ",
+  "laje do muriae":"RJ","quissamã":"RJ","miguel pereira":"RJ","paraiba do sul":"RJ",
+  "cabo frio":"RJ","tamoios":"RJ","unamar":"RJ",
+  // ── Capitais de estado ────────────────────────────────────────────────────
+  "sao paulo":"SP","belo horizonte":"MG","salvador":"BA","fortaleza":"CE",
+  "curitiba":"PR","manaus":"AM","recife":"PE","porto alegre":"RS",
+  "belem":"PA","goiania":"GO","florianopolis":"SC","maceio":"AL",
+  "natal":"RN","teresina":"PI","campo grande":"MS","joao pessoa":"PB",
+  "aracaju":"SE","cuiaba":"MT","macapa":"AP","porto velho":"RO",
+  "boa vista":"RR","palmas":"TO","vitoria":"ES","rio branco":"AC",
+  "sao luis":"MA",
+  // ── Grandes cidades SP ────────────────────────────────────────────────────
+  "guarulhos":"SP","campinas":"SP","sao bernardo do campo":"SP","santo andre":"SP",
+  "osasco":"SP","sao jose dos campos":"SP","sorocaba":"SP","ribeirao preto":"SP",
+  "mogi das cruzes":"SP","santos":"SP","maua":"SP","diadema":"SP","jundiai":"SP",
+  "carapicuiba":"SP","piracicaba":"SP","bauru":"SP","sao jose do rio preto":"SP",
+  "limeira":"SP","franca":"SP","taubate":"SP","praia grande":"SP","suzano":"SP",
+  "itaquaquecetuba":"SP","marilia":"SP","americana":"SP","sao vicente":"SP",
+  // ── Grandes cidades MG ────────────────────────────────────────────────────
+  "uberlandia":"MG","contagem":"MG","juiz de fora":"MG","betim":"MG",
+  "montes claros":"MG","ribeiro das neves":"MG","uberaba":"MG","governador valadares":"MG",
+  "ipatinga":"MG","sete lagoas":"MG","divinopolis":"MG","santa luzia":"MG",
+  // ── Grandes cidades BA ────────────────────────────────────────────────────
+  "feira de santana":"BA","vitoria da conquista":"BA","camaçari":"BA","camacari":"BA",
+  "itabuna":"BA","ilheus":"BA","lauro de freitas":"BA","simoes filho":"BA",
+  // ── Grandes cidades PR ────────────────────────────────────────────────────
+  "londrina":"PR","maringa":"PR","ponta grossa":"PR","cascavel":"PR",
+  "sao jose dos pinhais":"PR","foz do iguacu":"PR","colombo":"PR","guarapuava":"PR",
+  // ── Grandes cidades RS ────────────────────────────────────────────────────
+  "canoas":"RS","pelotas":"RS","caxias do sul":"RS","santa maria":"RS",
+  "gravataí":"RS","novo hamburgo":"RS","sao leopoldo":"RS","viamao":"RS",
+  // ── Grandes cidades PE ────────────────────────────────────────────────────
+  "jaboatao dos guararapes":"PE","olinda":"PE","caruaru":"PE","paulista":"PE",
+  "petrolina":"PE","camaragibe":"PE","cabo de santo agostinho":"PE",
+  // ── Grandes cidades CE ────────────────────────────────────────────────────
+  "caucaia":"CE","juazeiro do norte":"CE","maracanau":"CE","sobral":"CE",
+  "crato":"CE","itapipoca":"CE","iguatu":"CE",
+  // ── Grandes cidades AM / PA ───────────────────────────────────────────────
+  "santarem":"PA","ananindeua":"PA","maraba":"PA","castanhal":"PA","parauapebas":"PA",
+  "itacoatiara":"AM","parintins":"AM",
+  // ── Grandes cidades GO / DF ───────────────────────────────────────────────
+  "aparecida de goiania":"GO","anapolis":"GO","rio verde":"GO",
+  "aguas claras":"DF","taguatinga":"DF","ceilandia":"DF","planaltina":"DF",
+  // ── Grandes cidades ES ────────────────────────────────────────────────────
+  "vila velha":"ES","cariacica":"ES","serra":"ES","cachoeiro de itapemirim":"ES",
+  "linhares":"ES","sao mateus":"ES",
+  // ── Grandes cidades SC ────────────────────────────────────────────────────
+  "joinville":"SC","blumenau":"SC","sao jose":"SC","chapeco":"SC",
+  "itajai":"SC","criciuma":"SC","palhoça":"SC","palhoca":"SC",
+};
+
+/** Resolve UF a partir de qualquer combinação de fontes disponíveis.
+ *  Prioridade: (1) sigla explícita no texto → (2) resultado reverso geocoder
+ *  → (3) lookup por nome de cidade → (4) lookup por nome de bairro */
+export function resolverUF(
+  cidade: string | null | undefined,
+  bairro: string | null | undefined,
+  reverseResult: GeoResult | null | undefined
+): string | null {
+  // 1. Sigla já explícita no campo cidade ("Cabo Frio, RJ")
+  const fromCidade = extractUFFromCidade(cidade);
+  if (fromCidade) return fromCidade;
+
+  // 2. UF que o geocoder reverso retornou com o GPS
+  if (reverseResult?.uf) return reverseResult.uf;
+
+  // 3. Lookup pelo nome normalizado da cidade
+  if (cidade) {
+    const key = normStr(cidade);
+    if (MUNICIPIO_PARA_UF[key]) return MUNICIPIO_PARA_UF[key];
+    // Tenta sub-string: "Cabo Frio (RJ)" → "cabo frio"
+    for (const [mun, uf] of Object.entries(MUNICIPIO_PARA_UF)) {
+      if (key.includes(mun) || mun.includes(key)) return uf;
+    }
+  }
+
+  // 4. Lookup pelo bairro (cobre casos como "Unamar (Tamoios)" → RJ)
+  if (bairro) {
+    const key = normStr(bairro);
+    if (MUNICIPIO_PARA_UF[key]) return MUNICIPIO_PARA_UF[key];
+    for (const [mun, uf] of Object.entries(MUNICIPIO_PARA_UF)) {
+      if (key.includes(mun)) return uf;
+    }
+  }
+
+  return null;
+}
+
 const SIMILARITY_THRESHOLD_DEFAULT = 0.68;
 const SIMILARITY_THRESHOLD_AVENIDA = 0.92;
 // Piso mínimo de similaridade para liberar a regra "GPS dentro da tolerância
@@ -657,6 +793,10 @@ async function aguardarRateLimit(ultimaReq: number): Promise<number> {
 
 function extrairDadosNominatim(data: any): GeoResult | null {
   const addr = data?.address ?? {};
+  // Extrai UF do campo "state" do Nominatim (ex: "Rio de Janeiro" → "RJ")
+  const ufNominatim = estadoParaUF(addr.state ?? addr.state_code ?? null)
+    ?? (/^[A-Z]{2}$/.test(String(addr.state_code ?? "").trim().toUpperCase())
+        ? String(addr.state_code).trim().toUpperCase() : null);
   const campos = ["road", "pedestrian", "footway", "cycleway", "path", "street", "residential"];
   for (const c of campos) {
     if (addr[c]) {
@@ -666,6 +806,7 @@ function extrairDadosNominatim(data: any): GeoResult | null {
         lon: data.lon ? parseFloat(data.lon) : undefined,
         fonte: "reverse",
         confianca: "rua",
+        ...(ufNominatim ? { uf: ufNominatim } : {}),
       };
     }
   }
@@ -678,6 +819,7 @@ function extrairDadosNominatim(data: any): GeoResult | null {
       fonte: "reverse",
       confianca: "localidade",
       localidade: String(localidade).trim(),
+      ...(ufNominatim ? { uf: ufNominatim } : {}),
     };
   }
   return null;
@@ -959,6 +1101,10 @@ export async function geocodeReversePhoton(lat: number, lon: number): Promise<Ge
     const rua = (osmKey === "highway" || featureType === "street")
       ? (props.street ?? props.name)
       : props.street;
+    // Photon retorna "state" com nome completo do estado — convertemos para sigla
+    const ufPhoton = estadoParaUF(props.state ?? null)
+      ?? (/^[A-Z]{2}$/.test(String(props.state ?? "").trim().toUpperCase())
+          ? String(props.state).trim().toUpperCase() : null);
     if (rua && String(rua).trim().length > 3) {
       return {
         rua: String(rua).trim(),
@@ -966,6 +1112,7 @@ export async function geocodeReversePhoton(lat: number, lon: number): Promise<Ge
         lon: f.geometry?.coordinates?.[0],
         fonte: "photon",
         confianca: "rua",
+        ...(ufPhoton ? { uf: ufPhoton } : {}),
       };
     }
   }
@@ -1659,7 +1806,11 @@ export async function processarEndereco(
 
     // CEP detectado: usar geocodificação brasileira (BrasilAPI v2 → AwesomeAPI)
     // como fonte primária para endereços brasileiros — substitui Photon/Nominatim para ruas
-    let ufHint: string | null = extractUFFromCidade(item.cidade) || extractUFFromCidade(parsed.cidade);
+    // resolverUF: (1) sigla explícita no texto → (2) UF do geocoder reverso (Photon/Nominatim
+    // agora propagam o campo "state") → (3) lookup tabela municípios → (4) lookup pelo bairro.
+    // Garante que geocodebr seja sempre ativado mesmo quando planilha não tem "RJ" explícito.
+    let ufHint: string | null = resolverUF(item.cidade, item.bairro, reverseGeoResult)
+      || resolverUF(parsed.cidade, parsed.bairro, null);
     if (cep) {
       const cepGeo = await geocodeCEPBrasileiro(cep);
       if (cepGeo) {
